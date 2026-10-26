@@ -1,8 +1,10 @@
 [versions]
 # Library and plugin versions
+androidGradlePlugin = "9.3.2"
 
 [libraries]
 
 [bundles]
 
 [plugins]
+android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }
