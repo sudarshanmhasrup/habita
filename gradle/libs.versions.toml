@@ -1,6 +1,6 @@
 [versions]
 # Library and plugin versions
-androidGradlePlugin = "9.3.2"
+androidGradlePlugin = "9.4.1"
 
 [libraries]
 
