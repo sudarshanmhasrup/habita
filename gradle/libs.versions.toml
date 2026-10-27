@@ -8,7 +8,7 @@ android-version = "1.0.0"
 
 # android module's packaging information
 android-compileSdk = "37"
-android-minSdk = "21"
+android-minSdk = "24"
 android-targetSdk = "37"
 
 [libraries]
