@@ -4,6 +4,9 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
+group = libs.versions.android.group.get()
+version = libs.versions.android.version.get()
+
 kotlin {
     target {
         compilerOptions {
