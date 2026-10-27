@@ -8,9 +8,7 @@ group = libs.versions.android.group.get()
 version = libs.versions.android.version.get()
 
 kotlin {
-    target {
-        compilerOptions {
-            jvmTarget = JvmTarget.JVM_11
-        }
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_11
     }
 }
