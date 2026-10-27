@@ -12,3 +12,14 @@ kotlin {
         jvmTarget = JvmTarget.JVM_11
     }
 }
+
+android {
+    namespace = libs.versions.android.group.get()
+    compileSdk = libs.versions.android.compileSdk.get().toInt()
+
+    defaultConfig {
+        applicationId = libs.versions.android.group.get()
+        minSdk = libs.versions.android.minSdk.get().toInt()
+        targetSdk = libs.versions.android.targetSdk.get().toInt()
+    }
+}
