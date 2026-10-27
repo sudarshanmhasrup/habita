@@ -2,6 +2,10 @@
 # Library and plugin versions
 androidGradlePlugin = "9.4.1"
 
+# android module's configuration information
+android-group = "dev.habita.app"
+android-version = "1.0.0"
+
 [libraries]
 
 [bundles]
