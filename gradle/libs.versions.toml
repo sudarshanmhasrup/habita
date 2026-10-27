@@ -1,5 +1,6 @@
 [versions]
 # Library and plugin versions
+kotlin = "2.4.21"
 androidGradlePlugin = "9.4.1"
 activity = "1.13.0"
 
@@ -19,3 +20,4 @@ activity = { module = "androidx.activity:activity-compose", version.ref = "activ
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
