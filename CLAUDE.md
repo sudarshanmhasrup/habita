@@ -14,7 +14,10 @@ anything.
 - Merge with "Rebase and Merge" only, so `main` stays linear. Delete the branch afterwards.
 - Keep each branch focused on one change.
 - See "Branching Strategy" in [CODING-GUIDELINES.md](CODING-GUIDELINES.md) for the full workflow.
+
 ### Markdown files
 
-- Name every markdown file in uppercase, with words separated by hyphens (for example `CODING-GUIDELINES.md`).
+- Name every markdown file in uppercase, with words separated by hyphens (for example
+  `CODING-GUIDELINES.md`).
+- Wrap markdown at 100 columns, the same width as code.
 - See "Markdown files" in [CODING-GUIDELINES.md](CODING-GUIDELINES.md).
