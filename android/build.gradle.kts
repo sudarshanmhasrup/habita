@@ -16,6 +16,8 @@ android {
         applicationId = libs.versions.android.group.get()
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
+        versionCode = libs.versions.android.versionCode.get().toInt()
+        versionName = libs.versions.android.version.get()
     }
 
     compileOptions {
@@ -36,6 +38,7 @@ android {
 }
 
 kotlin {
+    jvmToolchain(17)
     compilerOptions {
         jvmTarget = JvmTarget.JVM_17
     }
