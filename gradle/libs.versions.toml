@@ -15,6 +15,10 @@ android-compileSdk = "37"
 android-minSdk = "24"
 android-targetSdk = "37"
 
+# compose module's configuration information
+compose-group = "dev.habita.app.compose"
+compose-version = "1.0.0"
+
 [libraries]
 activity = { module = "androidx.activity:activity-compose", version.ref = "activity" }
 splash-screen = { module = "androidx.core:core-splashscreen", version.ref = "splashScreen" }
