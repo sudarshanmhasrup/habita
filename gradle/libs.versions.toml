@@ -8,6 +8,7 @@ splashScreen = "1.2.0"
 # android module's configuration information
 android-group = "dev.habita.app"
 android-version = "1.0.0"
+android-versionCode = "1"
 
 # android module's packaging information
 android-compileSdk = "37"
