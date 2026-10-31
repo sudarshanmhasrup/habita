@@ -4,6 +4,9 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
 }
 
+group = libs.versions.compose.group.get()
+version = libs.versions.compose.version.get()
+
 kotlin {
     jvm("desktop") {
         compilerOptions {
