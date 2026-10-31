@@ -54,3 +54,7 @@ work continues, cut a `release/x.y` branch from `main` at that point.
 
 Fork the repository, then follow the same steps in your fork: branch off `main` and open the pull
 request against `main`.
+
+## Markdown files
+
+Name every markdown file in uppercase, with words separated by hyphens: `README.md`, `CLAUDE.md`, `CODING-GUIDELINES.md`, `CONTRIBUTING.md`. Update any links when you rename one.
