@@ -57,4 +57,7 @@ request against `main`.
 
 ## Markdown files
 
-Name every markdown file in uppercase, with words separated by hyphens: `README.md`, `CLAUDE.md`, `CODING-GUIDELINES.md`, `CONTRIBUTING.md`. Update any links when you rename one.
+- Name every markdown file in uppercase, with words separated by hyphens: `README.md`, `CLAUDE.md`,
+  `CODING-GUIDELINES.md`, `CONTRIBUTING.md`. Update any links when you rename one.
+- Wrap markdown at 100 columns, the same width as code. Tables and long links are the only
+  exception, because they cannot be wrapped.
