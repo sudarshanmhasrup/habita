@@ -18,16 +18,17 @@ Name every working branch `type/branch-name`:
 - `branch-name` is short, lowercase and kebab-case, and describes the change, not the author or an
   issue number alone.
 
-| Type            | Use for                                                 |
-|-----------------|---------------------------------------------------------|
-| `feature`       | A new feature                                           |
-| `fix`           | A bug fix, including urgent fixes to a released version |
-| `refactor`      | A change that neither adds a feature nor fixes a bug    |
-| `build`         | Gradle, dependencies, project setup                     |
-| `ci`            | CI configuration                                        |
-| `documentation` | Documentation only                                      |
-| `test`          | Adding or fixing tests                                  |
-| `chore`         | Anything else that does not touch app behaviour         |
+| Type            | Use for                                                              |
+|-----------------|----------------------------------------------------------------------|
+| `feature`       | A new feature                                                        |
+| `fix`           | A bug fix, including urgent fixes to a released version              |
+| `refactor`      | A change that neither adds a feature nor fixes a bug                 |
+| `setup`         | Project and module setup: new modules, source sets, plugins, tooling |
+| `build`         | Changes to the build: Gradle, dependencies, versions                 |
+| `ci`            | CI configuration                                                     |
+| `documentation` | Documentation only                                                   |
+| `test`          | Adding or fixing tests                                               |
+| `chore`         | Anything else that does not touch app behaviour                      |
 
 Examples: `feature/habit-streaks`, `fix/splash-icon-size`, `build/version-catalog-cleanup`.
 
