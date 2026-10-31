@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Project rules live in [Coding-guidelines.md](Coding-guidelines.md). Read it before changing
+Project rules live in [CODING-GUIDELINES.md](CODING-GUIDELINES.md). Read it before changing
 anything.
 
 ## Branching Strategy
@@ -13,4 +13,8 @@ anything.
 - Write commit messages as `type: message`, in lowercase and the imperative.
 - Merge with "Rebase and Merge" only, so `main` stays linear. Delete the branch afterwards.
 - Keep each branch focused on one change.
-- See "Branching Strategy" in [Coding-guidelines.md](Coding-guidelines.md) for the full workflow.
+- See "Branching Strategy" in [CODING-GUIDELINES.md](CODING-GUIDELINES.md) for the full workflow.
+### Markdown files
+
+- Name every markdown file in uppercase, with words separated by hyphens (for example `CODING-GUIDELINES.md`).
+- See "Markdown files" in [CODING-GUIDELINES.md](CODING-GUIDELINES.md).
