@@ -62,3 +62,10 @@ request against `main`.
   `CODING-GUIDELINES.md`, `CONTRIBUTING.md`. Update any links when you rename one.
 - Wrap markdown at 100 columns, the same width as code. Tables and long links are the only
   exception, because they cannot be wrapped.
+
+## Files
+
+End every file in the codebase on its last line of content, with no trailing newline or blank
+lines after it. This applies to every file type: Kotlin, Gradle, XML, properties, TOML, markdown
+and the rest. Turn off "Ensure every saved file ends with a line break" in your IDE so it does not
+add one back.
