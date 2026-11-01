@@ -1,0 +1,18 @@
+CREATE TABLE exercise_step (
+    exercise_id TEXT NOT NULL PRIMARY KEY,
+    step INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    server_seq INTEGER NOT NULL
+);
+
+updatedAt:
+SELECT updated_at FROM exercise_step WHERE exercise_id = ?;
+
+save:
+INSERT OR REPLACE INTO exercise_step VALUES (?, ?, ?, ?);
+
+selectAll:
+SELECT * FROM exercise_step;
+
+changedSince:
+SELECT * FROM exercise_step WHERE server_seq > ? ORDER BY server_seq;
