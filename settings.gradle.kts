@@ -41,13 +41,13 @@ gradle.beforeProject {
     }
 }
 
-val appModules = setOf("android", "compose")
-appModules.forEach { module ->
+val modules = setOf("android", "compose", "shared")
+modules.forEach { module ->
     include(":$module")
 }
 
 gradle.beforeProject {
-    if (name in appModules) {
+    if (name in modules) {
         layout.buildDirectory.set(rootProject.layout.projectDirectory.dir(".build/$name"))
     }
 }
