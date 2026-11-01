@@ -1,0 +1,4 @@
+# The server image needs only the built JAR and the workout plan.
+*
+!.build/server/libs/server-all.jar
+!program/PROGRAM.md
