@@ -12,3 +12,8 @@
 
 # Local properties
 local.properties
+
+# Server secrets and data, if deploy/ is used in place
+deploy/.env
+deploy/data
+deploy/backups
