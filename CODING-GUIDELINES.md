@@ -26,7 +26,7 @@ Name every working branch `type/branch-name`:
 | `setup`         | Project and module setup: new modules, source sets, plugins, tooling |
 | `build`         | Changes to the build: Gradle, dependencies, versions                 |
 | `ci`            | CI configuration                                                     |
-| `documentation` | Documentation only                                                   |
+| `docs`          | Documentation only                                                   |
 | `test`          | Adding or fixing tests                                               |
 | `chore`         | Anything else that does not touch app behaviour                      |
 
