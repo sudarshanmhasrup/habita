@@ -21,3 +21,8 @@ anything.
   `CODING-GUIDELINES.md`).
 - Wrap markdown at 100 columns, the same width as code.
 - See "Markdown files" in [CODING-GUIDELINES.md](CODING-GUIDELINES.md).
+
+### Files
+
+- End every file on its last line of content, with no trailing newline or blank lines.
+- See "Files" in [CODING-GUIDELINES.md](CODING-GUIDELINES.md).
