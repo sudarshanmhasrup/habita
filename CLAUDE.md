@@ -30,4 +30,5 @@ anything.
 ### YAML files
 
 - Indent YAML files with four spaces per level.
+- Wrap every `name:` value in double quotes.
 - See "YAML files" in [CODING-GUIDELINES.md](CODING-GUIDELINES.md).

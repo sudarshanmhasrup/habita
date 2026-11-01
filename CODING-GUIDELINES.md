@@ -74,4 +74,4 @@ add one back.
 
 Indent YAML files, such as GitHub workflows and Docker Compose files, with four spaces per level.
 Indent a list four spaces under its key, and line up the keys of a list item with the first key
-after its `- `.
+after its `- `. Wrap every `name:` value in double quotes, for example `name: "Test and build"`.
