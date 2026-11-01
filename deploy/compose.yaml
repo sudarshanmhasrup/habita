@@ -1,39 +1,39 @@
 # The Habita server behind Caddy, which serves HTTPS with automatic certificates.
 # Only Caddy publishes ports; the server is reachable only through it.
 services:
-  server:
-    image: ${HABITA_IMAGE:-ghcr.io/sudarshanmhasrup/habita-server:latest}
-    restart: unless-stopped
-    environment:
-      HABITA_EMAIL: ${HABITA_EMAIL:?Set HABITA_EMAIL in .env}
-      HABITA_PASSWORD_HASH: ${HABITA_PASSWORD_HASH:?Set HABITA_PASSWORD_HASH in .env}
-    volumes:
-      - ./data:/data
-    logging:
-      options:
-        max-size: 10m
-        max-file: "3"
+    server:
+        image: ${HABITA_IMAGE:-ghcr.io/sudarshanmhasrup/habita-server:latest}
+        restart: unless-stopped
+        environment:
+            HABITA_EMAIL: ${HABITA_EMAIL:?Set HABITA_EMAIL in .env}
+            HABITA_PASSWORD_HASH: ${HABITA_PASSWORD_HASH:?Set HABITA_PASSWORD_HASH in .env}
+        volumes:
+            - ./data:/data
+        logging:
+            options:
+                max-size: 10m
+                max-file: "3"
 
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    depends_on:
-      - server
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    environment:
-      HABITA_DOMAIN: ${HABITA_DOMAIN:?Set HABITA_DOMAIN in .env}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    logging:
-      options:
-        max-size: 10m
-        max-file: "3"
+    caddy:
+        image: caddy:2
+        restart: unless-stopped
+        depends_on:
+            - server
+        ports:
+            - "80:80"
+            - "443:443"
+            - "443:443/udp"
+        environment:
+            HABITA_DOMAIN: ${HABITA_DOMAIN:?Set HABITA_DOMAIN in .env}
+        volumes:
+            - ./Caddyfile:/etc/caddy/Caddyfile:ro
+            - caddy_data:/data
+            - caddy_config:/config
+        logging:
+            options:
+                max-size: 10m
+                max-file: "3"
 
 volumes:
-  caddy_data:
-  caddy_config:
+    caddy_data:
+    caddy_config:
