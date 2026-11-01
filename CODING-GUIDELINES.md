@@ -69,3 +69,9 @@ End every file in the codebase on its last line of content, with no trailing new
 lines after it. This applies to every file type: Kotlin, Gradle, XML, properties, TOML, markdown
 and the rest. Turn off "Ensure every saved file ends with a line break" in your IDE so it does not
 add one back.
+
+## YAML files
+
+Indent YAML files, such as GitHub workflows and Docker Compose files, with four spaces per level.
+Indent a list four spaces under its key, and line up the keys of a list item with the first key
+after its `- `.

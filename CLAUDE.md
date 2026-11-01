@@ -26,3 +26,8 @@ anything.
 
 - End every file on its last line of content, with no trailing newline or blank lines.
 - See "Files" in [CODING-GUIDELINES.md](CODING-GUIDELINES.md).
+
+### YAML files
+
+- Indent YAML files with four spaces per level.
+- See "YAML files" in [CODING-GUIDELINES.md](CODING-GUIDELINES.md).
