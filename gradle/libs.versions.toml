@@ -4,6 +4,7 @@ kotlin = "2.4.21"
 androidGradlePlugin = "9.4.1"
 activity = "1.13.0"
 splashScreen = "1.2.0"
+composeMultiplatform = "1.12.2"
 
 # android module's configuration information
 android-group = "dev.habita.app"
@@ -22,6 +23,7 @@ compose-version = "1.0.0"
 [libraries]
 activity = { module = "androidx.activity:activity-compose", version.ref = "activity" }
 splash-screen = { module = "androidx.core:core-splashscreen", version.ref = "splashScreen" }
+compose-multiplatform-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMultiplatform" }
 
 [bundles]
 
