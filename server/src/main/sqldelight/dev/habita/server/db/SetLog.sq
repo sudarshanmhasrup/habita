@@ -1,0 +1,28 @@
+CREATE TABLE set_log (
+    id TEXT NOT NULL PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    exercise_id TEXT NOT NULL,
+    set_number INTEGER NOT NULL,
+    weight_grams INTEGER NOT NULL,
+    target INTEGER NOT NULL,
+    achieved INTEGER,
+    completed_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    deleted INTEGER NOT NULL,
+    server_seq INTEGER NOT NULL
+);
+
+CREATE INDEX set_log_server_seq ON set_log (server_seq);
+CREATE INDEX set_log_exercise ON set_log (exercise_id);
+
+updatedAt:
+SELECT updated_at FROM set_log WHERE id = ?;
+
+save:
+INSERT OR REPLACE INTO set_log VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectAll:
+SELECT * FROM set_log ORDER BY completed_at;
+
+changedSince:
+SELECT * FROM set_log WHERE server_seq > ? ORDER BY server_seq;

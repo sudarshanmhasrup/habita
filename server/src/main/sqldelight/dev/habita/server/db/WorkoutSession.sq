@@ -1,0 +1,28 @@
+CREATE TABLE workout_session (
+    id TEXT NOT NULL PRIMARY KEY,
+    workout_id TEXT NOT NULL,
+    program_version INTEGER NOT NULL,
+    started_at INTEGER NOT NULL,
+    main_started_at INTEGER,
+    ended_at INTEGER,
+    updated_at INTEGER NOT NULL,
+    deleted INTEGER NOT NULL,
+    server_seq INTEGER NOT NULL
+);
+
+CREATE INDEX workout_session_server_seq ON workout_session (server_seq);
+
+updatedAt:
+SELECT updated_at FROM workout_session WHERE id = ?;
+
+save:
+INSERT OR REPLACE INTO workout_session VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectById:
+SELECT * FROM workout_session WHERE id = ?;
+
+selectAll:
+SELECT * FROM workout_session ORDER BY started_at;
+
+changedSince:
+SELECT * FROM workout_session WHERE server_seq > ? ORDER BY server_seq;

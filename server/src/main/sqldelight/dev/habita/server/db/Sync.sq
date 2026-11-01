@@ -1,0 +1,13 @@
+-- A single counter that orders every change, so the app can pull everything after its cursor.
+CREATE TABLE sync_counter (
+    id INTEGER NOT NULL PRIMARY KEY,
+    value INTEGER NOT NULL
+);
+
+INSERT INTO sync_counter (id, value) VALUES (1, 0);
+
+increment:
+UPDATE sync_counter SET value = value + 1 WHERE id = 1;
+
+current:
+SELECT value FROM sync_counter WHERE id = 1;

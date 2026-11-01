@@ -1,0 +1,19 @@
+-- Every distinct PROGRAM.md the server has started with, so old sessions keep their plan.
+CREATE TABLE program_version (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    content_hash TEXT NOT NULL UNIQUE,
+    content TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
+idByHash:
+SELECT id FROM program_version WHERE content_hash = ?;
+
+insert:
+INSERT INTO program_version (content_hash, content, created_at) VALUES (?, ?, ?);
+
+lastInsertedId:
+SELECT last_insert_rowid();
+
+selectAll:
+SELECT * FROM program_version ORDER BY id;
