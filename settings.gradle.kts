@@ -41,7 +41,7 @@ gradle.beforeProject {
     }
 }
 
-val modules = setOf("android", "compose", "shared")
+val modules = setOf("android", "compose", "shared", "server")
 modules.forEach { module ->
     include(":$module")
 }
