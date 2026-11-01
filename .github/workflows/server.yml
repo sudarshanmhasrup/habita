@@ -1,4 +1,4 @@
-name: Server
+name: "Server"
 
 on:
     pull_request:
@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
     test:
-        name: Test and build
+        name: "Test and build"
         runs-on: ubuntu-latest
         permissions:
             contents: read
@@ -25,17 +25,17 @@ jobs:
 
             -   uses: gradle/actions/setup-gradle@v6
 
-            -   name: Test and build the server JAR
+            -   name: "Test and build the server JAR"
                 run: ./gradlew :shared:jvmTest :server:test :server:buildFatJar
 
             -   uses: actions/upload-artifact@v7
                 with:
-                    name: server-jar
+                    name: "server-jar"
                     path: .build/server/libs/server-all.jar
                     retention-days: 7
 
     image:
-        name: Publish image
+        name: "Publish image"
         needs: test
         if: github.event_name == 'push'
         runs-on: ubuntu-latest
@@ -47,7 +47,7 @@ jobs:
 
             -   uses: actions/download-artifact@v8
                 with:
-                    name: server-jar
+                    name: "server-jar"
                     path: .build/server/libs
 
             -   uses: docker/setup-qemu-action@v4
@@ -60,7 +60,7 @@ jobs:
                     username: ${{ github.actor }}
                     password: ${{ secrets.GITHUB_TOKEN }}
 
-            -   name: Build and push for x86 and ARM servers
+            -   name: "Build and push for x86 and ARM servers"
                 uses: docker/build-push-action@v7
                 with:
                     context: .
