@@ -12,7 +12,7 @@ last time and tells you what to lift today, so there is nothing to remember or w
 |----------------|-------------------------------------------------------------------------|
 | Server         | Done: login, sync, progression, summaries, export                       |
 | Deployment     | Done: Docker image, CI, HTTPS, server hardening, backups                |
-| Android app    | In progress: project setup only, no screens yet                         |
+| Android app    | Done: login, home, the full gym flow, offline use with background sync  |
 | Desktop app    | Planned, sharing the Compose Multiplatform UI with Android              |
 | iOS and web    | Planned for later                                                       |
 | Other features | Planned for later: expense tracker, to-do list, roadmap, month planner  |
@@ -62,12 +62,14 @@ data as one JSON file, ready to review yourself or with an AI before you change 
 | Path             | Purpose                                                                |
 |------------------|------------------------------------------------------------------------|
 | `android`        | Android entry point                                                    |
-| `compose`        | Compose Multiplatform UI shared by Android and desktop                 |
+| `compose`        | Compose Multiplatform entry point: home screen and navigation          |
+| `core`           | App-wide pieces: theme, UI components, settings, server client         |
+| `feature/auth`   | The login screen                                                       |
+| `feature/gym`    | The gym flow, its local database and sync                              |
 | `shared`         | Code for every platform and the server: models, progression, summaries |
 | `server`         | Ktor server: login, sync, targets, summaries and export                |
 | `program`        | The workout plan                                                       |
 | `deploy`         | Docker Compose stack, server setup and backup scripts                  |
-| `feature/<name>` | One module per feature, added as features are built                    |
 
 The progression rules, rotation and summary live in `shared`, so the app gives the same answers
 offline that the server gives online.
@@ -93,7 +95,7 @@ cd habita
 ### Run the tests
 
 ```sh
-./gradlew :shared:jvmTest :server:test
+./gradlew :shared:jvmTest :server:test :feature:gym:desktopTest
 ```
 
 ### Run the server locally
@@ -119,9 +121,27 @@ are in the [server README](server/README.md).
 
 ### Build the Android app
 
+The app needs your server's address, set once in `local.properties` at the repository root. The
+name is used in the home screen greeting and is optional.
+
+```properties
+HABITA_SERVER_URL=https://habita.example.com
+HABITA_NAME=Sudarshan
+```
+
+Both can also be passed as Gradle properties or environment variables, for example in CI. Then
+build:
+
 ```sh
 ./gradlew :android:assembleDebug
 ```
+
+To use a server running on your computer from the Android emulator, set
+`HABITA_SERVER_URL=http://10.0.2.2:8080`. Debug builds allow plain HTTP for this; release builds
+need HTTPS.
+
+The app works offline once it has logged in and loaded the workout plan. Every set is saved on the
+phone as it is done and synced in the background when the server is reachable.
 
 ## Deploying your own server
 
