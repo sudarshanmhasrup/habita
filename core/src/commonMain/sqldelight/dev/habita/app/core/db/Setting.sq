@@ -1,0 +1,14 @@
+-- App-wide settings as key-value pairs: the login token and the theme.
+CREATE TABLE setting (
+    key TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+select:
+SELECT value FROM setting WHERE key = ?;
+
+save:
+INSERT OR REPLACE INTO setting (key, value) VALUES (?, ?);
+
+remove:
+DELETE FROM setting WHERE key = ?;
