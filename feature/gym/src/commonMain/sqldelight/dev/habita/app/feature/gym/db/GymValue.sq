@@ -1,0 +1,14 @@
+-- Single values: the cached program, the sync cursor and the workout in progress.
+CREATE TABLE gym_value (
+    key TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+select:
+SELECT value FROM gym_value WHERE key = ?;
+
+save:
+INSERT OR REPLACE INTO gym_value (key, value) VALUES (?, ?);
+
+remove:
+DELETE FROM gym_value WHERE key = ?;

@@ -1,0 +1,37 @@
+CREATE TABLE set_log (
+    id TEXT NOT NULL PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    exercise_id TEXT NOT NULL,
+    set_number INTEGER NOT NULL,
+    weight_grams INTEGER NOT NULL,
+    target INTEGER NOT NULL,
+    achieved INTEGER,
+    completed_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    deleted INTEGER NOT NULL,
+    dirty INTEGER NOT NULL
+);
+
+CREATE INDEX set_log_exercise ON set_log (exercise_id);
+CREATE INDEX set_log_session ON set_log (session_id);
+
+selectAll:
+SELECT * FROM set_log;
+
+selectBySession:
+SELECT * FROM set_log WHERE session_id = ?;
+
+selectByExercises:
+SELECT * FROM set_log WHERE exercise_id IN ?;
+
+selectDirty:
+SELECT * FROM set_log WHERE dirty = 1;
+
+updatedAt:
+SELECT updated_at FROM set_log WHERE id = ?;
+
+save:
+INSERT OR REPLACE INTO set_log VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+markClean:
+UPDATE set_log SET dirty = 0 WHERE id = ? AND updated_at = ?;

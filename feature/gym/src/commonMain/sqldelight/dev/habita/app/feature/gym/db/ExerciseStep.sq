@@ -1,0 +1,21 @@
+CREATE TABLE exercise_step (
+    exercise_id TEXT NOT NULL PRIMARY KEY,
+    step INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    dirty INTEGER NOT NULL
+);
+
+selectAll:
+SELECT * FROM exercise_step;
+
+selectDirty:
+SELECT * FROM exercise_step WHERE dirty = 1;
+
+updatedAt:
+SELECT updated_at FROM exercise_step WHERE exercise_id = ?;
+
+save:
+INSERT OR REPLACE INTO exercise_step VALUES (?, ?, ?, ?);
+
+markClean:
+UPDATE exercise_step SET dirty = 0 WHERE exercise_id = ? AND updated_at = ?;
