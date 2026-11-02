@@ -1,0 +1,27 @@
+CREATE TABLE warm_up_log (
+    id TEXT NOT NULL PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    completed_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    deleted INTEGER NOT NULL,
+    dirty INTEGER NOT NULL
+);
+
+CREATE INDEX warm_up_log_session ON warm_up_log (session_id);
+
+selectBySession:
+SELECT * FROM warm_up_log WHERE session_id = ?;
+
+selectDirty:
+SELECT * FROM warm_up_log WHERE dirty = 1;
+
+updatedAt:
+SELECT updated_at FROM warm_up_log WHERE id = ?;
+
+save:
+INSERT OR REPLACE INTO warm_up_log VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+markClean:
+UPDATE warm_up_log SET dirty = 0 WHERE id = ? AND updated_at = ?;
