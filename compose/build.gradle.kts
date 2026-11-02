@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kotlin.multiplatform.library)
+    alias(libs.plugins.compose.compiler)
 }
 
 group = libs.versions.compose.group.get()
@@ -11,7 +12,7 @@ version = libs.versions.compose.version.get()
 kotlin {
     jvm("desktop") {
         compilerOptions {
-            JvmTarget.JVM_11
+            jvmTarget.set(JvmTarget.JVM_17)
         }
     }
 
@@ -23,7 +24,9 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(libs.compose.multiplatform.ui)
+            api(projects.core)
+            implementation(projects.feature.auth)
+            implementation(projects.feature.gym)
         }
     }
 }
