@@ -10,6 +10,9 @@ logback = "1.6.6"
 kotlinxSerialization = "1.12.0"
 sqldelight = "2.4.1"
 bcrypt = "0.10.2"
+coroutines = "1.11.0"
+lifecycle = "2.11.0"
+navigationEvent = "1.1.0"
 
 # android module's configuration information
 android-group = "dev.habita.app"
@@ -25,6 +28,15 @@ android-targetSdk = "37"
 compose-group = "dev.habita.app.compose"
 compose-version = "1.0.0"
 
+# core module's configuration information
+core-group = "dev.habita.app.core"
+core-version = "1.0.0"
+
+# feature modules' configuration information
+feature-auth-group = "dev.habita.app.feature.auth"
+feature-gym-group = "dev.habita.app.feature.gym"
+feature-version = "1.0.0"
+
 # shared module's configuration information
 shared-group = "dev.habita.app.shared"
 shared-version = "1.0.0"
@@ -37,6 +49,14 @@ server-version = "1.0.0"
 activity = { module = "androidx.activity:activity-compose", version.ref = "activity" }
 splash-screen = { module = "androidx.core:core-splashscreen", version.ref = "splashScreen" }
 compose-multiplatform-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMultiplatform" }
+compose-multiplatform-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeMultiplatform" }
+compose-multiplatform-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "composeMultiplatform" }
+compose-multiplatform-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "composeMultiplatform" }
+lifecycle-viewmodel-compose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+navigation-event-compose = { module = "org.jetbrains.androidx.navigationevent:navigationevent-compose", version.ref = "navigationEvent" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
 ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
 ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
@@ -48,6 +68,8 @@ ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref 
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
+sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
+sqldelight-coroutines = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
 bcrypt = { module = "at.favre.lib:bcrypt", version.ref = "bcrypt" }
 logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -63,3 +85,4 @@ ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }
 android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "androidGradlePlugin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }

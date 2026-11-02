@@ -35,19 +35,14 @@ dependencyResolutionManagement {
     }
 }
 
-gradle.beforeProject {
-    if (name == rootProject.name) {
-        layout.buildDirectory.set(rootProject.layout.projectDirectory.dir(".build/project"))
-    }
-}
-
-val modules = setOf("android", "compose", "shared", "server")
+val modules = listOf("android", "compose", "core", "shared", "server", "feature:auth", "feature:gym")
 modules.forEach { module ->
     include(":$module")
 }
 
+// Every build output goes under .build: the root project to .build/project, and each module to
+// .build/<path>, for example .build/server and .build/feature-gym.
 gradle.beforeProject {
-    if (name in modules) {
-        layout.buildDirectory.set(rootProject.layout.projectDirectory.dir(".build/$name"))
-    }
+    val directory = if (path == ":") "project" else path.removePrefix(":").replace(':', '-')
+    layout.buildDirectory.set(rootProject.layout.projectDirectory.dir(".build/$directory"))
 }
