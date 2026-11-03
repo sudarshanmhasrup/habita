@@ -117,6 +117,9 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
 
     fun retrySync() = repository.sync.request()
 
+    /** The backup file's contents. */
+    suspend fun backup(): String = repository.backup()
+
     fun openWorkout(workoutId: String) {
         _route.value = GymRoute.PreStart(workoutId)
     }
@@ -145,6 +148,8 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
     fun endRest() = act {
         if (data.value?.active?.rest != null) repository.endRest()
     }
+
+    fun logWarmUpSet(weightGrams: Int, reps: Int?) = act { repository.logWarmUpSet(weightGrams, reps) }
 
     fun extendRest(seconds: Int) = act { repository.extendRest(seconds) }
 

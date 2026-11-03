@@ -117,6 +117,39 @@ object WorkoutEngine {
         return next to log
     }
 
+    /**
+     * Logs the warm-up set before the current exercise's working sets, or skips it when [reps] is
+     * `null`. A done warm-up set starts a short rest.
+     */
+    fun logWarmUpSet(active: ActiveWorkout, weightGrams: Int, reps: Int?, id: String, now: Long): Pair<ActiveWorkout, SetLog?> {
+        check(active.phase == Phase.MAIN && active.rest == null) { "No set to log" }
+        val slotIndex = active.exerciseQueue.first()
+        check(active.needsWarmUpSet(slotIndex)) { "No warm-up set to log" }
+        val log = reps?.let {
+            SetLog(
+                id = id,
+                sessionId = active.sessionId,
+                exerciseId = active.slot(slotIndex).exerciseId,
+                setNumber = 0,
+                weightGrams = weightGrams,
+                target = Progression.WARM_UP_REPS,
+                achieved = it,
+                completedAt = now,
+                updatedAt = now,
+                warmUp = true,
+            )
+        }
+        val next = active.copy(
+            warmUpSetsDone = active.warmUpSetsDone + slotIndex,
+            loggedSets = if (log != null) active.loggedSets + log else active.loggedSets,
+            rest = if (log != null) Rest(now, now + WARM_UP_SET_REST_SECONDS * 1000L) else null,
+        )
+        return next to log
+    }
+
+    /** Rest after a warm-up set: shorter than between working sets, since it was light. */
+    const val WARM_UP_SET_REST_SECONDS = 60
+
     /** Adds [seconds] to the running rest or break. */
     fun extendRest(active: ActiveWorkout, seconds: Int): ActiveWorkout {
         val rest = active.rest ?: return active

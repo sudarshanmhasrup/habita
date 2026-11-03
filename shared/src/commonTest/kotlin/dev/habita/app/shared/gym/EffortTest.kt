@@ -108,6 +108,23 @@ class EffortTest {
     }
 
     @Test
+    fun `the warm-up set is about half, rounded to the step`() {
+        assertEquals(8 * KG, Progression.warmUpWeight(15 * KG, 2 * KG))
+        assertEquals(10 * KG, Progression.warmUpWeight(20 * KG, 5 * KG))
+        assertEquals(2 * KG, Progression.warmUpWeight(2 * KG, 2 * KG))
+    }
+
+    @Test
+    fun `warm-up sets never count toward progression`() {
+        val working = sets("s1", "bench", now - 3 * DAY, 20 * KG, 12, 12, 12, 12)
+        val warmUp = sets("s1", "bench", now - 3 * DAY - 1000, 10 * KG, 10, 10).map { it.copy(id = "w", setNumber = 0, warmUp = true) }
+        val history = History.performances("bench", listOf(session("s1", "a", now - 3 * DAY)), warmUp + working)
+
+        assertEquals(3, history.single().sets.size)
+        assertEquals(TargetReason.INCREASE, bench(*history.toTypedArray()).reason)
+    }
+
+    @Test
     fun `a skipped set gives no advice`() {
         assertNull(Progression.nextSet(benchPress, 12, 2 * KG, set(20 * KG, null, null)))
     }

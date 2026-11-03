@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.habita.app.core.theme.HabitaTheme
+import dev.habita.app.core.theme.Space
 import dev.habita.app.core.ui.DashedCard
 import dev.habita.app.core.ui.Gap
 import dev.habita.app.core.ui.HIcon
@@ -39,7 +40,7 @@ internal fun HomeScreen(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = Space.screen, vertical = 12.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             HText(todayLabel(), type.label, color = colors.muted, modifier = Modifier.weight(1f))
@@ -57,13 +58,13 @@ internal fun HomeScreen(
             Gap(2.dp)
             HText(userName, type.display)
         }
-        Gap(36.dp)
+        Gap(Space.section)
         Overline("Your space")
-        Gap(12.dp)
+        Gap(Space.item)
         HabitaCard(Modifier.fillMaxWidth(), onClick = onOpenGym) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconTile(HabitaIcons.Dumbbell, background = colors.accentTint, tint = colors.accent)
-                Gap(16.dp)
+                Gap(Space.card)
                 Column(Modifier.weight(1f)) {
                     HText("Gym", type.title)
                     if (gymStatus != null) HText(gymStatus, type.caption, color = colors.muted, maxLines = 1)
@@ -71,13 +72,16 @@ internal fun HomeScreen(
                 HIcon(HabitaIcons.ChevronRight, contentDescription = null, tint = colors.muted)
             }
         }
-        Gap(12.dp)
+        Gap(Space.item)
         DashedCard(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconTile(HabitaIcons.Wallet, background = colors.border.copy(alpha = 0.5f), tint = colors.muted)
-                Gap(16.dp)
-                HText("Expense tracker", type.title, color = colors.muted, modifier = Modifier.weight(1f))
-                Pill("Coming soon", background = colors.border.copy(alpha = 0.6f), color = colors.muted)
+                Gap(Space.card)
+                Column(Modifier.weight(1f)) {
+                    HText("Expense tracker", type.title, color = colors.muted, maxLines = 1)
+                    Gap(Space.tiny)
+                    Pill("Coming soon", background = colors.border.copy(alpha = 0.6f), color = colors.muted)
+                }
             }
         }
     }

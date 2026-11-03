@@ -19,6 +19,7 @@ data class TrendPoint(val at: Long, val value: Double, val isToday: Boolean)
 data class ExerciseReport(
     val exercise: Exercise,
     val sets: List<SetLog>,
+    val warmUpSet: SetLog?,
     val lastTime: Performance?,
     val trend: List<TrendPoint>,
     val progressed: Boolean,
@@ -47,7 +48,8 @@ internal object Reports {
         sets: List<SetLog>,
     ): SessionReport {
         val workout = program.workout(session.workoutId)
-        val todaySets = sets.filter { it.sessionId == session.id && !it.deleted }
+        val allToday = sets.filter { it.sessionId == session.id && !it.deleted }
+        val todaySets = allToday.filter { !it.warmUp }
         val order = workout?.exercises?.map { it.exerciseId }.orEmpty()
         val exerciseIds = todaySets.map { it.exerciseId }.distinct()
             .sortedBy { id -> order.indexOf(id).takeIf { it >= 0 } ?: Int.MAX_VALUE }
@@ -61,6 +63,7 @@ internal object Reports {
             ExerciseReport(
                 exercise = exercise,
                 sets = todaySets.filter { it.exerciseId == id }.sortedBy { it.setNumber },
+                warmUpSet = allToday.lastOrNull { it.exerciseId == id && it.warmUp },
                 lastTime = upToToday.firstOrNull { it.sessionId != session.id && it.hasCompletedSets },
                 trend = upToToday
                     .filter { it.hasCompletedSets }
@@ -90,7 +93,7 @@ internal object Reports {
             .reversed()
             .map { past ->
                 val kg = sets
-                    .filter { it.sessionId == past.id && !it.deleted && !it.isSkipped }
+                    .filter { it.sessionId == past.id && !it.deleted && !it.isSkipped && !it.warmUp }
                     .filter { program.exercise(it.exerciseId)?.isWeighted == true }
                     .sumOf { it.weightGrams.toLong() * it.achieved!! } / 1000.0
                 TrendPoint(past.startedAt, kg, past.id == session.id)

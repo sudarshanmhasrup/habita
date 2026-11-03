@@ -24,10 +24,12 @@ last time and tells you what to lift today, so there is nothing to remember or w
    fallback that does not move the rotation.
 2. Do the warm-up one exercise at a time: done, skip, or machine taken, which moves it to after the
    next exercise. A 2-minute rest follows.
-3. Do the main workout set by set. Each exercise shows last time's weight and reps and today's
+3. Do the main workout set by set. Weighted exercises start with a warm-up set at about half of
+   today's weight for 10 reps, which can be skipped and never counts toward progress. Each
+   exercise shows last time's weight and reps and today's
    target, filled in so that a normal set is one tap. Log a set by tapping how it felt: Easy,
    Medium or Hard. The weight can be changed on any set, and the next set is suggested from how
-   this one felt. Finishing a set starts its rest timer.
+   this one felt. Finishing a set starts its rest timer, and the phone buzzes when it ends.
 4. At the end, see the workout summary: time spent, volume, sets, personal bests and what goes up
    next time, with charts of the time split, how the sets felt, volume over recent sessions, and
    each exercise set by set with its working weight over time.
@@ -159,7 +161,9 @@ To use a server running on your computer from the Android emulator, set
 `HABITA_SERVER_URL=http://10.0.2.2:8080`. Debug builds allow plain HTTP for this; release builds
 need HTTPS.
 
-Every set is saved on the phone as it is done. With the login on, everything is synced in the
+Every set is saved on the phone as it is done. Android's automatic backup includes it, and the gym
+screen's "Save a backup file" button writes everything to a JSON file you choose, in the same
+format as the server's export. With the login on, everything is synced in the
 background when the server is reachable, including workouts done before the login was turned on,
 and the server's workout plan replaces the built-in one.
 

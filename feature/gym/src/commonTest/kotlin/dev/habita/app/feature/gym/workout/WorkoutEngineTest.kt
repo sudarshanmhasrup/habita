@@ -114,6 +114,29 @@ class WorkoutEngineTest {
     }
 
     @Test
+    fun aWarmUpSetComesFirstAndDoesNotCountAsASet() {
+        var active = start().inMain()
+        assertTrue(active.needsWarmUpSet(0))
+
+        val (afterWarmUp, log) = WorkoutEngine.logWarmUpSet(active, 10_000, 10, "w", now = 1_000)
+        assertTrue(log!!.warmUp)
+        assertEquals(0, log.setNumber)
+        assertEquals(Rest(1_000, 61_000), afterWarmUp.rest)
+        assertEquals(1, afterWarmUp.setNumber(0))
+        assertFalse(afterWarmUp.needsWarmUpSet(0))
+        assertEquals(log, afterWarmUp.warmUpSetFor(0))
+        assertTrue(afterWarmUp.setsFor(0).isEmpty())
+
+        // Skipping logs nothing and starts no rest.
+        active = WorkoutEngine.endRest(afterWarmUp)
+        repeat(2) { active = WorkoutEngine.endRest(WorkoutEngine.logSet(active, 20_000, 12, Effort.MEDIUM, 2_000, "s$it", 0).first) }
+        val (skipped, none) = WorkoutEngine.logWarmUpSet(active, 0, null, "x", 0)
+        assertNull(none)
+        assertNull(skipped.rest)
+        assertFalse(skipped.needsWarmUpSet(1))
+    }
+
+    @Test
     fun anEasySetPrefillsAHeavierNextSet() {
         var active = start().inMain()
         val (afterSet, log) = WorkoutEngine.logSet(active, 5_000, 12, Effort.EASY, 2_000, "a", 0)

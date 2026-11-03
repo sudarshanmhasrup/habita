@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.habita.app.core.theme.HabitaTheme
+import dev.habita.app.core.theme.Space
 import dev.habita.app.core.ui.Divider
 import dev.habita.app.core.ui.Gap
 import dev.habita.app.core.ui.HText
@@ -48,30 +49,30 @@ internal fun PreStartScreen(
             Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 8.dp),
+                .padding(horizontal = Space.screen, vertical = 8.dp),
         ) {
             TopBar("Gym", onBack)
-            Gap(8.dp)
+            Gap(Space.inside)
             if (workout.id == data.suggested?.id) {
                 Overline("Up next", color = colors.accent)
-                Gap(4.dp)
+                Gap(Space.tiny)
             }
             HText(workout.name, type.headline)
-            Gap(16.dp)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Gap(Space.card)
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.item)) {
                 StatTile("Exercises", "${workout.exercises.size}", Modifier.weight(1f))
                 StatTile("Sets", "${workout.exercises.sumOf { it.sets }}", Modifier.weight(1f))
                 StatTile("Minutes", "~${estimateMinutes(workout, warmUp)}", Modifier.weight(1f))
             }
             if (warmUp != null) {
-                Gap(24.dp)
+                Gap(Space.section)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Overline("Warm-up", Modifier.weight(1f))
                     HText("then ${warmUp.restSeconds / 60} min break", type.caption, color = colors.muted)
                 }
-                Gap(10.dp)
+                Gap(Space.item)
                 HabitaCard(Modifier.fillMaxWidth()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(Space.item)) {
                         warmUp.items.forEach { item ->
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 HText(item.name, type.body, modifier = Modifier.weight(1f))
@@ -81,16 +82,16 @@ internal fun PreStartScreen(
                     }
                 }
             }
-            Gap(24.dp)
+            Gap(Space.section)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Overline("Workout", Modifier.weight(1f))
                 HText("today's weight", type.caption, color = colors.muted)
             }
-            Gap(10.dp)
+            Gap(Space.item)
             ExerciseList(program, workoutId, targets)
-            Gap(16.dp)
+            Gap(Space.card)
         }
-        Box(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+        Box(Modifier.padding(horizontal = Space.screen, vertical = 12.dp)) {
             if (data.active != null) {
                 HText(
                     "Finish or discard the workout in progress first.",
@@ -115,9 +116,9 @@ private fun ExerciseList(program: Program, workoutId: String, targets: List<Exer
         workout.exercises.forEachIndexed { index, slot ->
             val exercise = program.exercise(slot.exerciseId) ?: return@forEachIndexed
             if (index > 0) {
-                Gap(12.dp)
+                Gap(Space.item)
                 Divider()
-                Gap(12.dp)
+                Gap(Space.item)
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Box(
@@ -126,7 +127,7 @@ private fun ExerciseList(program: Program, workoutId: String, targets: List<Exer
                 ) {
                     HText("${index + 1}", type.label, color = colors.accent)
                 }
-                Gap(12.dp)
+                Gap(Space.item)
                 Column(Modifier.weight(1f)) {
                     HText(exercise.name, type.bodyStrong)
                     HText(
@@ -137,7 +138,7 @@ private fun ExerciseList(program: Program, workoutId: String, targets: List<Exer
                 }
                 val target = targets?.getOrNull(index)
                 if (target != null) {
-                    Gap(8.dp)
+                    Gap(Space.inside)
                     HText(
                         when {
                             !exercise.isWeighted -> exercise.formatAmount(target.target)

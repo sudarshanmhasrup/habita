@@ -39,7 +39,7 @@ object Summary {
     ): WorkoutSummary {
         val end = session.endedAt ?: now
         val mainStart = session.mainStartedAt ?: end
-        val sessionSets = sets.filter { it.sessionId == session.id && !it.deleted }
+        val sessionSets = sets.filter { it.sessionId == session.id && !it.deleted && !it.warmUp }
         val previous = sessions
             .filter {
                 !it.deleted && it.id != session.id && it.workoutId == session.workoutId &&
@@ -49,7 +49,7 @@ object Summary {
 
         val volume = volumeKg(sessionSets, program)
         val previousVolume = previous?.let { prev ->
-            volumeKg(sets.filter { it.sessionId == prev.id && !it.deleted }, program)
+            volumeKg(sets.filter { it.sessionId == prev.id && !it.deleted && !it.warmUp }, program)
         }
 
         val progressed = mutableListOf<String>()

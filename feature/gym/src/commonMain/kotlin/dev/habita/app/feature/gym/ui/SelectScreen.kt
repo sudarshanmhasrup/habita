@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import dev.habita.app.core.data.nowMillis
 import dev.habita.app.core.network.ApiException
 import dev.habita.app.core.theme.HabitaTheme
+import dev.habita.app.core.theme.Space
 import dev.habita.app.core.ui.Chip
 import dev.habita.app.core.ui.Gap
 import dev.habita.app.core.ui.HIcon
@@ -53,6 +54,8 @@ internal fun SelectScreen(
     onResume: () -> Unit,
     onDiscard: () -> Unit,
     onRetry: () -> Unit,
+    onBackup: () -> Unit,
+    backupMessage: String?,
 ) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
@@ -60,10 +63,10 @@ internal fun SelectScreen(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+            .padding(horizontal = Space.screen, vertical = Space.inside),
     ) {
         TopBar("Home", onBack)
-        Gap(8.dp)
+        Gap(Space.inside)
         HText("Gym", type.headline)
         val program = data.program
         if (program == null) {
@@ -74,27 +77,27 @@ internal fun SelectScreen(
         val now = nowMillis()
         val weekStart = startOfWeek(now)
         val thisWeek = data.sessions.filter { !it.deleted && it.endedAt != null && it.startedAt >= weekStart }
-        Gap(4.dp)
+        Gap(Space.tiny)
         HText(weekLine(thisWeek.size), type.body, color = colors.muted)
-        Gap(16.dp)
+        Gap(Space.card)
         WeekStrip(thisWeek, weekStart, now)
-        Gap(20.dp)
+        Gap(Space.section)
         data.active?.let {
             InProgressCard(it, onResume, onDiscard)
-            Gap(16.dp)
+            Gap(Space.section)
         }
         data.suggested?.let { workout ->
             if (data.active == null) {
                 UpNextCard(program, workout, lastDone(data.sessions, workout.id, now)) { onOpenWorkout(workout.id) }
-                Gap(24.dp)
+                Gap(Space.section)
             }
         }
         Overline("All workouts")
-        Gap(10.dp)
+        Gap(Space.item)
         DayCards(program, data.suggested, onOpenWorkout)
-        Gap(20.dp)
-        StorageNote(data)
-        Gap(8.dp)
+        Gap(Space.section)
+        StorageNote(data, onBackup, backupMessage)
+        Gap(Space.card)
     }
 }
 
@@ -127,7 +130,7 @@ private fun WeekStrip(sessions: List<WorkoutSession>, weekStart: Long, now: Long
             val done = index in doneDays
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 HText(letter, type.caption, color = if (index == today) colors.text else colors.muted)
-                Gap(6.dp)
+                Gap(Space.inside)
                 Box(
                     Modifier
                         .size(36.dp)
@@ -162,18 +165,19 @@ private fun UpNextCard(program: Program, workout: Workout, lastDone: String?, on
         borderColor = colors.accent,
     ) {
         Overline("Up next", color = colors.onAccent.copy(alpha = 0.75f))
-        Gap(6.dp)
+        Gap(Space.inside)
         HText(workout.name, type.headline, color = colors.onAccent)
-        Gap(4.dp)
+        Gap(Space.tiny)
         HText(
             "${workout.exercises.size} exercises · ${workout.exercises.sumOf { it.sets }} sets · ~${estimateMinutes(workout, warmUp)} min",
             type.body,
             color = colors.onAccent.copy(alpha = 0.85f),
         )
         if (lastDone != null) {
+            Gap(2.dp)
             HText(lastDone, type.caption, color = colors.onAccent.copy(alpha = 0.7f))
         }
-        Gap(16.dp)
+        Gap(Space.card)
         Row(
             Modifier.background(colors.onAccent, CircleShape).padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -210,16 +214,16 @@ private fun InProgressCard(active: ActiveWorkout, onResume: () -> Unit, onDiscar
     var confirmDiscard by remember(active.sessionId) { mutableStateOf(false) }
     HabitaCard(Modifier.fillMaxWidth(), color = colors.accentTint, borderColor = colors.accentTint) {
         Overline("In progress", color = colors.accent)
-        Gap(6.dp)
+        Gap(Space.inside)
         HText(active.workout.name, type.title)
-        Gap(2.dp)
+        Gap(Space.tiny)
         HText(
             "${active.setsLogged.sum()} of ${active.workout.exercises.sumOf { it.sets }} sets done",
             type.caption,
             color = colors.muted,
         )
-        Gap(16.dp)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Gap(Space.card)
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.inside)) {
             PrimaryButton("Resume", onResume, Modifier.weight(1f))
             SecondaryButton(
                 text = if (confirmDiscard) "Tap to confirm" else "Discard",
@@ -239,7 +243,7 @@ private fun DayCards(program: Program, suggested: Workout?, onOpenWorkout: (Stri
         .filter { it.rotation != null }
         .sortedBy { it.rotation }
         .groupBy { it.warmUpId }
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Space.item)) {
         days.forEach { (warmUpId, workouts) ->
             val warmUp = program.warmUps.firstOrNull { it.id == warmUpId }
             HabitaCard(Modifier.fillMaxWidth()) {
@@ -249,8 +253,8 @@ private fun DayCards(program: Program, suggested: Workout?, onOpenWorkout: (Stri
                         HText(dayFocus(warmUpId) ?: "${workouts.first().exercises.size} exercises", type.caption, color = colors.muted)
                     }
                 }
-                Gap(14.dp)
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Gap(Space.card)
+                Row(horizontalArrangement = Arrangement.spacedBy(Space.item)) {
                     workouts.forEach { workout ->
                         Chip(
                             text = workout.name.substringAfterLast(' '),
@@ -272,14 +276,14 @@ private fun DayCards(program: Program, suggested: Workout?, onOpenWorkout: (Stri
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         HText(workout.name, type.title, color = colors.onInverseCard)
-                        Gap(2.dp)
+                        Gap(Space.tiny)
                         HText(
                             "Short on time? Hits everything once. Doesn't move the rotation.",
                             type.caption,
                             color = colors.onInverseCard.copy(alpha = 0.7f),
                         )
                     }
-                    Gap(12.dp)
+                    Gap(Space.item)
                     HIcon(HabitaIcons.ChevronRight, contentDescription = null, tint = colors.onInverseCard)
                 }
             }
@@ -287,9 +291,12 @@ private fun DayCards(program: Program, suggested: Workout?, onOpenWorkout: (Stri
     }
 }
 
-/** Where the workouts are kept: on the phone only, or synced with the server. */
+/**
+ * Where the workouts are kept: on the phone only, or synced with the server, and a way to save a
+ * backup file of everything on the phone.
+ */
 @Composable
-private fun StorageNote(data: GymData) {
+private fun StorageNote(data: GymData, onBackup: () -> Unit, backupMessage: String?) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     val (title, detail) = when {
@@ -298,17 +305,25 @@ private fun StorageNote(data: GymData) {
         data.sync is SyncState.Syncing -> "Syncing…" to "Saved on this phone too."
         else -> "Synced" to "Saved on this phone and the server."
     }
-    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        HIcon(
-            if (data.syncEnabled && data.sync !is SyncState.Failed) HabitaIcons.Cloud else HabitaIcons.Phone,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = colors.muted,
-        )
-        Gap(10.dp)
-        Column {
-            HText(title, type.label, color = colors.muted)
-            HText(detail, type.caption, color = colors.muted)
+    HabitaCard(Modifier.fillMaxWidth(), color = colors.background) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HIcon(
+                if (data.syncEnabled && data.sync !is SyncState.Failed) HabitaIcons.Cloud else HabitaIcons.Phone,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = colors.muted,
+            )
+            Gap(Space.item)
+            Column(Modifier.weight(1f)) {
+                HText(title, type.label)
+                HText(detail, type.caption, color = colors.muted)
+            }
+        }
+        Gap(Space.item)
+        SecondaryButton("Save a backup file", onBackup, Modifier.fillMaxWidth())
+        if (backupMessage != null) {
+            Gap(Space.inside)
+            HText(backupMessage, type.caption, color = colors.muted)
         }
     }
 }

@@ -55,8 +55,10 @@ data class ActiveWorkout(
     val lastWeights: Map<Int, Int> = emptyMap(),
     /** What the next set of a slot should be, from how its last set felt. */
     val advice: Map<Int, SetAdvice> = emptyMap(),
-    /** Every set logged today, oldest first, to show what was done so far. */
+    /** Every set logged today, oldest first, warm-up sets included, to show what was done so far. */
     val loggedSets: List<SetLog> = emptyList(),
+    /** Slots whose warm-up set is done or skipped. */
+    val warmUpSetsDone: Set<Int> = emptySet(),
     val rest: Rest? = null,
 ) {
     val isFinished: Boolean get() = phase == Phase.MAIN && exerciseQueue.isEmpty()
@@ -82,8 +84,17 @@ data class ActiveWorkout(
         )
     }
 
-    /** The sets logged today for [slot]. */
-    fun setsFor(slot: Int): List<SetLog> = loggedSets.filter { it.exerciseId == workout.exercises[slot].exerciseId }
+    /** The working sets logged today for [slot]. */
+    fun setsFor(slot: Int): List<SetLog> =
+        loggedSets.filter { it.exerciseId == workout.exercises[slot].exerciseId && !it.warmUp }
+
+    /** The warm-up set logged today for [slot], if it was done. */
+    fun warmUpSetFor(slot: Int): SetLog? =
+        loggedSets.lastOrNull { it.exerciseId == workout.exercises[slot].exerciseId && it.warmUp }
+
+    /** Weighted exercises start with a lighter warm-up set, unless it was done or skipped. */
+    fun needsWarmUpSet(slot: Int): Boolean =
+        exercises[slot].isWeighted && slot !in warmUpSetsDone && setsLogged[slot] == 0
 
     /** Fraction of all sets logged, for the progress bar. */
     val progress: Float

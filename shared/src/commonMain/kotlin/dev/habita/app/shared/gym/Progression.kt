@@ -182,6 +182,18 @@ object Progression {
         }
     }
 
+    /**
+     * The weight for the warm-up set before [workingGrams]: about half, rounded to the nearest
+     * [step], and never less than one step.
+     */
+    fun warmUpWeight(workingGrams: Int, step: Int): Int {
+        if (step <= 0) return workingGrams / 2
+        val steps = (workingGrams / 2 + step / 2) / step
+        return maxOf(steps, 1) * step
+    }
+
+    const val WARM_UP_REPS = 10
+
     /** The fewest reps that still count as the right weight: 8 for a target of 12. */
     fun floor(target: Int): Int = (target * 2 + 2) / 3
 
@@ -226,7 +238,7 @@ object History {
     ): List<Performance> {
         val liveSessions = sessions.filter { !it.deleted }.map { it.id }.toSet()
         return sets
-            .filter { it.exerciseId == exerciseId && !it.deleted && it.sessionId in liveSessions }
+            .filter { it.exerciseId == exerciseId && !it.deleted && !it.warmUp && it.sessionId in liveSessions }
             .groupBy { it.sessionId }
             .map { (sessionId, sessionSets) ->
                 Performance(

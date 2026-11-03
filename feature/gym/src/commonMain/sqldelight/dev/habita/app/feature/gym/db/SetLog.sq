@@ -10,7 +10,8 @@ CREATE TABLE set_log (
     updated_at INTEGER NOT NULL,
     deleted INTEGER NOT NULL,
     dirty INTEGER NOT NULL,
-    effort TEXT
+    effort TEXT,
+    warm_up INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX set_log_exercise ON set_log (exercise_id);
@@ -32,7 +33,7 @@ updatedAt:
 SELECT updated_at FROM set_log WHERE id = ?;
 
 save:
-INSERT OR REPLACE INTO set_log VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO set_log VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 markClean:
 UPDATE set_log SET dirty = 0 WHERE id = ? AND updated_at = ?;

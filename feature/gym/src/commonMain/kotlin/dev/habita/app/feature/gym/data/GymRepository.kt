@@ -6,6 +6,8 @@ import dev.habita.app.core.data.nowMillis
 import dev.habita.app.feature.gym.db.GymDatabase
 import dev.habita.app.feature.gym.workout.ActiveWorkout
 import dev.habita.app.feature.gym.workout.WorkoutEngine
+import dev.habita.app.shared.api.Export
+import dev.habita.app.shared.api.ExportedProgram
 import dev.habita.app.shared.api.ProgramResponse
 import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.ExerciseStep
@@ -23,6 +25,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 
 /**
  * Everything the gym screens do. Each action saves its records and the workout in progress in one
@@ -127,6 +130,16 @@ class GymRepository(core: Core) {
         next.sessionId.takeIf { next.isFinished }
     }
 
+    /** Logs the current exercise's warm-up set, or skips it when [reps] is `null`. */
+    suspend fun logWarmUpSet(weightGrams: Int, reps: Int?) = write {
+        val active = store.active() ?: return@write
+        val (next, log) = WorkoutEngine.logWarmUpSet(active, weightGrams, reps, newId(), nowMillis())
+        store.transaction {
+            log?.let(store::saveSet)
+            store.saveActive(next)
+        }
+    }
+
     suspend fun endRest() = update { WorkoutEngine.endRest(it) }
 
     suspend fun extendRest(seconds: Int) = update { WorkoutEngine.extendRest(it, seconds) }
@@ -166,6 +179,27 @@ class GymRepository(core: Core) {
             store.warmUpsForSession(active.sessionId).forEach { store.saveWarmUp(it.copy(deleted = true, updatedAt = now)) }
             store.saveActive(null)
         }
+    }
+
+    /**
+     * Every workout on this phone as JSON, in the same format as the server's export, so it can be
+     * kept as a backup or read by anything that reads the server's.
+     */
+    suspend fun backup(): String = withContext(Dispatchers.Default) {
+        val now = nowMillis()
+        val program = store.program()
+        val export = Export(
+            exportedAt = now,
+            programs = listOf(
+                ExportedProgram(
+                    version = program?.version ?: BUNDLED_VERSION,
+                    content = if (program == null || program.version == BUNDLED_VERSION) BUNDLED_PROGRAM else "",
+                    createdAt = now,
+                ),
+            ),
+            changes = store.everything(),
+        )
+        backupJson.encodeToString(export)
     }
 
     /** The summary of [sessionId] with the data for its charts. */
@@ -238,3 +272,5 @@ class GymRepository(core: Core) {
 
 /** The version of the plan built into the app. Server versions start at 1. */
 internal const val BUNDLED_VERSION = 0L
+
+private val backupJson = Json { prettyPrint = true }
