@@ -28,7 +28,8 @@ enum class Effort { EASY, MEDIUM, HARD }
  * One set. [weightGrams] is the weight of one dumbbell for dumbbell exercises and `0` for
  * bodyweight ones. [target] is what the app asked for; [achieved] is what was done, in reps or
  * seconds, and `null` when the set was skipped. [effort] is how it felt, `null` when skipped or
- * logged before effort existed.
+ * logged before effort existed. A [warmUp] set is the lighter set before the working sets: it is
+ * kept in the log but never counts toward progression, volume or bests.
  */
 @Serializable
 data class SetLog(
@@ -43,6 +44,7 @@ data class SetLog(
     val updatedAt: Long,
     val deleted: Boolean = false,
     val effort: Effort? = null,
+    val warmUp: Boolean = false,
 ) {
     val isSkipped: Boolean get() = achieved == null
 }

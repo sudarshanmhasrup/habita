@@ -7,6 +7,8 @@ import java.util.Locale
 
 internal actual fun shortDate(millis: Long): String = SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(millis))
 
+internal actual fun backupDate(millis: Long): String = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(millis))
+
 internal actual fun startOfWeek(millis: Long): Long =
     midnight(millis).apply {
         val daysSinceMonday = (get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY + 7) % 7

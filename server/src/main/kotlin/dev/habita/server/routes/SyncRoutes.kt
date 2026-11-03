@@ -36,7 +36,7 @@ private fun validate(changes: SyncChanges) {
         require(it.id.isNotBlank() && it.sessionId.isNotBlank() && it.exerciseId.isNotBlank()) {
             "Set ids must not be blank"
         }
-        require(it.setNumber > 0 && it.weightGrams >= 0 && it.target > 0 && (it.achieved ?: 0) >= 0) {
+        require((it.setNumber > 0 || it.warmUp) && it.weightGrams >= 0 && it.target > 0 && (it.achieved ?: 0) >= 0) {
             "Set ${it.id} has an invalid number"
         }
     }

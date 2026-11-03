@@ -94,6 +94,16 @@ class GymStore(private val database: GymDatabase) {
 
     fun saveStep(step: ExerciseStep) = save(step, dirty = true)
 
+    /** Every record, including deleted ones and ones already synced, for a backup. */
+    fun everything(): SyncChanges = transaction {
+        SyncChanges(
+            sessions = sessions.selectAll().executeAsList().map { it.toModel() },
+            sets = sets.selectAll().executeAsList().map { it.toModel() },
+            warmUps = warmUps.selectAll().executeAsList().map { it.toModel() },
+            steps = steps.selectAll().executeAsList().map { ExerciseStep(it.exercise_id, it.step.toInt(), it.updated_at) },
+        )
+    }
+
     // Sync
 
     fun dirty(): SyncChanges = transaction {
@@ -132,7 +142,7 @@ class GymStore(private val database: GymDatabase) {
 
     private fun save(set: SetLog, dirty: Boolean) = sets.save(
         set.id, set.sessionId, set.exerciseId, set.setNumber.toLong(), set.weightGrams.toLong(), set.target.toLong(),
-        set.achieved?.toLong(), set.completedAt, set.updatedAt, set.deleted.toLong(), dirty.toLong(), set.effort?.name,
+        set.achieved?.toLong(), set.completedAt, set.updatedAt, set.deleted.toLong(), dirty.toLong(), set.effort?.name, set.warmUp.toLong(),
     )
 
     private fun save(warmUp: WarmUpLog, dirty: Boolean) = warmUps.save(
@@ -175,6 +185,7 @@ private fun Set_log.toModel() = SetLog(
     updatedAt = updated_at,
     deleted = deleted == 1L,
     effort = effort?.let { name -> Effort.entries.firstOrNull { it.name == name } },
+    warmUp = warm_up == 1L,
 )
 
 private fun Warm_up_log.toModel() = WarmUpLog(

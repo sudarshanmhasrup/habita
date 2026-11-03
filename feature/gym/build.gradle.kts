@@ -64,6 +64,10 @@ kotlin {
             implementation(libs.sqldelight.coroutines)
         }
 
+        androidMain.dependencies {
+            implementation(libs.activity)
+        }
+
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }

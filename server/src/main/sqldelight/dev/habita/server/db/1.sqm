@@ -1,2 +1,3 @@
--- Version 2: how each set felt.
+-- Version 2: how each set felt, and warm-up sets.
 ALTER TABLE set_log ADD COLUMN effort TEXT;
+ALTER TABLE set_log ADD COLUMN warm_up INTEGER NOT NULL DEFAULT 0;

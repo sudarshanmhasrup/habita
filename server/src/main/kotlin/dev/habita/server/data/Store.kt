@@ -40,7 +40,7 @@ class Store(private val database: HabitaDatabase) {
                 sets.save(
                     it.id, it.sessionId, it.exerciseId, it.setNumber.toLong(), it.weightGrams.toLong(),
                     it.target.toLong(), it.achieved?.toLong(), it.completedAt, it.updatedAt,
-                    it.deleted.toLong(), nextSeq(), it.effort?.name,
+                    it.deleted.toLong(), nextSeq(), it.effort?.name, it.warmUp.toLong(),
                 )
             }
         }
@@ -141,6 +141,7 @@ private fun Set_log.toModel() = SetLog(
     updatedAt = updated_at,
     deleted = deleted == 1L,
     effort = effort?.let { Effort.valueOf(it) },
+    warmUp = warm_up == 1L,
 )
 
 private fun Warm_up_log.toModel() = WarmUpLog(

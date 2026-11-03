@@ -11,6 +11,9 @@ CREATE TABLE warm_up_log (
 
 CREATE INDEX warm_up_log_session ON warm_up_log (session_id);
 
+selectAll:
+SELECT * FROM warm_up_log;
+
 selectBySession:
 SELECT * FROM warm_up_log WHERE session_id = ?;
 

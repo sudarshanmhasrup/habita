@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.habita.app.core.theme.HabitaTheme
+import dev.habita.app.core.theme.Space
 import dev.habita.app.core.ui.Gap
 import dev.habita.app.core.ui.HIcon
 import dev.habita.app.core.ui.HText
@@ -40,21 +41,21 @@ internal fun SummaryScreen(report: SessionReport?, onDone: () -> Unit) {
             Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .padding(horizontal = Space.screen, vertical = 16.dp),
         ) {
-            Gap(24.dp)
+            Gap(Space.section)
             Overline("Workout done", color = colors.accent)
-            Gap(6.dp)
+            Gap(Space.inside)
             HText(report?.workoutName ?: "Nice work", type.headline)
-            Gap(20.dp)
+            Gap(Space.card)
             if (report == null) {
                 HText("Adding it up…", type.body, color = colors.muted)
             } else {
                 Content(report)
             }
-            Gap(8.dp)
+            Gap(Space.inside)
         }
-        PrimaryButton("Done", onDone, Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp))
+        PrimaryButton("Done", onDone, Modifier.fillMaxWidth().padding(horizontal = Space.screen, vertical = 16.dp))
     }
 }
 
@@ -63,7 +64,7 @@ private fun ColumnScope.Content(report: SessionReport) {
     val summary = report.summary
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Space.item)) {
         StatTile("Time", formatDuration(summary.totalMillis), Modifier.weight(1f))
         StatTile(
             "Volume",
@@ -72,12 +73,12 @@ private fun ColumnScope.Content(report: SessionReport) {
             detail = volumeChange(summary) ?: "First one, trend next time",
         )
     }
-    Gap(10.dp)
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Gap(Space.item)
+    Row(horizontalArrangement = Arrangement.spacedBy(Space.item)) {
         StatTile("Sets done", "${summary.setsCompleted}", Modifier.weight(1f), detail = summary.setsSkipped.takeIf { it > 0 }?.let { "$it skipped" })
         StatTile("New bests", "${summary.personalBests.size}", Modifier.weight(1f))
     }
-    Gap(14.dp)
+    Gap(Space.item)
 
     ChartCard("Time", "Where the ${formatDuration(summary.totalMillis)} went") {
         SplitBar(
@@ -89,7 +90,7 @@ private fun ColumnScope.Content(report: SessionReport) {
     }
 
     if (report.efforts.isNotEmpty()) {
-        Gap(14.dp)
+        Gap(Space.item)
         val total = report.efforts.values.sum()
         ChartCard("Effort", "How your $total rated sets felt") {
             SplitBar(
@@ -102,38 +103,38 @@ private fun ColumnScope.Content(report: SessionReport) {
     }
 
     if (report.volumeTrend.size >= 2) {
-        Gap(14.dp)
+        Gap(Space.item)
         ChartCard("Volume", "Weight × reps, your last ${report.volumeTrend.size} ${report.workoutName} sessions") {
             TrendBars(report.volumeTrend, format = { formatCompactKg(it) })
         }
     }
 
     if (summary.nextIncreases.isNotEmpty()) {
-        Gap(14.dp)
+        Gap(Space.item)
         HabitaCard(Modifier.fillMaxWidth(), color = colors.accentTint, borderColor = colors.accentTint) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HIcon(HabitaIcons.TrendUp, contentDescription = null, tint = colors.accent)
-                Gap(10.dp)
+                Gap(Space.item)
                 HText("Heavier next time", type.title)
             }
-            Gap(8.dp)
+            Gap(Space.inside)
             val names = report.exercises.filter { it.heavierNext }.map { it.exercise.name }
             HText(names.joinToString(" · "), type.body, color = colors.text)
         }
     }
 
-    Gap(24.dp)
+    Gap(Space.section)
     Overline("Exercise by exercise")
-    Gap(10.dp)
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Gap(Space.item)
+    Column(verticalArrangement = Arrangement.spacedBy(Space.item)) {
         report.exercises.forEach { ExerciseCard(it) }
     }
     if (report.efforts.isNotEmpty()) {
-        Gap(12.dp)
+        Gap(Space.item)
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Effort.entries.forEach { LegendItem(colors.effort(it), it.label()) }
         }
-        Gap(4.dp)
+        Gap(Space.tiny)
         HText("Bar height is the weight; color is how the set felt.", type.caption, color = colors.muted)
     }
 }
@@ -143,7 +144,7 @@ private fun ChartCard(title: String, caption: String, content: @Composable () ->
     HabitaCard(Modifier.fillMaxWidth()) {
         HText(title, HabitaTheme.typography.title)
         HText(caption, HabitaTheme.typography.caption, color = HabitaTheme.colors.muted)
-        Gap(16.dp)
+        Gap(Space.card)
         content()
     }
 }
@@ -167,10 +168,13 @@ private fun ExerciseCard(report: ExerciseReport) {
             type.caption,
             color = colors.muted,
         )
-        Gap(14.dp)
+        report.warmUpSet?.let { warmUp ->
+            HText("Warm-up set ${formatKg(warmUp.weightGrams)} kg × ${warmUp.achieved}", type.caption, color = colors.muted)
+        }
+        Gap(Space.item)
         SetBars(exercise, report.sets)
         if (report.trend.size >= 2) {
-            Gap(14.dp)
+            Gap(Space.item)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     HText(
@@ -185,7 +189,7 @@ private fun ExerciseCard(report: ExerciseReport) {
                         type.bodyStrong,
                     )
                 }
-                Gap(12.dp)
+                Gap(Space.item)
                 Sparkline(report.trend, Modifier.weight(1f))
             }
         }
