@@ -18,8 +18,14 @@ data class Performance(
     /** The heaviest weight used, which is the weight progression builds on. */
     val workingWeight: Int get() = completed.maxOfOrNull { it.weightGrams } ?: 0
 
+    /** The completed sets at the working weight. */
+    val workingSets: List<SetLog> get() = completed.filter { it.weightGrams == workingWeight }
+
     /** Reps or seconds done at the working weight, set by set. */
-    val workingResults: List<Int> get() = completed.filter { it.weightGrams == workingWeight }.mapNotNull { it.achieved }
+    val workingResults: List<Int> get() = workingSets.mapNotNull { it.achieved }
+
+    /** Every working set was rated, and every one as [effort]. */
+    fun allFelt(effort: Effort): Boolean = workingSets.isNotEmpty() && workingSets.all { it.effort == effort }
 
     val target: Int get() = sets.maxOf { it.target }
 
@@ -34,6 +40,15 @@ enum class TargetReason {
     /** Every set hit the target last time: go up one step. */
     INCREASE,
 
+    /** Every set hit the target and felt easy: go up two steps. */
+    INCREASE_EASY,
+
+    /** Missed the target, but every set felt easy: go up one step anyway. */
+    FELT_EASY,
+
+    /** Every set hit the target but felt hard: same again before going up. */
+    HOLD_HARD,
+
     /** Some sets missed the target: same weight, beat last time's reps. */
     REPEAT,
 
@@ -45,6 +60,10 @@ enum class TargetReason {
 
     /** Long break since last time: same weight, no increase. */
     RETURN_AFTER_BREAK,
+    ;
+
+    /** Whether today's target is above last time's. */
+    val isIncrease: Boolean get() = this == INCREASE || this == INCREASE_EASY || this == FELT_EASY
 }
 
 /**
@@ -90,9 +109,13 @@ object Progression {
 
         if (!exercise.isWeighted) {
             val lastTarget = maxOf(last.target, slot.target)
+            val hitAll = last.hitAll(slot.sets, lastTarget)
             return when {
                 now - last.performedAt > BREAK_MILLIS -> result(0, lastTarget, TargetReason.RETURN_AFTER_BREAK)
-                last.hitAll(slot.sets, lastTarget) -> result(0, lastTarget + step, TargetReason.INCREASE)
+                hitAll && last.allFelt(Effort.EASY) -> result(0, lastTarget + step * 2, TargetReason.INCREASE_EASY)
+                hitAll && last.allFelt(Effort.HARD) -> result(0, lastTarget, TargetReason.HOLD_HARD)
+                hitAll -> result(0, lastTarget + step, TargetReason.INCREASE)
+                last.allFelt(Effort.EASY) -> result(0, lastTarget + step, TargetReason.FELT_EASY)
                 else -> result(0, lastTarget, TargetReason.REPEAT)
             }
         }
@@ -102,7 +125,14 @@ object Progression {
             return result(weight, slot.target, TargetReason.RETURN_AFTER_BREAK)
         }
         if (last.hitAll(slot.sets, slot.target)) {
-            return result(weight + step, slot.target, TargetReason.INCREASE)
+            return when {
+                last.allFelt(Effort.EASY) -> result(weight + step * 2, slot.target, TargetReason.INCREASE_EASY)
+                last.allFelt(Effort.HARD) -> result(weight, slot.target, TargetReason.HOLD_HARD)
+                else -> result(weight + step, slot.target, TargetReason.INCREASE)
+            }
+        }
+        if (last.allFelt(Effort.EASY)) {
+            return result(weight + step, slot.target, TargetReason.FELT_EASY)
         }
         val tooHeavy = last.workingResults.any { it < floor(slot.target) }
         val previousWeight = done.drop(1).firstOrNull { it.workingWeight < weight }?.workingWeight
@@ -113,6 +143,43 @@ object Progression {
             return result(deload(weight, step), slot.target, TargetReason.DELOAD)
         }
         return result(weight, slot.target, TargetReason.REPEAT)
+    }
+
+    /**
+     * What to do on the next set of the same exercise today, from how the set just done went.
+     * Easy moves the weight up (two steps when the reps were well over the target), hard with too
+     * few reps moves it down, anything else keeps it. Bodyweight exercises change the target
+     * instead of the weight.
+     */
+    fun nextSet(exercise: Exercise, target: Int, step: Int, done: SetLog): SetAdvice? {
+        val achieved = done.achieved ?: return null
+        val effort = done.effort ?: return null
+        val change = when {
+            effort == Effort.EASY && achieved >= target + 3 -> 2
+            effort == Effort.EASY -> 1
+            effort == Effort.HARD && achieved < floor(target) -> -1
+            else -> 0
+        }
+        val reason = when {
+            change > 0 -> SetAdviceReason.EASY
+            change < 0 -> SetAdviceReason.TOO_HARD
+            else -> SetAdviceReason.KEEP
+        }
+        return if (exercise.isWeighted) {
+            SetAdvice(
+                weightGrams = maxOf(done.weightGrams + change * step, 0),
+                target = target,
+                previousWeightGrams = done.weightGrams,
+                reason = reason,
+            )
+        } else {
+            SetAdvice(
+                weightGrams = 0,
+                target = maxOf(target + change * step, 1),
+                previousWeightGrams = 0,
+                reason = reason,
+            )
+        }
     }
 
     /** The fewest reps that still count as the right weight: 8 for a target of 12. */
@@ -132,6 +199,21 @@ object Progression {
         return recent.first().workingResults.sum() <= recent.last().workingResults.sum()
     }
 }
+
+@Serializable
+enum class SetAdviceReason { EASY, KEEP, TOO_HARD }
+
+/**
+ * The suggestion for the next set today. [previousWeightGrams] is the weight just used, so the app
+ * can offer to keep it.
+ */
+@Serializable
+data class SetAdvice(
+    val weightGrams: Int,
+    val target: Int,
+    val previousWeightGrams: Int,
+    val reason: SetAdviceReason,
+)
 
 object History {
     /**

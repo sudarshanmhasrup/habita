@@ -10,10 +10,12 @@ import kotlinx.coroutines.SupervisorJob
 
 /**
  * Build-time settings. [serverUrl] is the Habita server, [userName] the name used in the greeting.
+ * Without [loginEnabled] the app never asks for a login and works from the phone alone.
  */
 data class AppConfig(
     val serverUrl: String,
     val userName: String,
+    val loginEnabled: Boolean = true,
 )
 
 /**

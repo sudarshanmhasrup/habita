@@ -1,6 +1,5 @@
 package dev.habita.app.compose
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,14 +20,16 @@ import dev.habita.app.core.ui.HabitaCard
 import dev.habita.app.core.ui.HabitaIcons
 import dev.habita.app.core.ui.IconCircleButton
 import dev.habita.app.core.ui.IconTile
+import dev.habita.app.core.ui.Overline
 import dev.habita.app.core.ui.Pill
 
-/** The only screen: a greeting, the feature list and the theme toggle. */
+/** The only screen: the date, a greeting, the feature list and the theme toggle. */
 @Composable
 internal fun HomeScreen(
     userName: String,
     hour: Int,
     darkTheme: Boolean,
+    gymStatus: String?,
     onToggleTheme: () -> Unit,
     onOpenGym: () -> Unit,
 ) {
@@ -38,29 +39,39 @@ internal fun HomeScreen(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .padding(horizontal = 20.dp, vertical = 12.dp),
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            HText(todayLabel(), type.label, color = colors.muted, modifier = Modifier.weight(1f))
             IconCircleButton(
                 icon = if (darkTheme) HabitaIcons.Sun else HabitaIcons.Moon,
                 contentDescription = if (darkTheme) "Switch to light mode" else "Switch to dark mode",
                 onClick = onToggleTheme,
             )
         }
-        Gap(48.dp)
-        HText(if (userName.isBlank()) "Hi there" else "Hi $userName", type.display)
-        Gap(10.dp)
-        HText("${partOfDay(hour)}, how's the day going?", type.body, color = colors.muted)
+        Gap(40.dp)
+        if (userName.isBlank()) {
+            HText(partOfDay(hour), type.display)
+        } else {
+            HText(partOfDay(hour) + ",", type.body, color = colors.muted)
+            Gap(2.dp)
+            HText(userName, type.display)
+        }
         Gap(36.dp)
+        Overline("Your space")
+        Gap(12.dp)
         HabitaCard(Modifier.fillMaxWidth(), onClick = onOpenGym) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconTile(HabitaIcons.Dumbbell, background = colors.accentTint, tint = colors.accent)
                 Gap(16.dp)
-                HText("Gym", type.title, modifier = Modifier.weight(1f))
+                Column(Modifier.weight(1f)) {
+                    HText("Gym", type.title)
+                    if (gymStatus != null) HText(gymStatus, type.caption, color = colors.muted, maxLines = 1)
+                }
                 HIcon(HabitaIcons.ChevronRight, contentDescription = null, tint = colors.muted)
             }
         }
-        Gap(16.dp)
+        Gap(12.dp)
         DashedCard(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconTile(HabitaIcons.Wallet, background = colors.border.copy(alpha = 0.5f), tint = colors.muted)

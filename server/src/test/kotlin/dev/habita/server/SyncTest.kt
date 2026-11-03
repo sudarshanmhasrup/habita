@@ -3,6 +3,7 @@ package dev.habita.server
 import dev.habita.app.shared.api.PullResponse
 import dev.habita.app.shared.api.PushResponse
 import dev.habita.app.shared.api.SyncChanges
+import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.ExerciseStep
 import dev.habita.app.shared.gym.WarmUpLog
 import dev.habita.app.shared.gym.WarmUpStatus
@@ -23,7 +24,8 @@ class SyncTest {
     private val session = session("s1", "upper-a", NOW)
     private val changes = SyncChanges(
         sessions = listOf(session),
-        sets = sets("s1", "dumbbell-bench-press", NOW, 20 * KG, 12, 12, null),
+        sets = sets("s1", "dumbbell-bench-press", NOW, 20 * KG, 12, 12, null)
+            .mapIndexed { index, set -> if (index == 0) set.copy(effort = Effort.EASY) else set },
         warmUps = listOf(WarmUpLog("w1", "s1", 0, WarmUpStatus.DONE, NOW, NOW)),
         steps = listOf(ExerciseStep("dumbbell-bench-press", 2500, NOW)),
     )
@@ -42,6 +44,7 @@ class SyncTest {
         assertEquals(cursor, pulled.cursor)
         assertEquals(changes, pulled.changes)
         assertNull(pulled.changes.sets.last().achieved)
+        assertEquals(Effort.EASY, pulled.changes.sets.first().effort)
     }
 
     @Test

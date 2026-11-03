@@ -9,7 +9,11 @@ class HabitaApplication : Application() {
     /** Created on first use and kept for the life of the process. */
     val app: HabitaApp by lazy {
         HabitaApp(
-            config = AppConfig(serverUrl = BuildConfig.SERVER_URL, userName = BuildConfig.USER_NAME),
+            config = AppConfig(
+                serverUrl = BuildConfig.SERVER_URL,
+                userName = BuildConfig.USER_NAME,
+                loginEnabled = BuildConfig.LOGIN_ENABLED,
+            ),
             databases = AndroidDatabaseFactory(this),
         )
     }

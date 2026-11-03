@@ -5,7 +5,8 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * The palette. [inverseCard] is the dark card used for the full-body workout in light mode, and
- * flips to a light card in dark mode.
+ * flips to a light card in dark mode. The effort colors are one green ramp, light to strong as the
+ * effort goes up (reversed on dark, where strong means bright), and always come with a text label.
  */
 @Immutable
 data class HabitaColors(
@@ -21,6 +22,9 @@ data class HabitaColors(
     val inverseCard: Color,
     val onInverseCard: Color,
     val error: Color,
+    val effortEasy: Color,
+    val effortMedium: Color,
+    val effortHard: Color,
 )
 
 val LightColors = HabitaColors(
@@ -36,6 +40,9 @@ val LightColors = HabitaColors(
     inverseCard = Color(0xFF101613),
     onInverseCard = Color(0xFFFFFFFF),
     error = Color(0xFFB3261E),
+    effortEasy = Color(0xFF6DB38A),
+    effortMedium = Color(0xFF3D8C63),
+    effortHard = Color(0xFF1D5139),
 )
 
 val DarkColors = HabitaColors(
@@ -51,4 +58,7 @@ val DarkColors = HabitaColors(
     inverseCard = Color(0xFFE8EEEA),
     onInverseCard = Color(0xFF0E1311),
     error = Color(0xFFF2B8B5),
+    effortEasy = Color(0xFF3A7357),
+    effortMedium = Color(0xFF5BB487),
+    effortHard = Color(0xFFA3DDBC),
 )

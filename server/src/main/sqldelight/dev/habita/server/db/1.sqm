@@ -1,0 +1,2 @@
+-- Version 2: how each set felt.
+ALTER TABLE set_log ADD COLUMN effort TEXT;

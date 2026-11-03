@@ -3,6 +3,7 @@ package dev.habita.server.data
 import dev.habita.app.shared.api.ExportedProgram
 import dev.habita.app.shared.api.PullResponse
 import dev.habita.app.shared.api.SyncChanges
+import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.ExerciseStep
 import dev.habita.app.shared.gym.SetLog
 import dev.habita.app.shared.gym.WarmUpLog
@@ -39,7 +40,7 @@ class Store(private val database: HabitaDatabase) {
                 sets.save(
                     it.id, it.sessionId, it.exerciseId, it.setNumber.toLong(), it.weightGrams.toLong(),
                     it.target.toLong(), it.achieved?.toLong(), it.completedAt, it.updatedAt,
-                    it.deleted.toLong(), nextSeq(),
+                    it.deleted.toLong(), nextSeq(), it.effort?.name,
                 )
             }
         }
@@ -139,6 +140,7 @@ private fun Set_log.toModel() = SetLog(
     completedAt = completed_at,
     updatedAt = updated_at,
     deleted = deleted == 1L,
+    effort = effort?.let { Effort.valueOf(it) },
 )
 
 private fun Warm_up_log.toModel() = WarmUpLog(

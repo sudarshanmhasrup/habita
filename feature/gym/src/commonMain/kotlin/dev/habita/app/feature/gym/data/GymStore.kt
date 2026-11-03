@@ -10,6 +10,7 @@ import dev.habita.app.feature.gym.db.Workout_session
 import dev.habita.app.feature.gym.workout.ActiveWorkout
 import dev.habita.app.shared.api.ProgramResponse
 import dev.habita.app.shared.api.SyncChanges
+import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.ExerciseStep
 import dev.habita.app.shared.gym.SetLog
 import dev.habita.app.shared.gym.WarmUpLog
@@ -131,7 +132,7 @@ class GymStore(private val database: GymDatabase) {
 
     private fun save(set: SetLog, dirty: Boolean) = sets.save(
         set.id, set.sessionId, set.exerciseId, set.setNumber.toLong(), set.weightGrams.toLong(), set.target.toLong(),
-        set.achieved?.toLong(), set.completedAt, set.updatedAt, set.deleted.toLong(), dirty.toLong(),
+        set.achieved?.toLong(), set.completedAt, set.updatedAt, set.deleted.toLong(), dirty.toLong(), set.effort?.name,
     )
 
     private fun save(warmUp: WarmUpLog, dirty: Boolean) = warmUps.save(
@@ -173,6 +174,7 @@ private fun Set_log.toModel() = SetLog(
     completedAt = completed_at,
     updatedAt = updated_at,
     deleted = deleted == 1L,
+    effort = effort?.let { name -> Effort.entries.firstOrNull { it.name == name } },
 )
 
 private fun Warm_up_log.toModel() = WarmUpLog(

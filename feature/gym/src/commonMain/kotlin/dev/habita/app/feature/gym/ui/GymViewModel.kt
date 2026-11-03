@@ -3,16 +3,17 @@ package dev.habita.app.feature.gym.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.habita.app.feature.gym.data.GymRepository
+import dev.habita.app.feature.gym.data.SessionReport
 import dev.habita.app.feature.gym.data.SyncState
 import dev.habita.app.feature.gym.workout.ActiveWorkout
 import dev.habita.app.feature.gym.workout.Phase
+import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.ExerciseTarget
 import dev.habita.app.shared.gym.Program
 import dev.habita.app.shared.gym.Rotation
 import dev.habita.app.shared.gym.WarmUpStatus
 import dev.habita.app.shared.gym.Workout
 import dev.habita.app.shared.gym.WorkoutSession
-import dev.habita.app.shared.gym.WorkoutSummary
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +45,8 @@ internal data class GymData(
     val steps: Map<String, Int>,
     val active: ActiveWorkout?,
     val sync: SyncState,
+    /** Whether the app logs in and syncs; without it everything stays on the phone. */
+    val syncEnabled: Boolean,
 ) {
     /** The next workout in the rotation. */
     val suggested: Workout? = program?.let { Rotation.next(it, sessions) }
@@ -64,7 +67,7 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
         repository.active,
         repository.sync.state,
     ) { program, sessions, steps, active, sync ->
-        GymData(program?.program, sessions, steps, active, sync)
+        GymData(program?.program, sessions, steps, active, sync, repository.syncEnabled)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Targets for the pre-start screen, refreshed when synced history arrives. */
@@ -79,9 +82,9 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    val summary: StateFlow<WorkoutSummary?> = _route
+    val report: StateFlow<SessionReport?> = _route
         .flatMapLatest { route ->
-            if (route is GymRoute.Summary) flow<WorkoutSummary?> { emit(repository.summary(route.sessionId)) } else flowOf(null)
+            if (route is GymRoute.Summary) flow<SessionReport?> { emit(repository.report(route.sessionId)) } else flowOf(null)
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
@@ -90,11 +93,17 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
 
     private var busy = false
 
-    /** Called each time the gym opens: resumes a workout in progress, and syncs. */
+    /**
+     * Called each time the gym screen appears, including after the activity is recreated: resumes
+     * a workout in progress and syncs, but otherwise stays on the current screen.
+     */
     fun open() {
         _error.value = null
         viewModelScope.launch {
-            _route.value = if (repository.active.first() != null) GymRoute.Workout else GymRoute.Select
+            val hasActive = repository.active.first() != null
+            val route = _route.value
+            if (hasActive && route is GymRoute.Select) _route.value = GymRoute.Workout
+            if (!hasActive && route == GymRoute.Workout) _route.value = GymRoute.Select
         }
         repository.sync.request()
     }
@@ -137,9 +146,11 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
         if (data.value?.active?.rest != null) repository.endRest()
     }
 
+    fun extendRest(seconds: Int) = act { repository.extendRest(seconds) }
+
     /** Logs the current set; [achieved] is `null` for a skipped set. */
-    fun logSet(weightGrams: Int, achieved: Int?) = act {
-        repository.logSet(weightGrams, achieved)?.let { _route.value = GymRoute.Summary(it) }
+    fun logSet(weightGrams: Int, achieved: Int?, effort: Effort?) = act {
+        repository.logSet(weightGrams, achieved, effort)?.let { _route.value = GymRoute.Summary(it) }
     }
 
     fun exerciseMachineTaken() = act { repository.exerciseMachineTaken() }
