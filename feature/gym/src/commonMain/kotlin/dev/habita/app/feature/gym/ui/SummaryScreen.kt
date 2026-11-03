@@ -3,12 +3,11 @@ package dev.habita.app.feature.gym.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,10 +19,12 @@ import dev.habita.app.core.ui.HIcon
 import dev.habita.app.core.ui.HText
 import dev.habita.app.core.ui.HabitaCard
 import dev.habita.app.core.ui.HabitaIcons
+import dev.habita.app.core.ui.LocalWideLayout
 import dev.habita.app.core.ui.Overline
 import dev.habita.app.core.ui.Pill
 import dev.habita.app.core.ui.PrimaryButton
 import dev.habita.app.core.ui.StatTile
+import dev.habita.app.core.ui.TwoPane
 import dev.habita.app.feature.gym.data.ExerciseReport
 import dev.habita.app.feature.gym.data.SessionReport
 import dev.habita.app.shared.gym.Effort
@@ -36,31 +37,44 @@ import kotlin.math.roundToInt
 internal fun SummaryScreen(report: SessionReport?, onDone: () -> Unit) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
+    val wide = LocalWideLayout.current
     Column(Modifier.fillMaxSize()) {
-        Column(
+        TwoPane(
+            Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = Space.screen, vertical = Space.card),
+            first = {
+                Gap(Space.card)
+                Overline("Workout done", color = colors.accent)
+                Gap(Space.inside)
+                HText(report?.workoutName ?: "Nice work", type.headline)
+                Gap(Space.card)
+                if (report == null) {
+                    HText("Adding it up…", type.body, color = colors.muted)
+                } else {
+                    Overview(report)
+                }
+            },
+            second = {
+                if (report != null) {
+                    // Lines the exercises up with the stats in the first pane.
+                    if (wide) Gap(108.dp)
+                    Exercises(report)
+                }
+            },
+        )
+        PrimaryButton(
+            "Done",
+            onDone,
             Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = Space.screen, vertical = 16.dp),
-        ) {
-            Gap(Space.section)
-            Overline("Workout done", color = colors.accent)
-            Gap(Space.inside)
-            HText(report?.workoutName ?: "Nice work", type.headline)
-            Gap(Space.card)
-            if (report == null) {
-                HText("Adding it up…", type.body, color = colors.muted)
-            } else {
-                Content(report)
-            }
-            Gap(Space.inside)
-        }
-        PrimaryButton("Done", onDone, Modifier.fillMaxWidth().padding(horizontal = Space.screen, vertical = 16.dp))
+                .align(Alignment.End)
+                .fillMaxWidth(if (wide) 0.5f else 1f)
+                .padding(horizontal = Space.screen, vertical = Space.item),
+        )
     }
 }
 
 @Composable
-private fun ColumnScope.Content(report: SessionReport) {
+private fun ColumnScope.Overview(report: SessionReport) {
     val summary = report.summary
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
@@ -122,8 +136,12 @@ private fun ColumnScope.Content(report: SessionReport) {
             HText(names.joinToString(" · "), type.body, color = colors.text)
         }
     }
+}
 
-    Gap(Space.section)
+@Composable
+private fun ColumnScope.Exercises(report: SessionReport) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
     Overline("Exercise by exercise")
     Gap(Space.item)
     Column(verticalArrangement = Arrangement.spacedBy(Space.item)) {

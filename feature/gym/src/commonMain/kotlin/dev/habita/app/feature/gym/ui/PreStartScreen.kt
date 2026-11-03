@@ -9,9 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,10 +21,12 @@ import dev.habita.app.core.ui.Divider
 import dev.habita.app.core.ui.Gap
 import dev.habita.app.core.ui.HText
 import dev.habita.app.core.ui.HabitaCard
+import dev.habita.app.core.ui.LocalWideLayout
 import dev.habita.app.core.ui.Overline
 import dev.habita.app.core.ui.PrimaryButton
 import dev.habita.app.core.ui.StatTile
 import dev.habita.app.core.ui.TopBar
+import dev.habita.app.core.ui.TwoPane
 import dev.habita.app.shared.gym.ExerciseTarget
 import dev.habita.app.shared.gym.Program
 
@@ -44,13 +44,9 @@ internal fun PreStartScreen(
     val program = data.program ?: return
     val workout = program.workout(workoutId) ?: return
     val warmUp = program.warmUps.firstOrNull { it.id == workout.warmUpId }
+    val wide = LocalWideLayout.current
     Column(Modifier.fillMaxSize()) {
-        Column(
-            Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = Space.screen, vertical = 8.dp),
-        ) {
+        TwoPane(Modifier.weight(1f), first = {
             TopBar("Gym", onBack)
             Gap(Space.inside)
             if (workout.id == data.suggested?.id) {
@@ -82,7 +78,9 @@ internal fun PreStartScreen(
                     }
                 }
             }
-            Gap(Space.section)
+        }, second = {
+            // Lines the list up with the title in the first pane.
+            if (wide) Gap(56.dp)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Overline("Workout", Modifier.weight(1f))
                 HText("today's weight", type.caption, color = colors.muted)
@@ -90,8 +88,13 @@ internal fun PreStartScreen(
             Gap(Space.item)
             ExerciseList(program, workoutId, targets)
             Gap(Space.card)
-        }
-        Box(Modifier.padding(horizontal = Space.screen, vertical = 12.dp)) {
+        })
+        Box(
+            Modifier
+                .align(Alignment.End)
+                .fillMaxWidth(if (wide) 0.5f else 1f)
+                .padding(horizontal = Space.screen, vertical = Space.item),
+        ) {
             if (data.active != null) {
                 HText(
                     "Finish or discard the workout in progress first.",

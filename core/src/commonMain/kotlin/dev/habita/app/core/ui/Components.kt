@@ -10,6 +10,7 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,19 +28,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,8 +62,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
@@ -66,6 +73,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.habita.app.core.theme.HabitaTheme
+import dev.habita.app.core.theme.Space
 import kotlinx.coroutines.delay
 
 val CardShape = RoundedCornerShape(22.dp)
@@ -97,7 +105,8 @@ fun HIcon(icon: ImageVector, contentDescription: String?, modifier: Modifier = M
 
 /**
  * A full screen: the background, a soft accent glow at the top, and padding that keeps content
- * clear of the system bars and the keyboard.
+ * clear of the system bars and the keyboard. On wide screens the content is centred and kept to
+ * [MaxContentWidth].
  */
 @Composable
 fun HabitaScreen(
@@ -106,7 +115,7 @@ fun HabitaScreen(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val colors = HabitaTheme.colors
-    Box(
+    BoxWithConstraints(
         modifier
             .fillMaxSize()
             .background(colors.background)
@@ -125,9 +134,57 @@ fun HabitaScreen(
             }
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .imePadding(),
-        content = content,
-    )
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        val wide = maxWidth >= WideLayoutMinWidth
+        CompositionLocalProvider(LocalWideLayout provides wide) {
+            Box(
+                Modifier.widthIn(max = if (wide) MaxWideContentWidth else MaxContentWidth).fillMaxSize(),
+                content = content,
+            )
+        }
+    }
 }
+
+/** Screens at least this wide, such as tablets and desktop windows, lay out in two panes. */
+val WideLayoutMinWidth = 760.dp
+
+/** The widest a single-column screen gets, so lines and cards stay readable. */
+val MaxContentWidth = 600.dp
+
+/** The widest a two-pane screen gets. */
+val MaxWideContentWidth = 1240.dp
+
+/** Whether the current screen is wide enough for two panes. Set by [HabitaScreen]. */
+val LocalWideLayout = staticCompositionLocalOf { false }
+
+/**
+ * Two blocks of a screen: side by side, each scrolling on its own, on wide screens; one after the
+ * other in a single scroll on phones. [header] sits above both and scrolls with the first pane.
+ */
+@Composable
+fun TwoPane(
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(horizontal = Space.screen, vertical = Space.inside),
+    first: @Composable ColumnScope.() -> Unit,
+    second: @Composable ColumnScope.() -> Unit,
+) {
+    if (LocalWideLayout.current) {
+        Row(modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(PaneGap)) {
+            Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(contentPadding), content = first)
+            Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(contentPadding), content = second)
+        }
+    } else {
+        Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(contentPadding)) {
+            first()
+            Spacer(Modifier.height(Space.section))
+            second()
+        }
+    }
+}
+
+/** The gap between the two panes of a wide screen. */
+val PaneGap = 16.dp
 
 /** A white card with the standard radius and border. Clickable when [onClick] is set. */
 @Composable
