@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -50,7 +51,9 @@ import dev.habita.app.core.ui.HIcon
 import dev.habita.app.core.ui.HText
 import dev.habita.app.core.ui.HabitaCard
 import dev.habita.app.core.ui.HabitaIcons
+import dev.habita.app.core.ui.LocalWideLayout
 import dev.habita.app.core.ui.Overline
+import dev.habita.app.core.ui.PaneGap
 import dev.habita.app.core.ui.PrimaryButton
 import dev.habita.app.core.ui.ProgressBar
 import dev.habita.app.core.ui.SecondaryButton
@@ -162,6 +165,7 @@ private fun WarmUpContent(active: ActiveWorkout, viewModel: GymViewModel) {
                 }
             }
         },
+        side = { WarmUpUpcoming(active) },
     ) {
         Overline("Warm-up · ${done + 1} of $total", color = colors.accent)
         Gap(Space.inside)
@@ -172,23 +176,29 @@ private fun WarmUpContent(active: ActiveWorkout, viewModel: GymViewModel) {
             Gap(Space.inside)
             HText(item.amount, type.number)
         }
-        Gap(Space.section)
-        Overline("Then")
-        Gap(Space.item)
-        val upcoming = active.warmUpQueue.drop(1)
-        if (upcoming.isEmpty()) {
-            HText("${active.warmUp.restSeconds / 60} min break, then the main workout", type.body, color = colors.muted)
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(Space.item)) {
-                upcoming.forEach { index ->
-                    val next = active.warmUp.items[index]
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(6.dp).background(colors.muted.copy(alpha = 0.5f), CircleShape))
-                        Gap(Space.item)
-                        HText(next.name, type.body, modifier = Modifier.weight(1f))
-                        Gap(Space.item)
-                        HText(next.amount, type.caption, color = colors.muted)
-                    }
+    }
+}
+
+/** The warm-up items still to come, after the current one. */
+@Composable
+private fun ColumnScope.WarmUpUpcoming(active: ActiveWorkout) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
+    Overline("Then")
+    Gap(Space.item)
+    val upcoming = active.warmUpQueue.drop(1)
+    if (upcoming.isEmpty()) {
+        HText("${active.warmUp.restSeconds / 60} min break, then the main workout", type.body, color = colors.muted)
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(Space.item)) {
+            upcoming.forEach { index ->
+                val next = active.warmUp.items[index]
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(6.dp).background(colors.muted.copy(alpha = 0.5f), CircleShape))
+                    Gap(Space.item)
+                    HText(next.name, type.body, modifier = Modifier.weight(1f))
+                    Gap(Space.item)
+                    HText(next.amount, type.caption, color = colors.muted)
                 }
             }
         }
@@ -234,6 +244,7 @@ private fun RestContent(
                 PrimaryButton(if (title == "Break") "Start main" else "Skip rest", onDone, Modifier.weight(2f))
             }
         },
+        side = next,
     ) {
         Column(Modifier.fillMaxWidth().padding(top = Space.item), horizontalAlignment = Alignment.CenterHorizontally) {
             Overline(title, color = colors.accent)
@@ -254,8 +265,6 @@ private fun RestContent(
                 }
             }
         }
-        Gap(Space.section)
-        next()
     }
 }
 
@@ -363,6 +372,17 @@ private fun WarmUpSetContent(active: ActiveWorkout, data: GymData, viewModel: Gy
                 }
             }
         },
+        side = {
+            SetInputs(
+                exercise = exercise,
+                step = step,
+                weightText = weightText,
+                onWeightChange = { weightText = it },
+                amountText = repsText,
+                onAmountChange = { repsText = it },
+                onEditStep = null,
+            )
+        },
     ) {
         ExerciseHeader(active, slotIndex, "Exercise ${active.exercisesDone + 1} of ${active.workout.exercises.size} · warm-up set")
         Gap(Space.card)
@@ -376,16 +396,6 @@ private fun WarmUpSetContent(active: ActiveWorkout, data: GymData, viewModel: Gy
                 type.body,
             )
         }
-        Gap(Space.section)
-        SetInputs(
-            exercise = exercise,
-            step = step,
-            weightText = weightText,
-            onWeightChange = { weightText = it },
-            amountText = repsText,
-            onAmountChange = { repsText = it },
-            onEditStep = null,
-        )
     }
 }
 
@@ -401,8 +411,10 @@ private fun WorkingSetContent(active: ActiveWorkout, data: GymData, viewModel: G
     val advice = active.advice[slotIndex]
 
     // Prefilled with today's target, adjusted by how the last set felt, so a normal set is one tap.
+    // With no target yet (the first time), the warm-up set is about half, so double it.
     var weightText by remember(active.sessionId, slotIndex, setNumber) {
-        mutableStateOf(next.weightGrams?.let(::formatKg) ?: "")
+        val prefill = next.weightGrams ?: active.warmUpSetFor(slotIndex)?.weightGrams?.let { it * 2 }
+        mutableStateOf(prefill?.let(::formatKg) ?: "")
     }
     var amountText by remember(active.sessionId, slotIndex, setNumber) { mutableStateOf(next.target.toString()) }
     var editingStep by remember(slotIndex) { mutableStateOf(false) }
@@ -441,6 +453,24 @@ private fun WorkingSetContent(active: ActiveWorkout, data: GymData, viewModel: G
                 Spacer(Modifier.weight(1f))
                 if (active.exerciseQueue.size > 1) {
                     TextAction("Machine taken", viewModel::exerciseMachineTaken, color = colors.muted)
+                }
+            }
+        },
+        side = {
+            SetInputs(
+                exercise = exercise,
+                step = step,
+                weightText = weightText,
+                onWeightChange = { weightText = it },
+                amountText = amountText,
+                onAmountChange = { amountText = it },
+                onEditStep = { editingStep = !editingStep },
+            )
+            if (editingStep) {
+                Gap(Space.item)
+                StepEditor(exercise.formatStep(step)) { change ->
+                    val nextStep = step + change * exercise.stepIncrement()
+                    if (nextStep > 0) viewModel.setStep(exercise.id, nextStep)
                 }
             }
         },
@@ -490,23 +520,6 @@ private fun WorkingSetContent(active: ActiveWorkout, data: GymData, viewModel: G
                 Divider()
                 Gap(Space.item)
                 HText(baseTarget.reasonText(exercise, step), type.caption, color = colors.muted)
-            }
-        }
-        Gap(Space.section)
-        SetInputs(
-            exercise = exercise,
-            step = step,
-            weightText = weightText,
-            onWeightChange = { weightText = it },
-            amountText = amountText,
-            onAmountChange = { amountText = it },
-            onEditStep = { editingStep = !editingStep },
-        )
-        if (editingStep) {
-            Gap(Space.item)
-            StepEditor(exercise.formatStep(step)) { change ->
-                val nextStep = step + change * exercise.stepIncrement()
-                if (nextStep > 0) viewModel.setStep(exercise.id, nextStep)
             }
         }
     }
@@ -689,23 +702,35 @@ private fun StepEditor(value: String, onChange: (Int) -> Unit) {
     }
 }
 
-/** Scrolling content with the action buttons pinned at the bottom, within thumb reach. */
+/**
+ * Scrolling content with the action buttons pinned at the bottom, within thumb reach. On phones
+ * [side] follows [content] in the same scroll; on wide screens it gets the right-hand pane, with
+ * the actions under it.
+ */
 @Composable
 private fun ActionLayout(
     actions: @Composable ColumnScope.() -> Unit,
+    side: @Composable ColumnScope.() -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(Modifier.fillMaxSize()) {
-        Column(
-            Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(start = Space.screen, end = Space.screen, top = Space.card, bottom = Space.card),
-        ) {
-            content()
+    val padding = Modifier.padding(start = Space.screen, end = Space.screen, top = Space.card, bottom = Space.card)
+    val actionPadding = Modifier.padding(start = Space.screen, end = Space.screen, top = Space.item, bottom = Space.item)
+    if (LocalWideLayout.current) {
+        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(PaneGap)) {
+            Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).then(padding), content = content)
+            Column(Modifier.weight(1f).fillMaxHeight()) {
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).then(padding), content = side)
+                Column(actionPadding, content = actions)
+            }
         }
-        Column(Modifier.padding(start = Space.screen, end = Space.screen, top = Space.item, bottom = Space.item)) {
-            actions()
+    } else {
+        Column(Modifier.fillMaxSize()) {
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).then(padding)) {
+                content()
+                Gap(Space.section)
+                side()
+            }
+            Column(actionPadding, content = actions)
         }
     }
 }

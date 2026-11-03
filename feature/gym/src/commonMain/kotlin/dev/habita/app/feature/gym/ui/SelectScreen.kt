@@ -10,9 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,10 +29,12 @@ import dev.habita.app.core.ui.HIcon
 import dev.habita.app.core.ui.HText
 import dev.habita.app.core.ui.HabitaCard
 import dev.habita.app.core.ui.HabitaIcons
+import dev.habita.app.core.ui.LocalWideLayout
 import dev.habita.app.core.ui.Overline
 import dev.habita.app.core.ui.PrimaryButton
 import dev.habita.app.core.ui.SecondaryButton
 import dev.habita.app.core.ui.TopBar
+import dev.habita.app.core.ui.TwoPane
 import dev.habita.app.feature.gym.data.SyncState
 import dev.habita.app.feature.gym.workout.ActiveWorkout
 import dev.habita.app.shared.gym.Program
@@ -59,46 +59,55 @@ internal fun SelectScreen(
 ) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = Space.screen, vertical = Space.inside),
-    ) {
-        TopBar("Home", onBack)
-        Gap(Space.inside)
-        HText("Gym", type.headline)
-        val program = data.program
-        if (program == null) {
-            Gap(24.dp)
-            NoProgram(data.sync, onRetry)
-            return@Column
-        }
-        val now = nowMillis()
-        val weekStart = startOfWeek(now)
-        val thisWeek = data.sessions.filter { !it.deleted && it.endedAt != null && it.startedAt >= weekStart }
-        Gap(Space.tiny)
-        HText(weekLine(thisWeek.size), type.body, color = colors.muted)
-        Gap(Space.card)
-        WeekStrip(thisWeek, weekStart, now)
-        Gap(Space.section)
-        data.active?.let {
-            InProgressCard(it, onResume, onDiscard)
+    val wide = LocalWideLayout.current
+    val program = data.program
+    if (program == null) {
+        Column(Modifier.fillMaxSize().padding(horizontal = Space.screen, vertical = Space.inside)) {
+            TopBar("Home", onBack)
+            Gap(Space.inside)
+            HText("Gym", type.headline)
             Gap(Space.section)
+            NoProgram(data.sync, onRetry)
         }
-        data.suggested?.let { workout ->
-            if (data.active == null) {
-                UpNextCard(program, workout, lastDone(data.sessions, workout.id, now)) { onOpenWorkout(workout.id) }
-                Gap(Space.section)
-            }
-        }
-        Overline("All workouts")
-        Gap(Space.item)
-        DayCards(program, data.suggested, onOpenWorkout)
-        Gap(Space.section)
-        StorageNote(data, onBackup, backupMessage)
-        Gap(Space.card)
+        return
     }
+    val now = nowMillis()
+    val weekStart = startOfWeek(now)
+    val thisWeek = data.sessions.filter { !it.deleted && it.endedAt != null && it.startedAt >= weekStart }
+    TwoPane(
+        first = {
+            TopBar("Home", onBack)
+            Gap(Space.inside)
+            HText("Gym", type.headline)
+            Gap(Space.tiny)
+            HText(weekLine(thisWeek.size), type.body, color = colors.muted)
+            Gap(Space.card)
+            WeekStrip(thisWeek, weekStart, now)
+            Gap(Space.section)
+            data.active?.let { InProgressCard(it, onResume, onDiscard) }
+            data.suggested?.let { workout ->
+                if (data.active == null) {
+                    UpNextCard(program, workout, lastDone(data.sessions, workout.id, now)) { onOpenWorkout(workout.id) }
+                }
+            }
+            if (wide) {
+                Gap(Space.section)
+                StorageNote(data, onBackup, backupMessage)
+            }
+        },
+        second = {
+            // Lines the list up with the title in the first pane.
+            if (wide) Gap(56.dp)
+            Overline("All workouts")
+            Gap(Space.item)
+            DayCards(program, data.suggested, onOpenWorkout)
+            if (!wide) {
+                Gap(Space.section)
+                StorageNote(data, onBackup, backupMessage)
+            }
+            Gap(Space.card)
+        },
+    )
 }
 
 private fun weekLine(count: Int): String = when (count) {
