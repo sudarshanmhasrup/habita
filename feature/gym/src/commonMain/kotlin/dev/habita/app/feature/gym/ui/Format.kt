@@ -99,6 +99,9 @@ internal fun ExerciseTarget.reasonText(exercise: Exercise, step: Int): String = 
     TargetReason.FIRST_TIME ->
         if (exercise.isWeighted) "First time. Pick a weight you can lift for every rep with good form." else "First time. Aim for the target."
     TargetReason.INCREASE -> "Every set hit the target last time, so it's up ${exercise.formatStep(step)}."
+    TargetReason.INCREASE_EASY -> "Every set hit the target and felt easy, so it's up two steps."
+    TargetReason.FELT_EASY -> "Missed a few reps, but it all felt easy, so it's up ${exercise.formatStep(step)}."
+    TargetReason.HOLD_HARD -> "You hit every rep, but it was hard. Same again to own it."
     TargetReason.REPEAT ->
         if (exercise.isWeighted) "Same weight as last time. Beat last time's reps." else "Same target. Hit it on every set."
     TargetReason.DROP_BACK -> "Reps fell too low after the last jump, so it's back to the previous weight."

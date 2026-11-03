@@ -18,10 +18,22 @@ import dev.habita.app.feature.gym.ui.PreStartScreen
 import dev.habita.app.feature.gym.ui.SelectScreen
 import dev.habita.app.feature.gym.ui.SummaryScreen
 import dev.habita.app.feature.gym.ui.WorkoutScreen
+import dev.habita.app.shared.gym.Rotation
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 
 /** The gym feature. Create it once at startup, so syncing starts as soon as the user is logged in. */
 class GymFeature(core: Core) {
     internal val repository = GymRepository(core)
+
+    /** One line for the home screen: the workout in progress, or the next one in the rotation. */
+    val status: Flow<String?> = combine(repository.program, repository.sessions, repository.active) { program, sessions, active ->
+        when {
+            active != null -> "In progress · ${active.workout.name}"
+            program != null -> "Up next · ${Rotation.next(program.program, sessions).name}"
+            else -> null
+        }
+    }
 }
 
 /** The gym, from picking a workout to its summary. [onExit] goes back to the home screen. */
@@ -32,7 +44,7 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
     val route by viewModel.route.collectAsStateWithLifecycle()
     val data by viewModel.data.collectAsStateWithLifecycle()
     val preStartTargets by viewModel.preStartTargets.collectAsStateWithLifecycle()
-    val summary by viewModel.summary.collectAsStateWithLifecycle()
+    val report by viewModel.report.collectAsStateWithLifecycle()
 
     // The workout screen with no workout, for example after a discard: go back to the list. The
     // check runs on the latest route, so finishing, which moves on to the summary, is left alone.
@@ -71,13 +83,7 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
                     WorkoutScreen(active, current, viewModel, onBack = { viewModel.back() })
                 }
 
-                is GymRoute.Summary -> SummaryScreen(
-                    summary = summary,
-                    program = current.program,
-                    workoutName = current.sessions.firstOrNull { it.id == screen.sessionId }
-                        ?.let { session -> current.program?.workout(session.workoutId)?.name },
-                    onDone = onExit,
-                )
+                is GymRoute.Summary -> SummaryScreen(report = report, onDone = { viewModel.back() })
             }
         }
     }

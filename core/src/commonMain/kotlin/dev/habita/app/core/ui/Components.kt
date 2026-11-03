@@ -34,8 +34,11 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,14 +53,20 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.habita.app.core.theme.HabitaTheme
+import kotlinx.coroutines.delay
 
 val CardShape = RoundedCornerShape(22.dp)
 val ControlShape = RoundedCornerShape(16.dp)
@@ -337,8 +346,9 @@ fun LabeledField(
 }
 
 /**
- * A number with − and + buttons either side. The number can also be typed. [unit] is shown after
- * the number, such as "kg".
+ * A number with − and + buttons either side. The number can also be typed: only digits, plus one
+ * decimal point when the keyboard is [KeyboardType.Decimal]. [unit] is shown after the number,
+ * such as "kg". The keyboard's done key closes it.
  */
 @Composable
 fun Stepper(
@@ -353,6 +363,19 @@ fun Stepper(
     contentDescription: String,
 ) {
     val colors = HabitaTheme.colors
+    val focusManager = LocalFocusManager.current
+    val decimal = keyboardOptions.keyboardType == KeyboardType.Decimal
+    // Selects the whole number when the field gains focus, so typing replaces it.
+    var field by remember { mutableStateOf(TextFieldValue(value)) }
+    val shown = if (field.text == value) field else TextFieldValue(value, TextRange(value.length)).also { field = it }
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    LaunchedEffect(focused) {
+        if (focused) {
+            delay(80)
+            field = field.copy(selection = TextRange(0, field.text.length))
+        }
+    }
     Row(
         modifier
             .fillMaxWidth()
@@ -361,19 +384,28 @@ fun Stepper(
             .border(1.dp, colors.border, ControlShape),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StepperButton(HabitaIcons.Minus, "Less $contentDescription", onMinus)
+        StepperButton(HabitaIcons.Minus, "Less $contentDescription") {
+            focusManager.clearFocus()
+            onMinus()
+        }
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Box(contentAlignment = Alignment.Center) {
                 if (value.isEmpty()) {
                     HText(placeholder, HabitaTheme.typography.number, color = colors.muted.copy(alpha = 0.6f))
                 }
                 BasicTextField(
-                    value = value,
-                    onValueChange = onValueChange,
+                    value = shown,
+                    onValueChange = { typed ->
+                        val clean = cleanNumber(typed.text, decimal) ?: return@BasicTextField
+                        field = if (clean == typed.text) typed else TextFieldValue(clean, TextRange(clean.length))
+                        if (clean != value) onValueChange(clean)
+                    },
+                    interactionSource = interaction,
                     singleLine = true,
                     textStyle = HabitaTheme.typography.number.copy(color = colors.text, textAlign = TextAlign.Center),
                     cursorBrush = SolidColor(colors.accent),
-                    keyboardOptions = keyboardOptions,
+                    keyboardOptions = keyboardOptions.copy(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                     modifier = Modifier.width(110.dp),
                 )
             }
@@ -381,8 +413,31 @@ fun Stepper(
                 HText(unit, HabitaTheme.typography.bodyStrong, color = colors.muted)
             }
         }
-        StepperButton(HabitaIcons.Plus, "More $contentDescription", onPlus)
+        StepperButton(HabitaIcons.Plus, "More $contentDescription") {
+            focusManager.clearFocus()
+            onPlus()
+        }
     }
+}
+
+/**
+ * [typed] with anything but digits (and one decimal point, as "." or ",") taken out, or `null` to
+ * reject it when it is too long to be a real weight or count.
+ */
+private fun cleanNumber(typed: String, decimal: Boolean): String? {
+    var seenPoint = false
+    val clean = buildString {
+        typed.forEach { char ->
+            when {
+                char.isDigit() -> append(char)
+                decimal && (char == '.' || char == ',') && !seenPoint -> {
+                    seenPoint = true
+                    append('.')
+                }
+            }
+        }
+    }
+    return clean.takeIf { it.length <= 6 }
 }
 
 @Composable
@@ -400,9 +455,9 @@ private fun StepperButton(icon: ImageVector, label: String, onClick: () -> Unit)
 
 /** A thin progress bar; [progress] runs from 0 to 1. */
 @Composable
-fun ProgressBar(progress: Float, modifier: Modifier = Modifier) {
+fun ProgressBar(progress: Float, modifier: Modifier = Modifier, height: Dp = 6.dp) {
     val colors = HabitaTheme.colors
-    Canvas(modifier.fillMaxWidth().height(6.dp)) {
+    Canvas(modifier.fillMaxWidth().height(height)) {
         val y = size.height / 2
         drawLine(colors.border, Offset(0f, y), Offset(size.width, y), size.height, StrokeCap.Round)
         val end = size.width * progress.coerceIn(0f, 1f)
@@ -426,3 +481,48 @@ fun RowScope.Gap(width: Dp) = Spacer(Modifier.width(width))
 
 @Composable
 fun ColumnScope.Gap(height: Dp) = Spacer(Modifier.height(height))
+
+/** The row at the top of a screen: a back link and optional actions on the right. */
+@Composable
+fun TopBar(
+    backText: String?,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    trailing: @Composable RowScope.() -> Unit = {},
+) {
+    Row(
+        modifier.fillMaxWidth().heightIn(min = 48.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (backText != null) BackLink(backText, onBack)
+        Spacer(Modifier.weight(1f))
+        trailing()
+    }
+}
+
+/** A small, spaced-out capital label above a section or a big value. */
+@Composable
+fun Overline(text: String, modifier: Modifier = Modifier, color: Color = HabitaTheme.colors.muted) {
+    HText(text.uppercase(), HabitaTheme.typography.overline, modifier = modifier, color = color)
+}
+
+/** A compact number with its label, for rows of stats. */
+@Composable
+fun StatTile(label: String, value: String, modifier: Modifier = Modifier, detail: String? = null) {
+    val colors = HabitaTheme.colors
+    HabitaCard(modifier, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)) {
+        HText(value, HabitaTheme.typography.stat, maxLines = 1)
+        Spacer(Modifier.height(2.dp))
+        HText(label, HabitaTheme.typography.caption, color = colors.muted, maxLines = 1)
+        if (detail != null) {
+            Spacer(Modifier.height(2.dp))
+            HText(detail, HabitaTheme.typography.caption, color = colors.accent, maxLines = 1)
+        }
+    }
+}
+
+/** A thin divider in the border color. */
+@Composable
+fun Divider(modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxWidth().height(1.dp).background(HabitaTheme.colors.border))
+}

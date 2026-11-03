@@ -7,16 +7,17 @@ import dev.habita.app.feature.gym.db.GymDatabase
 import dev.habita.app.feature.gym.workout.ActiveWorkout
 import dev.habita.app.feature.gym.workout.WorkoutEngine
 import dev.habita.app.shared.api.ProgramResponse
+import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.ExerciseStep
 import dev.habita.app.shared.gym.ExerciseTarget
 import dev.habita.app.shared.gym.History
 import dev.habita.app.shared.gym.Program
+import dev.habita.app.shared.gym.ProgramParser
 import dev.habita.app.shared.gym.Progression
 import dev.habita.app.shared.gym.Summary
 import dev.habita.app.shared.gym.WarmUpStatus
 import dev.habita.app.shared.gym.Workout
 import dev.habita.app.shared.gym.WorkoutSession
-import dev.habita.app.shared.gym.WorkoutSummary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
@@ -34,6 +35,23 @@ class GymRepository(core: Core) {
     private val mutex = Mutex()
 
     val sync = GymSync(store, core)
+
+    val syncEnabled: Boolean = core.config.loginEnabled
+
+    init {
+        loadBundledProgram()
+    }
+
+    /**
+     * Uses the plan built into the app until the server sends one, so the gym works offline from
+     * the first launch. A newer bundled plan replaces an older bundled one, never the server's.
+     */
+    private fun loadBundledProgram() {
+        val cached = store.program()
+        if (cached != null && cached.version != BUNDLED_VERSION) return
+        val bundled = ProgramResponse(BUNDLED_VERSION, ProgramParser.parse(BUNDLED_PROGRAM))
+        if (cached != bundled) store.saveProgram(bundled)
+    }
 
     val program: Flow<ProgramResponse?> = store.program
     val sessions: Flow<List<WorkoutSession>> = store.allSessions
@@ -96,10 +114,12 @@ class GymRepository(core: Core) {
      * Logs the current set. Returns the session id when that was the workout's last set, which
      * finishes the workout.
      */
-    suspend fun logSet(weightGrams: Int, achieved: Int?): String? = write {
+    suspend fun logSet(weightGrams: Int, achieved: Int?, effort: Effort?): String? = write {
         val active = store.active() ?: return@write null
         val now = nowMillis()
-        val (next, log) = WorkoutEngine.logSet(active, weightGrams, achieved, newId(), now)
+        val exercise = active.currentSlot?.let { active.exercises[it] } ?: return@write null
+        val step = store.steps()[exercise.id] ?: exercise.defaultStep
+        val (next, log) = WorkoutEngine.logSet(active, weightGrams, achieved, effort, step, newId(), now)
         store.transaction {
             store.saveSet(log)
             if (next.isFinished) finishSession(next, now) else store.saveActive(next)
@@ -108,6 +128,8 @@ class GymRepository(core: Core) {
     }
 
     suspend fun endRest() = update { WorkoutEngine.endRest(it) }
+
+    suspend fun extendRest(seconds: Int) = update { WorkoutEngine.extendRest(it, seconds) }
 
     suspend fun exerciseMachineTaken() = update { WorkoutEngine.exerciseMachineTaken(it) }
 
@@ -146,19 +168,25 @@ class GymRepository(core: Core) {
         }
     }
 
-    suspend fun summary(sessionId: String): WorkoutSummary? = withContext(Dispatchers.Default) {
+    /** The summary of [sessionId] with the data for its charts. */
+    suspend fun report(sessionId: String): SessionReport? = withContext(Dispatchers.Default) {
         val program = store.program()?.program ?: return@withContext null
         val session = store.session(sessionId) ?: return@withContext null
+        val sessions = store.sessions()
         val exerciseIds = store.setsForSession(sessionId).map { it.exerciseId } +
             program.workout(session.workoutId)?.exercises?.map { it.exerciseId }.orEmpty()
-        Summary.of(
+        val sameWorkout = sessions.filter { it.workoutId == session.workoutId && !it.deleted }.map { it.id }.toSet()
+        val sets = (store.setsForExercises(exerciseIds.distinct()) + sameWorkout.flatMap { store.setsForSession(it) })
+            .distinctBy { it.id }
+        val summary = Summary.of(
             session = session,
             program = program,
-            sessions = store.sessions(),
-            sets = store.setsForExercises(exerciseIds.distinct()),
+            sessions = sessions,
+            sets = sets,
             steps = store.steps(),
             now = nowMillis(),
         )
+        Reports.of(summary, session, program, sessions, sets)
     }
 
     private fun finishSession(active: ActiveWorkout, now: Long) {
@@ -207,3 +235,6 @@ class GymRepository(core: Core) {
         }
     }
 }
+
+/** The version of the plan built into the app. Server versions start at 1. */
+internal const val BUNDLED_VERSION = 0L

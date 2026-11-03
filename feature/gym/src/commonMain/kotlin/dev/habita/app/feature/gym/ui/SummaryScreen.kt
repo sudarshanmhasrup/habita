@@ -2,92 +2,209 @@ package dev.habita.app.feature.gym.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.ui.Gap
+import dev.habita.app.core.ui.HIcon
 import dev.habita.app.core.ui.HText
 import dev.habita.app.core.ui.HabitaCard
+import dev.habita.app.core.ui.HabitaIcons
+import dev.habita.app.core.ui.Overline
+import dev.habita.app.core.ui.Pill
 import dev.habita.app.core.ui.PrimaryButton
-import dev.habita.app.shared.gym.Program
+import dev.habita.app.core.ui.StatTile
+import dev.habita.app.feature.gym.data.ExerciseReport
+import dev.habita.app.feature.gym.data.SessionReport
+import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.WorkoutSummary
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** The six end-of-workout numbers. */
+/** The end of a workout: the headline numbers, then charts of how it went. */
 @Composable
-internal fun SummaryScreen(
-    summary: WorkoutSummary?,
-    program: Program?,
-    workoutName: String?,
-    onDone: () -> Unit,
-) {
+internal fun SummaryScreen(report: SessionReport?, onDone: () -> Unit) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
-    fun names(ids: List<String>) =
-        if (ids.isEmpty()) "None this time" else ids.joinToString("\n") { program?.exercise(it)?.name ?: it }
-
     Column(Modifier.fillMaxSize()) {
         Column(
             Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(horizontal = 20.dp, vertical = 16.dp),
         ) {
-            Gap(32.dp)
-            HText("Workout done", type.headline)
-            workoutName?.let {
-                Gap(6.dp)
-                HText(it, type.body, color = colors.muted)
-            }
             Gap(24.dp)
-            if (summary == null) {
+            Overline("Workout done", color = colors.accent)
+            Gap(6.dp)
+            HText(report?.workoutName ?: "Nice work", type.headline)
+            Gap(20.dp)
+            if (report == null) {
                 HText("Adding it up…", type.body, color = colors.muted)
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SummaryCard(
-                        "Time",
-                        formatDuration(summary.totalMillis),
-                        "Warm-up ${formatDuration(summary.warmUpMillis)} · main ${formatDuration(summary.mainMillis)}",
-                    )
-                    SummaryCard("Volume", "${formatVolume(summary.volumeKg)} kg", volumeChange(summary, workoutName))
-                    SummaryCard("Progressed", names(summary.exercisesProgressed))
-                    SummaryCard("New bests", names(summary.personalBests))
-                    SummaryCard("Sets", "${summary.setsCompleted} done · ${summary.setsSkipped} skipped")
-                    SummaryCard("Heavier next time", names(summary.nextIncreases))
-                }
+                Content(report)
             }
+            Gap(8.dp)
         }
-        PrimaryButton("Done", onDone, Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp))
-    }
-}
-
-private fun volumeChange(summary: WorkoutSummary, workoutName: String?): String {
-    val change = summary.volumeChangePercent ?: return "First ${workoutName ?: "time"} to compare with"
-    val rounded = change.roundToInt()
-    return when {
-        rounded > 0 -> "Up $rounded% on last time"
-        rounded < 0 -> "Down ${abs(rounded)}% on last time"
-        else -> "Same as last time"
+        PrimaryButton("Done", onDone, Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp))
     }
 }
 
 @Composable
-private fun SummaryCard(label: String, value: String, detail: String? = null) {
+private fun ColumnScope.Content(report: SessionReport) {
+    val summary = report.summary
     val colors = HabitaTheme.colors
-    HabitaCard(Modifier.fillMaxWidth()) {
-        HText(label, HabitaTheme.typography.caption, color = colors.muted)
-        Gap(4.dp)
-        HText(value, HabitaTheme.typography.title)
-        if (detail != null) {
-            Gap(4.dp)
-            HText(detail, HabitaTheme.typography.body, color = colors.muted)
+    val type = HabitaTheme.typography
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        StatTile("Time", formatDuration(summary.totalMillis), Modifier.weight(1f))
+        StatTile(
+            "Volume",
+            "${formatVolume(summary.volumeKg)} kg",
+            Modifier.weight(1f),
+            detail = volumeChange(summary) ?: "First one, trend next time",
+        )
+    }
+    Gap(10.dp)
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        StatTile("Sets done", "${summary.setsCompleted}", Modifier.weight(1f), detail = summary.setsSkipped.takeIf { it > 0 }?.let { "$it skipped" })
+        StatTile("New bests", "${summary.personalBests.size}", Modifier.weight(1f))
+    }
+    Gap(14.dp)
+
+    ChartCard("Time", "Where the ${formatDuration(summary.totalMillis)} went") {
+        SplitBar(
+            listOf(
+                Triple("Warm-up ${formatDuration(summary.warmUpMillis)}", summary.warmUpMillis.toDouble(), colors.effortEasy),
+                Triple("Main ${formatDuration(summary.mainMillis)}", summary.mainMillis.toDouble(), colors.effortMedium),
+            ),
+        )
+    }
+
+    if (report.efforts.isNotEmpty()) {
+        Gap(14.dp)
+        val total = report.efforts.values.sum()
+        ChartCard("Effort", "How your $total rated sets felt") {
+            SplitBar(
+                Effort.entries.map { effort ->
+                    val count = report.efforts[effort] ?: 0
+                    Triple("${effort.label()} $count", count.toDouble(), colors.effort(effort))
+                },
+            )
         }
     }
+
+    if (report.volumeTrend.size >= 2) {
+        Gap(14.dp)
+        ChartCard("Volume", "Weight × reps, your last ${report.volumeTrend.size} ${report.workoutName} sessions") {
+            TrendBars(report.volumeTrend, format = { formatCompactKg(it) })
+        }
+    }
+
+    if (summary.nextIncreases.isNotEmpty()) {
+        Gap(14.dp)
+        HabitaCard(Modifier.fillMaxWidth(), color = colors.accentTint, borderColor = colors.accentTint) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HIcon(HabitaIcons.TrendUp, contentDescription = null, tint = colors.accent)
+                Gap(10.dp)
+                HText("Heavier next time", type.title)
+            }
+            Gap(8.dp)
+            val names = report.exercises.filter { it.heavierNext }.map { it.exercise.name }
+            HText(names.joinToString(" · "), type.body, color = colors.text)
+        }
+    }
+
+    Gap(24.dp)
+    Overline("Exercise by exercise")
+    Gap(10.dp)
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        report.exercises.forEach { ExerciseCard(it) }
+    }
+    if (report.efforts.isNotEmpty()) {
+        Gap(12.dp)
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Effort.entries.forEach { LegendItem(colors.effort(it), it.label()) }
+        }
+        Gap(4.dp)
+        HText("Bar height is the weight; color is how the set felt.", type.caption, color = colors.muted)
+    }
+}
+
+@Composable
+private fun ChartCard(title: String, caption: String, content: @Composable () -> Unit) {
+    HabitaCard(Modifier.fillMaxWidth()) {
+        HText(title, HabitaTheme.typography.title)
+        HText(caption, HabitaTheme.typography.caption, color = HabitaTheme.colors.muted)
+        Gap(16.dp)
+        content()
+    }
+}
+
+@Composable
+private fun ExerciseCard(report: ExerciseReport) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
+    val exercise = report.exercise
+    HabitaCard(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HText(exercise.name, type.bodyStrong, modifier = Modifier.weight(1f))
+            when {
+                report.personalBest -> Pill("Best")
+                report.progressed -> Pill("Up")
+                report.heavierNext -> Pill("Heavier next")
+            }
+        }
+        HText(
+            report.lastTime?.let { "Last time ${it.describe(exercise)}" } ?: "First time",
+            type.caption,
+            color = colors.muted,
+        )
+        Gap(14.dp)
+        SetBars(exercise, report.sets)
+        if (report.trend.size >= 2) {
+            Gap(14.dp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    HText(
+                        if (exercise.isWeighted) "Working weight, last ${report.trend.size}" else "Best hold, last ${report.trend.size}",
+                        type.caption,
+                        color = colors.muted,
+                    )
+                    val first = report.trend.first().value
+                    val last = report.trend.last().value
+                    HText(
+                        if (exercise.isWeighted) "${formatCompactKg(first)} → ${formatCompactKg(last)} kg" else "${first.toInt()} → ${last.toInt()} s",
+                        type.bodyStrong,
+                    )
+                }
+                Gap(12.dp)
+                Sparkline(report.trend, Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+private fun volumeChange(summary: WorkoutSummary): String? {
+    val change = summary.volumeChangePercent ?: return null
+    val rounded = change.roundToInt()
+    return when {
+        rounded > 0 -> "+$rounded% vs last"
+        rounded < 0 -> "−${abs(rounded)}% vs last"
+        else -> "Same as last"
+    }
+}
+
+/** 4320.0 → "4.3k", 850.0 → "850", 22.5 → "22.5". */
+private fun formatCompactKg(kg: Double): String = when {
+    kg >= 10_000 -> "${(kg / 1000).roundToInt()}k"
+    kg >= 1000 -> "${(kg / 100).roundToInt() / 10.0}k"
+    else -> formatKg((kg * 1000).roundToInt())
 }

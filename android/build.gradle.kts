@@ -13,13 +13,16 @@ val localProperties = Properties().apply {
     if (file.exists()) file.inputStream().use(::load)
 }
 
-fun appSetting(name: String): String {
+fun rawSetting(name: String): String {
     val value = localProperties.getProperty(name)
         ?: providers.gradleProperty(name).orNull
         ?: providers.environmentVariable(name).orNull
         ?: ""
-    return "\"" + value.trim().replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+    return value.trim()
 }
+
+fun appSetting(name: String): String =
+    "\"" + rawSetting(name).replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
 group = libs.versions.android.group.get()
 version = libs.versions.android.version.get()
@@ -37,6 +40,9 @@ android {
 
         buildConfigField("String", "SERVER_URL", appSetting("HABITA_SERVER_URL"))
         buildConfigField("String", "USER_NAME", appSetting("HABITA_NAME"))
+        // Off until the server is running: the app opens straight to home and keeps everything on
+        // the phone. Set HABITA_LOGIN=true to ask for the login and start syncing.
+        buildConfigField("boolean", "LOGIN_ENABLED", (rawSetting("HABITA_LOGIN") == "true").toString())
     }
 
     compileOptions {

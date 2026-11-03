@@ -1,7 +1,9 @@
 package dev.habita.app.feature.gym.workout
 
+import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.Exercise
 import dev.habita.app.shared.gym.ExerciseTarget
+import dev.habita.app.shared.gym.Progression
 import dev.habita.app.shared.gym.SetLog
 import dev.habita.app.shared.gym.WarmUp
 import dev.habita.app.shared.gym.WarmUpLog
@@ -72,33 +74,53 @@ object WorkoutEngine {
     }
 
     /**
-     * Logs the current set: [achieved] reps or seconds, or `null` when skipped. Starts the set's
+     * Logs the current set: [achieved] reps or seconds, or `null` when skipped, and how it felt.
+     * Works out the next set from that, using the exercise's progression [step]. Starts the set's
      * rest, unless it was the last set of the workout.
      */
-    fun logSet(active: ActiveWorkout, weightGrams: Int, achieved: Int?, id: String, now: Long): Pair<ActiveWorkout, SetLog> {
+    fun logSet(
+        active: ActiveWorkout,
+        weightGrams: Int,
+        achieved: Int?,
+        effort: Effort?,
+        step: Int,
+        id: String,
+        now: Long,
+    ): Pair<ActiveWorkout, SetLog> {
         check(active.phase == Phase.MAIN && active.rest == null) { "No set to log" }
         val slotIndex = active.exerciseQueue.first()
         val slot = active.slot(slotIndex)
+        val setTarget = active.nextSet(slotIndex).target
         val log = SetLog(
             id = id,
             sessionId = active.sessionId,
             exerciseId = slot.exerciseId,
             setNumber = active.setNumber(slotIndex),
             weightGrams = weightGrams,
-            target = active.targets[slotIndex].target,
+            target = setTarget,
             achieved = achieved,
             completedAt = now,
             updatedAt = now,
+            effort = effort.takeIf { achieved != null },
         )
+        val advice = Progression.nextSet(active.exercises[slotIndex], setTarget, step, log)
         val setsLogged = active.setsLogged.toMutableList().also { it[slotIndex]++ }
         val queue = if (setsLogged[slotIndex] >= slot.sets) active.exerciseQueue.drop(1) else active.exerciseQueue
         val next = active.copy(
             exerciseQueue = queue,
             setsLogged = setsLogged,
             lastWeights = if (achieved != null) active.lastWeights + (slotIndex to weightGrams) else active.lastWeights,
+            advice = if (advice != null) active.advice + (slotIndex to advice) else active.advice,
+            loggedSets = active.loggedSets + log,
             rest = if (queue.isEmpty()) null else Rest(now, now + slot.restSeconds * 1000L),
         )
         return next to log
+    }
+
+    /** Adds [seconds] to the running rest or break. */
+    fun extendRest(active: ActiveWorkout, seconds: Int): ActiveWorkout {
+        val rest = active.rest ?: return active
+        return active.copy(rest = rest.copy(endsAt = rest.endsAt + seconds * 1000L))
     }
 
     /** Ends the rest between sets early or on time. */

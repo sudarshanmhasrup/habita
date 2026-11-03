@@ -2,6 +2,8 @@ package dev.habita.app.feature.gym.workout
 
 import dev.habita.app.shared.gym.Exercise
 import dev.habita.app.shared.gym.ExerciseTarget
+import dev.habita.app.shared.gym.SetAdvice
+import dev.habita.app.shared.gym.SetLog
 import dev.habita.app.shared.gym.WarmUp
 import dev.habita.app.shared.gym.Workout
 import dev.habita.app.shared.gym.WorkoutExercise
@@ -51,6 +53,10 @@ data class ActiveWorkout(
     val setsLogged: List<Int>,
     /** The weight of the latest set per slot today, to prefill the next set. */
     val lastWeights: Map<Int, Int> = emptyMap(),
+    /** What the next set of a slot should be, from how its last set felt. */
+    val advice: Map<Int, SetAdvice> = emptyMap(),
+    /** Every set logged today, oldest first, to show what was done so far. */
+    val loggedSets: List<SetLog> = emptyList(),
     val rest: Rest? = null,
 ) {
     val isFinished: Boolean get() = phase == Phase.MAIN && exerciseQueue.isEmpty()
@@ -65,6 +71,26 @@ data class ActiveWorkout(
 
     /** The set number about to be done in [slot], starting at 1. */
     fun setNumber(slot: Int): Int = setsLogged[slot] + 1
+
+    /** The next set of [slot]: today's target, adjusted by how the previous set felt. */
+    fun nextSet(slot: Int): ExerciseTarget {
+        val target = targets[slot]
+        val advice = advice[slot] ?: return lastWeights[slot]?.let { target.copy(weightGrams = it) } ?: target
+        return target.copy(
+            weightGrams = if (exercises[slot].isWeighted) advice.weightGrams else target.weightGrams,
+            target = advice.target,
+        )
+    }
+
+    /** The sets logged today for [slot]. */
+    fun setsFor(slot: Int): List<SetLog> = loggedSets.filter { it.exerciseId == workout.exercises[slot].exerciseId }
+
+    /** Fraction of all sets logged, for the progress bar. */
+    val progress: Float
+        get() {
+            val total = workout.exercises.sumOf { it.sets }
+            return if (total == 0) 0f else setsLogged.sum().toFloat() / total
+        }
 
     /** How many exercises have all their sets logged. */
     val exercisesDone: Int get() = workout.exercises.indices.count { setsLogged[it] >= slot(it).sets }

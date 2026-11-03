@@ -46,7 +46,8 @@ class GymSync(private val store: GymStore, private val core: Core) {
             for (request in requests) {
                 // Waits briefly so a burst of changes goes out as one push.
                 delay(DEBOUNCE_MILLIS)
-                if (!sync()) scheduleRetry()
+                // Without a login there is nothing to retry: changes stay queued on the phone.
+                if (!sync() && core.settings.token.value != null) scheduleRetry()
             }
         }
     }

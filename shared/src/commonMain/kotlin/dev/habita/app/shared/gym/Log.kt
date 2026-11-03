@@ -20,10 +20,15 @@ data class WorkoutSession(
     val deleted: Boolean = false,
 )
 
+/** How a set felt, picked when it is logged. It steers the next set and the next session. */
+@Serializable
+enum class Effort { EASY, MEDIUM, HARD }
+
 /**
  * One set. [weightGrams] is the weight of one dumbbell for dumbbell exercises and `0` for
  * bodyweight ones. [target] is what the app asked for; [achieved] is what was done, in reps or
- * seconds, and `null` when the set was skipped.
+ * seconds, and `null` when the set was skipped. [effort] is how it felt, `null` when skipped or
+ * logged before effort existed.
  */
 @Serializable
 data class SetLog(
@@ -37,6 +42,7 @@ data class SetLog(
     val completedAt: Long,
     val updatedAt: Long,
     val deleted: Boolean = false,
+    val effort: Effort? = null,
 ) {
     val isSkipped: Boolean get() = achieved == null
 }

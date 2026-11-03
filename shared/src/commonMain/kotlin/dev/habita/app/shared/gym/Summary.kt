@@ -75,7 +75,7 @@ object Summary {
                 val step = steps[exerciseId] ?: exercise.defaultStep
                 val upToToday = history.filter { it.performedAt <= today.performedAt }
                 val next = Progression.target(exercise, slot, step, upToToday, today.performedAt)
-                if (next.reason == TargetReason.INCREASE) increases += exerciseId
+                if (next.reason.isIncrease) increases += exerciseId
             }
         }
 

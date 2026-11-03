@@ -27,6 +27,8 @@ data class HabitaTypography(
     val caption: TextStyle,
     val button: TextStyle,
     val number: TextStyle,
+    val overline: TextStyle,
+    val stat: TextStyle,
 )
 
 @Composable
@@ -49,5 +51,13 @@ internal fun habitaTypography(): HabitaTypography {
         caption = TextStyle(fontFamily = manrope, fontWeight = FontWeight.Medium, fontSize = 13.sp, lineHeight = 18.sp),
         button = TextStyle(fontFamily = manrope, fontWeight = FontWeight.Bold, fontSize = 16.sp, lineHeight = 22.sp),
         number = TextStyle(fontFamily = unbounded, fontWeight = FontWeight.SemiBold, fontSize = 26.sp, lineHeight = 32.sp),
+        overline = TextStyle(
+            fontFamily = manrope,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            letterSpacing = 1.2.sp,
+        ),
+        stat = TextStyle(fontFamily = unbounded, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 28.sp),
     )
 }

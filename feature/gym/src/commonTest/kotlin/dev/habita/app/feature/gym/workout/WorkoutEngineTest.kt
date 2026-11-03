@@ -1,5 +1,6 @@
 package dev.habita.app.feature.gym.workout
 
+import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.Equipment
 import dev.habita.app.shared.gym.Exercise
 import dev.habita.app.shared.gym.ExerciseTarget
@@ -95,17 +96,17 @@ class WorkoutEngineTest {
     @Test
     fun eachSetStartsItsRestAndTheLastSetMovesOn() {
         var active = start().inMain()
-        val (afterSet, log) = WorkoutEngine.logSet(active, 20_000, 12, "set1", now = 1_000)
+        val (afterSet, log) = WorkoutEngine.logSet(active, 20_000, 12, Effort.MEDIUM, 2_000, "set1", now = 1_000)
         assertEquals(1, log.setNumber)
         assertEquals("bench", log.exerciseId)
         assertEquals(12, log.target)
         assertEquals(Rest(1_000, 91_000), afterSet.rest)
         assertEquals(0, afterSet.currentSlot)
         assertEquals(2, afterSet.setNumber(0))
-        assertFailsWith<IllegalStateException> { WorkoutEngine.logSet(afterSet, 20_000, 12, "x", 0) }
+        assertFailsWith<IllegalStateException> { WorkoutEngine.logSet(afterSet, 20_000, 12, Effort.MEDIUM, 2_000, "x", 0) }
 
         active = WorkoutEngine.endRest(afterSet)
-        active = WorkoutEngine.logSet(active, 22_000, 11, "set2", 2_000).first
+        active = WorkoutEngine.logSet(active, 22_000, 11, Effort.MEDIUM, 2_000, "set2", 2_000).first
         assertEquals(1, active.currentSlot)
         assertEquals(1, active.exercisesDone)
         assertEquals(22_000, active.lastWeights[0])
@@ -113,10 +114,23 @@ class WorkoutEngineTest {
     }
 
     @Test
+    fun anEasySetPrefillsAHeavierNextSet() {
+        var active = start().inMain()
+        val (afterSet, log) = WorkoutEngine.logSet(active, 5_000, 12, Effort.EASY, 2_000, "a", 0)
+        assertEquals(Effort.EASY, log.effort)
+        active = WorkoutEngine.endRest(afterSet)
+        assertEquals(7_000, active.nextSet(0).weightGrams)
+
+        // The weight typed for the next set wins, and how that set felt sets the one after.
+        active = WorkoutEngine.endRest(WorkoutEngine.logSet(active, 15_000, 12, Effort.MEDIUM, 2_000, "b", 0).first)
+        assertEquals(15_000, active.nextSet(0).weightGrams)
+    }
+
+    @Test
     fun aSkippedSetCountsButKeepsThePreviousWeight() {
         var active = start().inMain()
-        active = WorkoutEngine.endRest(WorkoutEngine.logSet(active, 20_000, 12, "a", 0).first)
-        val (next, log) = WorkoutEngine.logSet(active, 0, null, "b", 0)
+        active = WorkoutEngine.endRest(WorkoutEngine.logSet(active, 20_000, 12, Effort.MEDIUM, 2_000, "a", 0).first)
+        val (next, log) = WorkoutEngine.logSet(active, 0, null, null, 2_000, "b", 0)
         assertTrue(log.isSkipped)
         assertEquals(20_000, next.lastWeights[0])
         assertEquals(1, next.currentSlot)
@@ -125,12 +139,12 @@ class WorkoutEngineTest {
     @Test
     fun machineTakenInTheMainWorkoutKeepsCompletedSets() {
         var active = start().inMain()
-        active = WorkoutEngine.endRest(WorkoutEngine.logSet(active, 20_000, 12, "a", 0).first)
+        active = WorkoutEngine.endRest(WorkoutEngine.logSet(active, 20_000, 12, Effort.MEDIUM, 2_000, "a", 0).first)
         active = WorkoutEngine.exerciseMachineTaken(active)
         assertEquals(listOf(1, 0, 2), active.exerciseQueue)
         assertEquals(1, active.setsLogged[0])
 
-        repeat(2) { active = WorkoutEngine.endRest(WorkoutEngine.logSet(active, 30_000, 12, "r$it", 0).first) }
+        repeat(2) { active = WorkoutEngine.endRest(WorkoutEngine.logSet(active, 30_000, 12, Effort.MEDIUM, 2_000, "r$it", 0).first) }
         assertEquals(0, active.currentSlot)
         assertEquals(2, active.setNumber(0))
     }
@@ -140,7 +154,7 @@ class WorkoutEngineTest {
         var active = start().inMain()
         var sets = 0
         while (!active.isFinished) {
-            active = WorkoutEngine.logSet(active, 20_000, 12, "s${sets++}", 0).first
+            active = WorkoutEngine.logSet(active, 20_000, 12, Effort.MEDIUM, 2_000, "s${sets++}", 0).first
             if (!active.isFinished) {
                 assertTrue(active.rest != null)
                 active = WorkoutEngine.endRest(active)
@@ -154,7 +168,7 @@ class WorkoutEngineTest {
     @Test
     fun updatedTargetsApplyOnlyToUnstartedSlots() {
         var active = start().inMain()
-        active = WorkoutEngine.endRest(WorkoutEngine.logSet(active, 20_000, 12, "a", 0).first)
+        active = WorkoutEngine.endRest(WorkoutEngine.logSet(active, 20_000, 12, Effort.MEDIUM, 2_000, "a", 0).first)
         val newTarget = targets[0].copy(weightGrams = 25_000)
         val updated = WorkoutEngine.updateTargets(active, mapOf(0 to newTarget, 2 to newTarget.copy(exerciseId = "curl")))
         assertEquals(20_000, updated.targets[0].weightGrams)
