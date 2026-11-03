@@ -12,7 +12,7 @@ last time and tells you what to lift today, so there is nothing to remember or w
 |----------------|-------------------------------------------------------------------------|
 | Server         | Done: login, sync, progression, summaries, export                       |
 | Deployment     | Done: Docker image, CI, HTTPS, server hardening, backups                |
-| Android app    | Done: login, home, the full gym flow, offline use with background sync  |
+| Android app    | Done: home, the full gym flow, effort-based suggestions, summary charts |
 | Desktop app    | Planned, sharing the Compose Multiplatform UI with Android              |
 | iOS and web    | Planned for later                                                       |
 | Other features | Planned for later: expense tracker, to-do list, roadmap, month planner  |
@@ -25,9 +25,12 @@ last time and tells you what to lift today, so there is nothing to remember or w
 2. Do the warm-up one exercise at a time: done, skip, or machine taken, which moves it to after the
    next exercise. A 2-minute rest follows.
 3. Do the main workout set by set. Each exercise shows last time's weight and reps and today's
-   target, filled in so that a normal set is one tap. Finishing a set starts its rest timer.
-4. At the end, see the workout summary: time spent, volume compared with last time, exercises that
-   progressed, personal bests, sets completed and skipped, and what goes up next time.
+   target, filled in so that a normal set is one tap. Log a set by tapping how it felt: Easy,
+   Medium or Hard. The weight can be changed on any set, and the next set is suggested from how
+   this one felt. Finishing a set starts its rest timer.
+4. At the end, see the workout summary: time spent, volume, sets, personal bests and what goes up
+   next time, with charts of the time split, how the sets felt, volume over recent sessions, and
+   each exercise set by set with its working weight over time.
 
 ### Progression rules
 
@@ -40,6 +43,17 @@ Habita uses double progression, the standard method for a fixed rep target like 
   up.
 - Come back after more than 3 weeks off, and the weight stays where it was.
 - Bodyweight exercises such as the plank grow their target instead, by 5 seconds at a time.
+
+How each set felt adjusts this:
+
+- During a workout, an Easy set suggests one step heavier for the next set (two steps when the
+  reps were 3 or more over the target). A Hard set with fewer than 8 reps suggests one step
+  lighter. The suggestion is filled in, with a button to keep the weight you just used.
+- Hit the target on every set and every set felt easy, and next time goes up two steps.
+- Hit the target on every set but every set felt hard, and next time stays at the same weight.
+- Miss the target but every set felt easy, and next time still goes up one step.
+- Change the weight partway through, for example 5 kg felt easy so the rest was done at 15 kg, and
+  the heavier weight is the one next time builds on.
 
 The step size defaults per exercise in the plan and can be changed in the app, for example after
 switching gyms. Weights are in kg; dumbbell exercises record the weight of one dumbbell.
@@ -121,16 +135,21 @@ are in the [server README](server/README.md).
 
 ### Build the Android app
 
-The app needs your server's address, set once in `local.properties` at the repository root. The
-name is used in the home screen greeting and is optional.
+The app works with no server at all: the workout plan is built into it, and every workout is kept
+on the phone. Without settings, it opens straight to the home screen.
+
+To sync with your server, turn on the login and set the server's address, once, in
+`local.properties` at the repository root. The name is used in the home screen greeting and is
+optional.
 
 ```properties
+HABITA_LOGIN=true
 HABITA_SERVER_URL=https://habita.example.com
 HABITA_NAME=Sudarshan
 ```
 
-Both can also be passed as Gradle properties or environment variables, for example in CI. Then
-build:
+All of them can also be passed as Gradle properties or environment variables, for example in CI.
+Then build:
 
 ```sh
 ./gradlew :android:assembleDebug
@@ -140,8 +159,9 @@ To use a server running on your computer from the Android emulator, set
 `HABITA_SERVER_URL=http://10.0.2.2:8080`. Debug builds allow plain HTTP for this; release builds
 need HTTPS.
 
-The app works offline once it has logged in and loaded the workout plan. Every set is saved on the
-phone as it is done and synced in the background when the server is reachable.
+Every set is saved on the phone as it is done. With the login on, everything is synced in the
+background when the server is reachable, including workouts done before the login was turned on,
+and the server's workout plan replaces the built-in one.
 
 ## Deploying your own server
 
