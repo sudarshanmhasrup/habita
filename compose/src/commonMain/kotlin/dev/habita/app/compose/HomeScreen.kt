@@ -1,5 +1,9 @@
 package dev.habita.app.compose
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,20 +14,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.theme.Space
-import dev.habita.app.core.ui.DashedCard
+import dev.habita.app.core.ui.IconBadge
+import dev.habita.app.core.ui.Pill
 import dev.habita.app.core.ui.Gap
 import dev.habita.app.core.ui.HIcon
 import dev.habita.app.core.ui.HText
 import dev.habita.app.core.ui.HabitaCard
 import dev.habita.app.core.ui.HabitaIcons
 import dev.habita.app.core.ui.IconCircleButton
-import dev.habita.app.core.ui.IconTile
 import dev.habita.app.core.ui.LocalWideLayout
-import dev.habita.app.core.ui.Overline
-import dev.habita.app.core.ui.Pill
 import dev.habita.app.core.ui.TwoPane
 
 /** The only screen: the date, a greeting, the feature list and the theme toggle. */
@@ -67,35 +70,48 @@ internal fun HomeScreen(
     }
 }
 
-/** The feature cards: the gym, and what is coming next. */
+/** The features, one tile each: the gym, and what is coming next. */
 @Composable
 private fun ColumnScope.Features(gymStatus: String?, onOpenGym: () -> Unit) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
-    Overline("Your space")
+    HText("Your space", type.overline, color = colors.muted)
     Gap(Space.item)
-    HabitaCard(Modifier.fillMaxWidth(), onClick = onOpenGym) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconTile(HabitaIcons.Dumbbell, background = colors.accentTint, tint = colors.accent)
-            Gap(Space.card)
-            Column(Modifier.weight(1f)) {
-                HText("Gym", type.title)
-                if (gymStatus != null) HText(gymStatus, type.caption, color = colors.muted, maxLines = 1)
+    HabitaCard(Modifier.fillMaxWidth(), onClick = onOpenGym, contentPadding = PaddingValues(16.dp)) {
+        FeatureRow(HabitaIcons.Dumbbell, "Gym", gymStatus) {
+            Box(Modifier.size(36.dp).background(colors.highlight, CircleShape), contentAlignment = Alignment.Center) {
+                HIcon(HabitaIcons.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp), tint = colors.onHighlight)
             }
-            HIcon(HabitaIcons.ChevronRight, contentDescription = null, tint = colors.muted)
         }
     }
-    Gap(Space.item)
-    DashedCard(Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconTile(HabitaIcons.Wallet, background = colors.border.copy(alpha = 0.5f), tint = colors.muted)
-            Gap(Space.card)
-            Column(Modifier.weight(1f)) {
-                HText("Expense tracker", type.title, color = colors.muted, maxLines = 1)
-                Gap(Space.tiny)
-                Pill("Coming soon", background = colors.border.copy(alpha = 0.6f), color = colors.muted)
-            }
+    Gap(Space.inside)
+    HabitaCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp)) {
+        FeatureRow(HabitaIcons.Wallet, "Expense tracker", "Track what you spend", enabled = false) {
+            Pill("Soon", color = colors.muted)
         }
+    }
+}
+
+@Composable
+private fun FeatureRow(
+    icon: ImageVector,
+    title: String,
+    detail: String?,
+    enabled: Boolean = true,
+    trailing: @Composable () -> Unit,
+) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
+    val tint = if (enabled) colors.text else colors.muted
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        IconBadge(icon, tint = tint)
+        Gap(Space.item)
+        Column(Modifier.weight(1f)) {
+            HText(title, type.title, color = tint, maxLines = 1)
+            if (detail != null) HText(detail, type.caption, color = colors.muted, maxLines = 1)
+        }
+        Gap(Space.item)
+        trailing()
     }
 }
 

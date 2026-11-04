@@ -63,7 +63,7 @@ private fun LoginContent(
                     .padding(24.dp),
                 verticalArrangement = Arrangement.Bottom,
             ) {
-                HText("habita", type.display.copy(fontSize = type.display.fontSize * 1.2f))
+                HText("habita", type.wordmark)
                 Gap(8.dp)
                 HText("Your personal space.", type.body, color = colors.muted)
                 Gap(40.dp)

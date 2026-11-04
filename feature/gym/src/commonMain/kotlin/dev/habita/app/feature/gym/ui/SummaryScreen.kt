@@ -1,5 +1,9 @@
 package dev.habita.app.feature.gym.ui
 
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -43,6 +47,8 @@ internal fun SummaryScreen(report: SessionReport?, onDone: () -> Unit) {
             Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = Space.screen, vertical = Space.card),
             first = {
+                Gap(Space.card)
+                DoneBadge()
                 Gap(Space.card)
                 Overline("Workout done", color = colors.accent)
                 Gap(Space.inside)
@@ -125,7 +131,7 @@ private fun ColumnScope.Overview(report: SessionReport) {
 
     if (summary.nextIncreases.isNotEmpty()) {
         Gap(Space.item)
-        HabitaCard(Modifier.fillMaxWidth(), color = colors.accentTint, borderColor = colors.accentTint) {
+        HabitaCard(Modifier.fillMaxWidth(), borderColor = colors.accent) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HIcon(HabitaIcons.TrendUp, contentDescription = null, tint = colors.accent)
                 Gap(Space.item)
@@ -229,4 +235,18 @@ private fun formatCompactKg(kg: Double): String = when {
     kg >= 10_000 -> "${(kg / 1000).roundToInt()}k"
     kg >= 1000 -> "${(kg / 100).roundToInt() / 10.0}k"
     else -> formatKg((kg * 1000).roundToInt())
+}
+
+/** A blue check in a faint blue ring, at the top of the summary. */
+@Composable
+private fun DoneBadge() {
+    val colors = HabitaTheme.colors
+    Box(
+        Modifier.size(76.dp).background(colors.accent.copy(alpha = 0.16f), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.size(52.dp).background(colors.accent, CircleShape), contentAlignment = Alignment.Center) {
+            HIcon(HabitaIcons.Check, contentDescription = null, modifier = Modifier.size(26.dp), tint = colors.onAccent)
+        }
+    }
 }

@@ -1,6 +1,5 @@
 package dev.habita.app.feature.gym.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,8 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -124,13 +122,7 @@ private fun ExerciseList(program: Program, workoutId: String, targets: List<Exer
                 Gap(Space.item)
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(28.dp).background(colors.accentTint, RoundedCornerShape(8.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    HText("${index + 1}", type.label, color = colors.accent)
-                }
-                Gap(Space.item)
+                HText("${index + 1}", type.label, color = colors.muted, modifier = Modifier.width(24.dp))
                 Column(Modifier.weight(1f)) {
                     HText(exercise.name, type.bodyStrong)
                     HText(

@@ -52,10 +52,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -76,8 +76,9 @@ import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.theme.Space
 import kotlinx.coroutines.delay
 
-val CardShape = RoundedCornerShape(22.dp)
-val ControlShape = RoundedCornerShape(16.dp)
+val CardShape = RoundedCornerShape(24.dp)
+val ControlShape = RoundedCornerShape(percent = 50)
+private val TagShape = RoundedCornerShape(percent = 50)
 
 /** Plain text in the theme's colors. */
 @Composable
@@ -104,14 +105,13 @@ fun HIcon(icon: ImageVector, contentDescription: String?, modifier: Modifier = M
 }
 
 /**
- * A full screen: the background, a soft accent glow at the top, and padding that keeps content
+ * A full screen: the background, a soft graphite fade at the top, and padding that keeps content
  * clear of the system bars and the keyboard. On wide screens the content is centred and kept to
  * [MaxContentWidth].
  */
 @Composable
 fun HabitaScreen(
     modifier: Modifier = Modifier,
-    glow: Boolean = true,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val colors = HabitaTheme.colors
@@ -120,17 +120,13 @@ fun HabitaScreen(
             .fillMaxSize()
             .background(colors.background)
             .drawBehind {
-                if (glow) {
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(colors.accentTint.copy(alpha = if (colors.isDark) 0.7f else 0.9f), Color.Transparent),
-                            center = Offset(size.width * 0.7f, 0f),
-                            radius = size.width * 0.75f,
-                        ),
-                        radius = size.width * 0.75f,
-                        center = Offset(size.width * 0.7f, 0f),
-                    )
-                }
+                drawRect(
+                    Brush.verticalGradient(
+                        0f to colors.backgroundTop,
+                        1f to colors.background,
+                        endY = size.height * 0.45f,
+                    ),
+                )
             }
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .imePadding(),
@@ -186,21 +182,30 @@ fun TwoPane(
 /** The gap between the two panes of a wide screen. */
 val PaneGap = 16.dp
 
-/** A white card with the standard radius and border. Clickable when [onClick] is set. */
+/**
+ * A card: a surface that fades a little lighter at the top on dark, with no border unless
+ * [borderColor] is set. Clickable when [onClick] is set.
+ */
 @Composable
 fun HabitaCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     color: Color = HabitaTheme.colors.card,
-    borderColor: Color = HabitaTheme.colors.border,
-    contentPadding: PaddingValues = PaddingValues(20.dp),
+    borderColor: Color = Color.Transparent,
+    contentPadding: PaddingValues = PaddingValues(Space.card),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
         modifier
             .clip(CardShape)
-            .background(color)
-            .border(1.dp, borderColor, CardShape)
+            .background(
+                if (color == HabitaTheme.colors.card) {
+                    Brush.verticalGradient(listOf(HabitaTheme.colors.cardTop, color))
+                } else {
+                    SolidColor(color)
+                },
+            )
+            .then(if (borderColor != Color.Transparent) Modifier.border(1.dp, borderColor, CardShape) else Modifier)
             .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .padding(contentPadding),
         content = content,
@@ -216,15 +221,16 @@ fun DashedCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.(
             .drawBehind {
                 drawRoundRect(
                     color = border,
-                    cornerRadius = CornerRadius(22.dp.toPx()),
-                    style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f))),
+                    cornerRadius = CornerRadius(24.dp.toPx()),
+                    style = Stroke(width = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx()))),
                 )
             }
-            .padding(20.dp),
+            .padding(Space.card),
         content = content,
     )
 }
 
+/** The main action of a screen: a pill in the highlight colour, black on light and white on dark. */
 @Composable
 fun PrimaryButton(
     text: String,
@@ -236,9 +242,9 @@ fun PrimaryButton(
     ButtonBox(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.background(if (enabled) colors.accent else colors.accent.copy(alpha = 0.4f), ControlShape),
+        modifier = modifier.background(if (enabled) colors.highlight else colors.border, ControlShape),
     ) {
-        HText(text, HabitaTheme.typography.button, color = colors.onAccent)
+        HText(text, HabitaTheme.typography.button, color = if (enabled) colors.onHighlight else colors.muted)
     }
 }
 
@@ -254,7 +260,7 @@ fun SecondaryButton(
     ButtonBox(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.border(1.dp, colors.border, ControlShape).background(colors.card, ControlShape),
+        modifier = modifier.background(colors.card, ControlShape).border(1.dp, colors.border, ControlShape),
     ) {
         HText(text, HabitaTheme.typography.button, color = if (enabled) color else colors.muted.copy(alpha = 0.6f))
     }
@@ -269,7 +275,7 @@ private fun ButtonBox(
 ) {
     Box(
         modifier
-            .heightIn(min = 52.dp)
+            .heightIn(min = 56.dp)
             .clip(ControlShape)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -324,25 +330,28 @@ fun IconCircleButton(icon: ImageVector, contentDescription: String, onClick: () 
     }
 }
 
-/** A rounded tile holding an icon, used at the start of feature cards. */
+
+/** An icon in a small graphite circle, at the start of a list row. */
 @Composable
-fun IconTile(icon: ImageVector, background: Color, tint: Color, modifier: Modifier = Modifier) {
+fun IconBadge(icon: ImageVector, modifier: Modifier = Modifier, tint: Color = HabitaTheme.colors.text) {
+    val colors = HabitaTheme.colors
     Box(
-        modifier.size(52.dp).background(background, RoundedCornerShape(14.dp)),
+        modifier.size(44.dp).background(if (colors.isDark) colors.border else colors.background, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        HIcon(icon, contentDescription = null, tint = tint)
+        HIcon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = tint)
     }
 }
 
+/** A small outlined tag, such as "Best" next to an exercise. */
 @Composable
-fun Pill(text: String, modifier: Modifier = Modifier, background: Color = HabitaTheme.colors.accentTint, color: Color = HabitaTheme.colors.accent) {
-    Box(modifier.background(background, CircleShape).padding(horizontal = 12.dp, vertical = 6.dp)) {
+fun Pill(text: String, modifier: Modifier = Modifier, color: Color = HabitaTheme.colors.text) {
+    Box(modifier.border(1.dp, HabitaTheme.colors.border, TagShape).padding(horizontal = 8.dp, vertical = 3.dp)) {
         HText(text, HabitaTheme.typography.caption, color = color)
     }
 }
 
-/** A 48 dp choice chip. [selected] chips are filled with the accent. */
+/** A 48 dp choice pill. [selected] chips are filled with the highlight colour. */
 @Composable
 fun Chip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = HabitaTheme.colors
@@ -350,17 +359,17 @@ fun Chip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifie
         modifier
             .height(48.dp)
             .clip(ControlShape)
-            .background(if (selected) colors.accent else colors.card)
-            .border(1.dp, if (selected) colors.accent else colors.border, ControlShape)
+            .background(if (selected) colors.highlight else colors.card)
+            .border(1.dp, if (selected) colors.highlight else colors.border, ControlShape)
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        HText(text, HabitaTheme.typography.button, color = if (selected) colors.onAccent else colors.text)
+        HText(text, HabitaTheme.typography.button, color = if (selected) colors.onHighlight else colors.text)
     }
 }
 
 /**
- * A labelled text field. The outline turns accent green while it has focus.
+ * A labelled text field. The outline turns to the accent while it has focus.
  */
 @Composable
 fun LabeledField(
@@ -393,8 +402,8 @@ fun LabeledField(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
-                .background(colors.card, ControlShape)
-                .border(if (focused) 2.dp else 1.dp, if (focused) colors.accent else colors.border, ControlShape),
+                .background(colors.card, RoundedCornerShape(16.dp))
+                .border(if (focused) 1.5.dp else 1.dp, if (focused) colors.accent else colors.border, RoundedCornerShape(16.dp)),
             decorationBox = { inner ->
                 Box(Modifier.padding(horizontal = 18.dp), contentAlignment = Alignment.CenterStart) { inner() }
             },
@@ -438,7 +447,8 @@ fun Stepper(
             .fillMaxWidth()
             .height(64.dp)
             .background(colors.card, ControlShape)
-            .border(1.dp, colors.border, ControlShape),
+            .border(1.dp, colors.border, ControlShape)
+            .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         StepperButton(HabitaIcons.Minus, "Less $contentDescription") {
@@ -501,8 +511,9 @@ private fun cleanNumber(typed: String, decimal: Boolean): String? {
 private fun StepperButton(icon: ImageVector, label: String, onClick: () -> Unit) {
     Box(
         Modifier
-            .size(64.dp)
-            .clip(ControlShape)
+            .size(52.dp)
+            .clip(CircleShape)
+            .background(HabitaTheme.colors.border.copy(alpha = 0.6f))
             .clickable(role = Role.Button, onClickLabel = label, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -512,7 +523,7 @@ private fun StepperButton(icon: ImageVector, label: String, onClick: () -> Unit)
 
 /** A thin progress bar; [progress] runs from 0 to 1. */
 @Composable
-fun ProgressBar(progress: Float, modifier: Modifier = Modifier, height: Dp = 6.dp) {
+fun ProgressBar(progress: Float, modifier: Modifier = Modifier, height: Dp = 4.dp) {
     val colors = HabitaTheme.colors
     Canvas(modifier.fillMaxWidth().height(height)) {
         val y = size.height / 2
@@ -557,13 +568,13 @@ fun TopBar(
     }
 }
 
-/** A small, spaced-out capital label above a section or a big value. */
+/** A small label above a section or a big value, in sentence case. */
 @Composable
 fun Overline(text: String, modifier: Modifier = Modifier, color: Color = HabitaTheme.colors.muted) {
-    HText(text.uppercase(), HabitaTheme.typography.overline, modifier = modifier, color = color)
+    HText(text, HabitaTheme.typography.overline, modifier = modifier, color = color)
 }
 
-/** A compact number with its label, for rows of stats. */
+/** A compact number with its label in a small card, for rows of stats. */
 @Composable
 fun StatTile(label: String, value: String, modifier: Modifier = Modifier, detail: String? = null) {
     val colors = HabitaTheme.colors
