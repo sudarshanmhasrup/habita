@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 internal sealed interface GymRoute {
     data object Select : GymRoute
@@ -126,6 +127,9 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
 
     fun start(workoutId: String) = act {
         repository.start(workoutId)
+        // Waits for the new workout to reach [data] first; otherwise the gym screen sees the workout
+        // route with no workout and sends us back to the list.
+        withTimeoutOrNull(2_000) { data.first { it?.active != null } }
         _route.value = GymRoute.Workout
     }
 
