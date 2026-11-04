@@ -14,7 +14,10 @@ import dev.habita.app.core.resources.manrope_semibold
 import dev.habita.app.core.resources.unbounded_semibold
 import org.jetbrains.compose.resources.Font
 
-/** Headings use Unbounded 600, everything else Manrope. */
+/**
+ * Manrope throughout, with tabular figures on numbers so they don't jump as they change.
+ * Unbounded 600 is kept for the wordmark only ([wordmark]).
+ */
 @Immutable
 data class HabitaTypography(
     val display: TextStyle,
@@ -29,6 +32,7 @@ data class HabitaTypography(
     val number: TextStyle,
     val overline: TextStyle,
     val stat: TextStyle,
+    val wordmark: TextStyle,
 )
 
 @Composable
@@ -41,23 +45,18 @@ internal fun habitaTypography(): HabitaTypography {
         Font(Res.font.manrope_bold, FontWeight.Bold),
     )
     return HabitaTypography(
-        display = TextStyle(fontFamily = unbounded, fontWeight = FontWeight.SemiBold, fontSize = 36.sp, lineHeight = 44.sp),
-        headline = TextStyle(fontFamily = unbounded, fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 36.sp),
-        timer = TextStyle(fontFamily = unbounded, fontWeight = FontWeight.SemiBold, fontSize = 64.sp, lineHeight = 72.sp),
-        title = TextStyle(fontFamily = manrope, fontWeight = FontWeight.Bold, fontSize = 19.sp, lineHeight = 26.sp),
+        display = TextStyle(fontFamily = manrope, fontWeight = FontWeight.SemiBold, fontSize = 34.sp, lineHeight = 40.sp, letterSpacing = (-0.8).sp),
+        headline = TextStyle(fontFamily = manrope, fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 34.sp, letterSpacing = (-0.6).sp),
+        timer = TextStyle(fontFamily = manrope, fontWeight = FontWeight.SemiBold, fontSize = 68.sp, lineHeight = 76.sp, letterSpacing = (-1).sp, fontFeatureSettings = "tnum"),
+        title = TextStyle(fontFamily = manrope, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, lineHeight = 24.sp),
         body = TextStyle(fontFamily = manrope, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp),
         bodyStrong = TextStyle(fontFamily = manrope, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 24.sp),
         label = TextStyle(fontFamily = manrope, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 20.sp),
         caption = TextStyle(fontFamily = manrope, fontWeight = FontWeight.Medium, fontSize = 13.sp, lineHeight = 18.sp),
-        button = TextStyle(fontFamily = manrope, fontWeight = FontWeight.Bold, fontSize = 16.sp, lineHeight = 22.sp),
-        number = TextStyle(fontFamily = unbounded, fontWeight = FontWeight.SemiBold, fontSize = 26.sp, lineHeight = 32.sp),
-        overline = TextStyle(
-            fontFamily = manrope,
-            fontWeight = FontWeight.Bold,
-            fontSize = 12.sp,
-            lineHeight = 16.sp,
-            letterSpacing = 1.2.sp,
-        ),
-        stat = TextStyle(fontFamily = unbounded, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 28.sp),
+        button = TextStyle(fontFamily = manrope, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 22.sp),
+        number = TextStyle(fontFamily = manrope, fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 34.sp, fontFeatureSettings = "tnum"),
+        overline = TextStyle(fontFamily = manrope, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, lineHeight = 18.sp),
+        stat = TextStyle(fontFamily = manrope, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 30.sp, letterSpacing = (-0.4).sp, fontFeatureSettings = "tnum"),
+        wordmark = TextStyle(fontFamily = unbounded, fontWeight = FontWeight.SemiBold, fontSize = 40.sp, lineHeight = 48.sp),
     )
 }

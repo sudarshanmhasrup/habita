@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -34,9 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -69,6 +66,9 @@ import dev.habita.app.shared.gym.Measure
 import dev.habita.app.shared.gym.Progression
 import dev.habita.app.shared.gym.SetAdviceReason
 import kotlinx.coroutines.delay
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 /** The workout in progress: warm-up, break, then the main workout set by set. */
 @Composable
@@ -171,8 +171,8 @@ private fun WarmUpContent(active: ActiveWorkout, viewModel: GymViewModel) {
         Gap(Space.inside)
         HText(item.name, type.headline)
         Gap(Space.card)
-        HabitaCard(Modifier.fillMaxWidth(), color = colors.accentTint, borderColor = colors.accentTint) {
-            Overline("Do", color = colors.accent)
+        HabitaCard(Modifier.fillMaxWidth()) {
+            Overline("Do")
             Gap(Space.inside)
             HText(item.amount, type.number)
         }
@@ -194,8 +194,6 @@ private fun ColumnScope.WarmUpUpcoming(active: ActiveWorkout) {
             upcoming.forEach { index ->
                 val next = active.warmUp.items[index]
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(6.dp).background(colors.muted.copy(alpha = 0.5f), CircleShape))
-                    Gap(Space.item)
                     HText(next.name, type.body, modifier = Modifier.weight(1f))
                     Gap(Space.item)
                     HText(next.amount, type.caption, color = colors.muted)
@@ -251,13 +249,26 @@ private fun RestContent(
             Gap(Space.card)
             Box(Modifier.size(232.dp), contentAlignment = Alignment.Center) {
                 val fraction = remaining.toFloat() / rest.totalMillis.coerceAtLeast(1)
+                // A dial of 60 ticks: the accent for the time left, grey for the time gone.
                 Canvas(Modifier.fillMaxSize()) {
-                    val stroke = 10.dp.toPx()
-                    val inset = stroke / 2
-                    val arcSize = Size(size.width - stroke, size.height - stroke)
-                    val topLeft = Offset(inset, inset)
-                    drawArc(colors.border, 0f, 360f, false, topLeft, arcSize, style = Stroke(stroke))
-                    drawArc(colors.accent, -90f, 360f * fraction, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+                    val ticks = 60
+                    val lit = (fraction * ticks).toInt()
+                    val outer = size.minDimension / 2
+                    val long = 18.dp.toPx()
+                    val short = 12.dp.toPx()
+                    for (i in 0 until ticks) {
+                        val angle = (i.toFloat() / ticks) * 2f * PI.toFloat() - PI.toFloat() / 2f
+                        val length = if (i % 5 == 0) long else short
+                        val dx = cos(angle)
+                        val dy = sin(angle)
+                        drawLine(
+                            color = if (i < lit) colors.accent else colors.border,
+                            start = Offset(center.x + dx * (outer - length), center.y + dy * (outer - length)),
+                            end = Offset(center.x + dx * outer, center.y + dy * outer),
+                            strokeWidth = 3.dp.toPx(),
+                            cap = StrokeCap.Round,
+                        )
+                    }
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     HText(formatTimer(remaining), type.timer)
@@ -386,7 +397,7 @@ private fun WarmUpSetContent(active: ActiveWorkout, data: GymData, viewModel: Gy
     ) {
         ExerciseHeader(active, slotIndex, "Exercise ${active.exercisesDone + 1} of ${active.workout.exercises.size} · warm-up set")
         Gap(Space.card)
-        HabitaCard(Modifier.fillMaxWidth(), color = colors.accentTint, borderColor = colors.accentTint) {
+        Column(Modifier.fillMaxWidth()) {
             HText(
                 if (working != null) {
                     "About half of today's ${formatKg(working)} kg, easy reps to get the movement in. It doesn't count toward progress."
@@ -394,6 +405,7 @@ private fun WarmUpSetContent(active: ActiveWorkout, data: GymData, viewModel: Gy
                     "Go light, about half of what you'll lift, to get the movement in. It doesn't count toward progress."
                 },
                 type.body,
+                color = colors.muted,
             )
         }
     }
@@ -588,14 +600,16 @@ private fun InputLabel(text: String, action: String?, onAction: (() -> Unit)?) {
 private fun EffortButton(effort: Effort, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = HabitaTheme.colors
     val filled = effort == Effort.MEDIUM
-    val background = if (filled) colors.accent else colors.card
+    val ink = colors.highlight
+    val onInk = colors.onHighlight
+    val background = if (filled) ink else colors.card
     Column(
         modifier
             .height(68.dp)
             .alpha(if (enabled) 1f else 0.35f)
             .clip(ControlShape)
             .background(background)
-            .border(1.dp, if (filled) colors.accent else colors.border, ControlShape)
+            .border(1.dp, if (filled) ink else colors.border, ControlShape)
             .clickable(enabled = enabled, role = Role.Button, onClickLabel = "Log set as ${effort.label()}", onClick = onClick),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -604,10 +618,10 @@ private fun EffortButton(effort: Effort, enabled: Boolean, onClick: () -> Unit, 
             Box(
                 Modifier
                     .size(8.dp)
-                    .background(if (filled) colors.onAccent else colors.effort(effort), CircleShape),
+                    .background(if (filled) onInk else colors.effort(effort), CircleShape),
             )
             Gap(6.dp)
-            HText(effort.label(), HabitaTheme.typography.button, color = if (filled) colors.onAccent else colors.text)
+            HText(effort.label(), HabitaTheme.typography.button, color = if (filled) onInk else colors.text)
         }
         Gap(2.dp)
         HText(
@@ -617,7 +631,7 @@ private fun EffortButton(effort: Effort, enabled: Boolean, onClick: () -> Unit, 
                 Effort.HARD -> "barely made it"
             },
             HabitaTheme.typography.caption,
-            color = if (filled) colors.onAccent.copy(alpha = 0.8f) else colors.muted,
+            color = if (filled) onInk.copy(alpha = 0.7f) else colors.muted,
         )
     }
 }
@@ -634,7 +648,7 @@ private fun SetTrack(active: ActiveWorkout, slotIndex: Int) {
     val logged = active.setsFor(slotIndex)
     val warmUpSet = active.warmUpSetFor(slotIndex)
     val total = active.slot(slotIndex).sets
-    val shape = RoundedCornerShape(14.dp)
+    val shape = ControlShape
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.inside)) {
         if (warmUpSet != null) {
             Column(
@@ -652,7 +666,7 @@ private fun SetTrack(active: ActiveWorkout, slotIndex: Int) {
             val modifier = Modifier.weight(1f).height(60.dp).clip(shape)
             when {
                 set != null -> Column(
-                    modifier.background(colors.accentTint),
+                    modifier.background(colors.card),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -672,7 +686,7 @@ private fun SetTrack(active: ActiveWorkout, slotIndex: Int) {
                     )
                 }
                 current -> Column(
-                    modifier.border(2.dp, colors.accent, shape),
+                    modifier.border(1.5.dp, colors.accent, shape),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -691,7 +705,7 @@ private fun SetTrack(active: ActiveWorkout, slotIndex: Int) {
 @Composable
 private fun StepEditor(value: String, onChange: (Int) -> Unit) {
     val colors = HabitaTheme.colors
-    HabitaCard(Modifier.fillMaxWidth(), color = colors.accentTint, borderColor = colors.accentTint) {
+    HabitaCard(Modifier.fillMaxWidth(), borderColor = colors.border) {
         HText("How much − and + move, and the jump when you progress", HabitaTheme.typography.caption, color = colors.muted)
         Gap(Space.item)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.item)) {

@@ -1,13 +1,14 @@
 package dev.habita.app.feature.gym.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -18,12 +19,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.habita.app.core.data.nowMillis
 import dev.habita.app.core.network.ApiException
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.theme.Space
 import dev.habita.app.core.ui.Chip
+import dev.habita.app.core.ui.Divider
 import dev.habita.app.core.ui.Gap
 import dev.habita.app.core.ui.HIcon
 import dev.habita.app.core.ui.HText
@@ -127,36 +132,39 @@ private fun lastDone(sessions: List<WorkoutSession>, workoutId: String, now: Lon
     }
 }
 
-/** Monday to Sunday: a filled dot for each day with a finished workout, a ring around today. */
+/**
+ * Monday to Sunday: the day letter over a short bar, filled for each day with a finished workout.
+ * Today's letter and bar are in the accent until a workout fills it.
+ */
 @Composable
 private fun WeekStrip(sessions: List<WorkoutSession>, weekStart: Long, now: Long) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     val today = daysBetween(weekStart, now)
     val doneDays = sessions.map { daysBetween(weekStart, it.startedAt) }.toSet()
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         listOf("M", "T", "W", "T", "F", "S", "S").forEachIndexed { index, letter ->
             val done = index in doneDays
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                HText(letter, type.caption, color = if (index == today) colors.text else colors.muted)
-                Gap(Space.inside)
+            Column(
+                Modifier.weight(1f).semantics(mergeDescendants = true) {
+                    if (done) contentDescription = "Worked out"
+                },
+            ) {
+                HText(letter, type.caption, color = if (index == today) colors.accent else colors.muted)
+                Gap(6.dp)
                 Box(
                     Modifier
-                        .size(36.dp)
-                        .background(if (done) colors.accent else colors.card, CircleShape)
-                        .border(
-                            width = if (index == today) 2.dp else 1.dp,
-                            color = when {
-                                done -> colors.accent
-                                index == today -> colors.text
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(CircleShape)
+                        .background(
+                            when {
+                                done -> colors.highlight
+                                index == today -> colors.accent
                                 else -> colors.border
                             },
-                            shape = CircleShape,
                         ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (done) HIcon(HabitaIcons.Check, contentDescription = "Worked out", modifier = Modifier.size(18.dp), tint = colors.onAccent)
-                }
+                )
             }
         }
     }
@@ -167,34 +175,19 @@ private fun UpNextCard(program: Program, workout: Workout, lastDone: String?, on
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     val warmUp = program.warmUps.firstOrNull { it.id == workout.warmUpId }
-    HabitaCard(
-        Modifier.fillMaxWidth(),
-        onClick = onOpen,
-        color = colors.accent,
-        borderColor = colors.accent,
-    ) {
-        Overline("Up next", color = colors.onAccent.copy(alpha = 0.75f))
-        Gap(Space.inside)
-        HText(workout.name, type.headline, color = colors.onAccent)
+    HabitaCard(Modifier.fillMaxWidth(), onClick = onOpen) {
+        Overline("Up next", color = colors.accent)
+        Gap(Space.tiny)
+        HText(workout.name, type.headline)
         Gap(Space.tiny)
         HText(
             "${workout.exercises.size} exercises · ${workout.exercises.sumOf { it.sets }} sets · ~${estimateMinutes(workout, warmUp)} min",
             type.body,
-            color = colors.onAccent.copy(alpha = 0.85f),
+            color = colors.muted,
         )
-        if (lastDone != null) {
-            Gap(2.dp)
-            HText(lastDone, type.caption, color = colors.onAccent.copy(alpha = 0.7f))
-        }
+        if (lastDone != null) HText(lastDone, type.caption, color = colors.muted)
         Gap(Space.card)
-        Row(
-            Modifier.background(colors.onAccent, CircleShape).padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            HIcon(HabitaIcons.Play, contentDescription = null, modifier = Modifier.size(16.dp), tint = colors.accent)
-            Gap(6.dp)
-            HText("See workout", type.label, color = colors.accent)
-        }
+        PrimaryButton("See workout", onOpen, Modifier.fillMaxWidth())
     }
 }
 
@@ -221,7 +214,7 @@ private fun InProgressCard(active: ActiveWorkout, onResume: () -> Unit, onDiscar
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     var confirmDiscard by remember(active.sessionId) { mutableStateOf(false) }
-    HabitaCard(Modifier.fillMaxWidth(), color = colors.accentTint, borderColor = colors.accentTint) {
+    HabitaCard(Modifier.fillMaxWidth(), borderColor = colors.accent) {
         Overline("In progress", color = colors.accent)
         Gap(Space.inside)
         HText(active.workout.name, type.title)
@@ -305,7 +298,7 @@ private fun DayCards(program: Program, suggested: Workout?, onOpenWorkout: (Stri
  * backup file of everything on the phone.
  */
 @Composable
-private fun StorageNote(data: GymData, onBackup: () -> Unit, backupMessage: String?) {
+private fun ColumnScope.StorageNote(data: GymData, onBackup: () -> Unit, backupMessage: String?) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     val (title, detail) = when {
@@ -314,7 +307,9 @@ private fun StorageNote(data: GymData, onBackup: () -> Unit, backupMessage: Stri
         data.sync is SyncState.Syncing -> "Syncing…" to "Saved on this phone too."
         else -> "Synced" to "Saved on this phone and the server."
     }
-    HabitaCard(Modifier.fillMaxWidth(), color = colors.background) {
+    Divider()
+    Gap(Space.card)
+    Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             HIcon(
                 if (data.syncEnabled && data.sync !is SyncState.Failed) HabitaIcons.Cloud else HabitaIcons.Phone,

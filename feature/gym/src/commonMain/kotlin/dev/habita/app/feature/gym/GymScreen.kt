@@ -75,7 +75,7 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
         onBackCompleted = { if (!viewModel.back()) onExit() },
     )
 
-    HabitaScreen(glow = route == GymRoute.Select) {
+    HabitaScreen {
         val current = data ?: return@HabitaScreen
         Crossfade(route) { screen ->
             when (screen) {
