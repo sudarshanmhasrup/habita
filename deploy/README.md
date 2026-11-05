@@ -84,31 +84,47 @@ It should print `OK`.
 
 ## Updating
 
-Merging to `main` publishes a new image. To run it:
+Merging to `main` publishes a new image tagged with that commit's full SHA. `.env` pins the server
+to one SHA in `HABITA_IMAGE`, so nothing changes until you move it. Wait for the Server workflow to
+finish, then back up first, because a new version can migrate the database when it starts:
 
 ```sh
 cd /opt/habita
-docker compose pull
-docker compose up -d
+sudo ./backup.sh
+sed -i "s|^HABITA_IMAGE=.*|HABITA_IMAGE=ghcr.io/<owner>/habita-server:<commit-sha>|" .env
+docker compose pull server
+docker compose up -d server
+curl -fsS https://<your-domain>/health
 ```
 
-Editing `PROGRAM.md` works the same way: merge the change, then pull and restart.
+To roll back, put the previous SHA back in `.env` and run the last two `docker compose` lines
+again. Editing `PROGRAM.md` works the same way. When `compose.yaml` itself changes, for example a
+new Caddy version, copy it over first and run `docker compose up -d`.
 
 ## Backups
 
 Every night at 03:30 the server copies the database to `/opt/habita/backups`, checks the copy and
-keeps 30 days. The log is at `/var/log/habita-backup.log`. Run a backup by hand with
-`sudo /opt/habita/backup.sh`.
+keeps 30 days. The log is at `/var/log/habita-backup.log`; it appears after the first nightly run.
+Run a backup by hand with `sudo ./backup.sh` from `/opt/habita`. It needs root because `data/`
+belongs to the container's user.
 
-These copies live on the same server, so they do not survive losing it. To keep copies elsewhere,
-install [rclone](https://rclone.org), configure a remote for root with `sudo rclone config`, and
-set `HABITA_BACKUP_REMOTE` in `.env`, for example `b2:habita-backups`.
+These copies live on the same server, so they do not survive losing it. Turn on your provider's
+server backups (on Hetzner, the Backups option of the server, which keeps 7 daily images stored
+apart from the server) so a lost server can be restored with its history. Those images aren't
+encrypted, and they sit in the same provider account as the server.
+
+For a copy outside that account, install [rclone](https://rclone.org), configure a remote for
+root with `sudo rclone config`, and set `HABITA_BACKUP_REMOTE` in `.env`, for example
+`b2:habita-backups`. These copies are not encrypted, so use an encrypting rclone remote
+(`crypt`) on top of the storage.
 
 To restore a backup:
 
 ```sh
 cd /opt/habita
 docker compose stop server
+# A leftover journal from the old database would be applied to the restored one and corrupt it.
+sudo rm -f data/habita.db-journal data/habita.db-wal data/habita.db-shm
 gunzip -c backups/<backup-file>.db.gz | sudo tee data/habita.db > /dev/null
 sudo chown 10001:10001 data/habita.db
 docker compose start server
@@ -118,9 +134,21 @@ docker compose start server
 
 Only ports 22, 80 and 443 are open. The Habita server itself publishes no port, so it is reachable
 only through Caddy over HTTPS. Every route except `/health` and `/auth/login` needs a login token,
-and login allows 5 attempts a minute from each address and 30 in total. The server reads each
+and login allows 5 attempts a minute from each address and 120 in total. The server reads each
 client's address from Caddy's `X-Forwarded-For`, which is only safe because its port stays
 unpublished: never add a `ports:` entry to the `server` service.
 
 Lost a phone? Call `POST /auth/logout-all` with any valid token, or change the password: a new
 `HABITA_PASSWORD_HASH` ends every session when the server restarts.
+
+## Keeping the server yours
+
+- **Put a passphrase on your SSH key.** The `habita` user can use sudo without a password and
+  runs Docker, so the key that logs in as it is as good as root. Add one with
+  `ssh-keygen -p -f ~/.ssh/<key>`; on a Mac, `ssh-add --apple-use-keychain ~/.ssh/<key>` keeps
+  you from typing it every time.
+- **Optionally limit SSH to your own address** with a firewall rule at the provider (Hetzner Cloud
+  Firewalls), so port 22 isn't open to the whole internet. Only do this with a fixed home or
+  office address, or you can lock yourself out.
+- Security updates install on their own. When one needs a reboot, `/var/run/reboot-required`
+  exists; reboot with `sudo reboot` at a quiet time.
