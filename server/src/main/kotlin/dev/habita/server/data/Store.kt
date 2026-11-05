@@ -9,6 +9,8 @@ import dev.habita.app.shared.gym.SetLog
 import dev.habita.app.shared.gym.WarmUpLog
 import dev.habita.app.shared.gym.WarmUpStatus
 import dev.habita.app.shared.gym.WorkoutSession
+import dev.habita.server.auth.SessionPolicy
+import dev.habita.server.db.Auth_token
 import dev.habita.server.db.Exercise_step
 import dev.habita.server.db.HabitaDatabase
 import dev.habita.server.db.Set_log
@@ -98,14 +100,31 @@ class Store(private val database: HabitaDatabase) {
             ExportedProgram(version = it.id, content = it.content, createdAt = it.created_at)
         }
 
-    fun saveToken(tokenHash: String, now: Long) {
-        database.authTokenQueries.insert(tokenHash, now)
+    fun saveToken(tokenHash: String, now: Long, passwordFingerprint: String) {
+        database.authTokenQueries.insert(tokenHash, now, now, passwordFingerprint)
     }
 
-    fun hasToken(tokenHash: String): Boolean = database.authTokenQueries.exists(tokenHash).executeAsOne() > 0
+    fun token(tokenHash: String): Auth_token? = database.authTokenQueries.byHash(tokenHash).executeAsOneOrNull()
+
+    fun touchToken(tokenHash: String, now: Long) {
+        database.authTokenQueries.touch(now, tokenHash)
+    }
 
     fun deleteToken(tokenHash: String) {
         database.authTokenQueries.delete(tokenHash)
+    }
+
+    fun deleteAllTokens() {
+        database.authTokenQueries.deleteAll()
+    }
+
+    /** Removes tokens that can no longer be used, so the table doesn't grow with every login. */
+    fun deleteInvalidTokens(now: Long, passwordFingerprint: String) {
+        database.authTokenQueries.deleteInvalid(
+            createdBefore = now - SessionPolicy.maxAge,
+            usedBefore = now - SessionPolicy.maxIdle,
+            fingerprint = passwordFingerprint,
+        )
     }
 
     private fun isNewer(existing: Long?, incoming: Long) = existing == null || incoming > existing

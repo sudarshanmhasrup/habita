@@ -1,14 +1,32 @@
--- Session tokens, stored only as SHA-256 hashes.
+-- Session tokens, stored only as SHA-256 hashes. A token lasts 90 days from login and ends
+-- after 30 days unused. password_fingerprint ties it to the password hash it was issued under, so
+-- changing HABITA_PASSWORD_HASH ends every session.
 CREATE TABLE auth_token (
     token_hash TEXT NOT NULL PRIMARY KEY,
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    last_used_at INTEGER NOT NULL DEFAULT 0,
+    password_fingerprint TEXT
 );
 
 insert:
-INSERT INTO auth_token (token_hash, created_at) VALUES (?, ?);
+INSERT INTO auth_token (token_hash, created_at, last_used_at, password_fingerprint) VALUES (?, ?, ?, ?);
 
-exists:
-SELECT count(*) FROM auth_token WHERE token_hash = ?;
+byHash:
+SELECT * FROM auth_token WHERE token_hash = ?;
+
+touch:
+UPDATE auth_token SET last_used_at = ? WHERE token_hash = ?;
 
 delete:
 DELETE FROM auth_token WHERE token_hash = ?;
+
+deleteAll:
+DELETE FROM auth_token;
+
+-- Tokens past their lifetime, idle too long, or from another password.
+deleteInvalid:
+DELETE FROM auth_token
+WHERE created_at < :createdBefore
+   OR last_used_at < :usedBefore
+   OR password_fingerprint IS NULL
+   OR password_fingerprint != :fingerprint;

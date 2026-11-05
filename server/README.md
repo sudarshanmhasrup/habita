@@ -36,11 +36,16 @@ Relative paths resolve from the repository root.
 
 Every route except `/health` and `/auth/login` needs an `Authorization: Bearer <token>` header.
 
+A token lasts 90 days from login and ends after 30 days unused; the app then asks for the login
+again. Changing `HABITA_PASSWORD_HASH` ends every session at the next start. Login allows 5
+attempts a minute from each address and 30 a minute in total, so a stranger can't lock you out.
+
 | Route                         | Purpose                                                    |
 |-------------------------------|------------------------------------------------------------|
 | `GET /health`                 | Liveness check                                             |
-| `POST /auth/login`            | Email and password in, token out. Limited to 5 per minute. |
+| `POST /auth/login`            | Email and password in, token out                           |
 | `POST /auth/logout`           | Revokes the token                                          |
+| `POST /auth/logout-all`       | Revokes every token, on every device                       |
 | `GET /program`                | The current plan and its version                           |
 | `GET /workouts/next`          | The next workout in the rotation                           |
 | `GET /workouts/{id}/targets`  | Today's weight and target for each exercise                |
