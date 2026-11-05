@@ -1,0 +1,11 @@
+-- Single values, such as the monthly income.
+CREATE TABLE expense_value (
+    key TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+select:
+SELECT value FROM expense_value WHERE key = ?;
+
+save:
+INSERT OR REPLACE INTO expense_value VALUES (?, ?);

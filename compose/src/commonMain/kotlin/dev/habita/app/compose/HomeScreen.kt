@@ -19,7 +19,6 @@ import androidx.compose.ui.unit.dp
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.theme.Space
 import dev.habita.app.core.ui.IconBadge
-import dev.habita.app.core.ui.Pill
 import dev.habita.app.core.ui.Gap
 import dev.habita.app.core.ui.HIcon
 import dev.habita.app.core.ui.HText
@@ -36,8 +35,11 @@ internal fun HomeScreen(
     hour: Int,
     darkTheme: Boolean,
     gymStatus: String?,
+    expenseStatus: String?,
     onToggleTheme: () -> Unit,
     onOpenGym: () -> Unit,
+    onOpenExpense: () -> Unit,
+    bottomBar: @Composable () -> Unit = {},
 ) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
@@ -55,6 +57,7 @@ internal fun HomeScreen(
             )
         }
         TwoPane(
+            Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = Space.screen, vertical = if (wide) 48.dp else Space.section),
             first = {
                 if (userName.isBlank()) {
@@ -65,30 +68,34 @@ internal fun HomeScreen(
                     HText(userName, type.display)
                 }
             },
-            second = { Features(gymStatus, onOpenGym) },
+            second = { Features(gymStatus, expenseStatus, onOpenGym, onOpenExpense) },
         )
+        Box(Modifier.fillMaxWidth().padding(horizontal = Space.screen, vertical = Space.item)) { bottomBar() }
     }
 }
 
-/** The features, one tile each: the gym, and what is coming next. */
+/** The features, one tile each: the gym and the expense tracker. */
 @Composable
-private fun ColumnScope.Features(gymStatus: String?, onOpenGym: () -> Unit) {
+private fun ColumnScope.Features(gymStatus: String?, expenseStatus: String?, onOpenGym: () -> Unit, onOpenExpense: () -> Unit) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     HText("Your space", type.overline, color = colors.muted)
     Gap(Space.item)
     HabitaCard(Modifier.fillMaxWidth(), onClick = onOpenGym, contentPadding = PaddingValues(16.dp)) {
-        FeatureRow(HabitaIcons.Dumbbell, "Gym", gymStatus) {
-            Box(Modifier.size(36.dp).background(colors.highlight, CircleShape), contentAlignment = Alignment.Center) {
-                HIcon(HabitaIcons.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp), tint = colors.onHighlight)
-            }
-        }
+        FeatureRow(HabitaIcons.Dumbbell, "Gym", gymStatus) { OpenArrow() }
     }
     Gap(Space.inside)
-    HabitaCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp)) {
-        FeatureRow(HabitaIcons.Wallet, "Expense tracker", "Track what you spend", enabled = false) {
-            Pill("Soon", color = colors.muted)
-        }
+    HabitaCard(Modifier.fillMaxWidth(), onClick = onOpenExpense, contentPadding = PaddingValues(16.dp)) {
+        FeatureRow(HabitaIcons.Wallet, "Expenses", expenseStatus) { OpenArrow() }
+    }
+}
+
+/** A small round arrow at the end of a feature tile. */
+@Composable
+private fun OpenArrow() {
+    val colors = HabitaTheme.colors
+    Box(Modifier.size(36.dp).background(colors.highlight, CircleShape), contentAlignment = Alignment.Center) {
+        HIcon(HabitaIcons.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp), tint = colors.onHighlight)
     }
 }
 

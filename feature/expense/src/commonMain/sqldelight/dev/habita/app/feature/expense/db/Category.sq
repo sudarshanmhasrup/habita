@@ -1,0 +1,24 @@
+-- A spending category with its monthly limit in paise. Removed categories are kept, archived, so
+-- old payments still show their name.
+CREATE TABLE category (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    limit_paise INTEGER NOT NULL,
+    position INTEGER NOT NULL,
+    archived INTEGER NOT NULL DEFAULT 0
+);
+
+all:
+SELECT * FROM category ORDER BY position;
+
+count:
+SELECT COUNT(*) FROM category;
+
+save:
+INSERT OR REPLACE INTO category VALUES (?, ?, ?, ?, ?);
+
+setLimit:
+UPDATE category SET limit_paise = ? WHERE id = ?;
+
+nextPosition:
+SELECT COALESCE(MAX(position), -1) + 1 FROM category;
