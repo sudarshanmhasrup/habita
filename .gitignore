@@ -24,3 +24,9 @@ deploy/backups
 # Xcode user state
 xcuserdata
 *.xcuserstate
+
+# Editor and OS files
+.DS_Store
+*.iml
+captures/
+.cxx/
