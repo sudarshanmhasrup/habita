@@ -7,8 +7,8 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * The theme colour. Each one is a whole palette, not just a button colour: the page, cards,
- * borders and text all take a quiet tint of its hue, so the app feels made of that colour. The
+ * The theme colour. Each one is a whole palette, not just a button colour: cards, borders and text
+ * take a quiet tint of its hue, and so does the dark page. The light page stays plain white. The
  * tones are deep and muted on purpose; bright, flat colours look cheap. [id] is what gets saved
  * and synced, so never rename one.
  */
@@ -41,8 +41,9 @@ enum class Accent(
             val tint = tone(0.45f, 0.91f)
             HabitaColors(
                 isDark = false,
-                background = tone(0.22f, 0.975f),
-                backgroundTop = tone(0.30f, 0.955f),
+                // The page stays plain white in every colour; the colour lives in everything on it.
+                background = Color.White,
+                backgroundTop = Color.White,
                 card = tone(0.26f, 0.935f),
                 cardTop = tone(0.26f, 0.935f),
                 border = tone(0.20f, 0.865f),
@@ -54,7 +55,7 @@ enum class Accent(
                 highlight = accent,
                 onHighlight = Color.White,
                 inverseCard = tone(0.40f, 0.15f),
-                onInverseCard = tone(0.22f, 0.975f),
+                onInverseCard = Color.White,
                 error = Color(0xFFB42318),
                 effortEasy = lerp(tint, accent, 0.3f),
                 effortMedium = lerp(tint, accent, 0.65f),
