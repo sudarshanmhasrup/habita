@@ -20,6 +20,10 @@ sqldelight {
     databases {
         create("HabitaDatabase") {
             packageName.set("dev.habita.server.db")
+            // The schema of every released version lives here as N.db; check applies the migrations to
+            // each and fails if the result differs from the current schema.
+            schemaOutputDirectory.set(file("src/main/sqldelight/databases"))
+            verifyMigrations.set(true)
         }
     }
 }
