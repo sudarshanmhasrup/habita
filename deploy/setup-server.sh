@@ -51,8 +51,10 @@ PubkeyAuthentication yes
 MaxAuthTries 3
 X11Forwarding no
 EOF
+# Ubuntu 24.04 starts sshd on demand, so its runtime directory can be missing until then.
+install -d -m 755 /run/sshd
 sshd -t
-systemctl reload ssh
+systemctl try-reload-or-restart ssh
 
 echo "==> Opening only SSH, HTTP and HTTPS"
 ufw default deny incoming
