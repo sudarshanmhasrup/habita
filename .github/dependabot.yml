@@ -1,0 +1,21 @@
+# Weekly pull requests for outdated Gradle dependencies, GitHub Actions and the server's base
+# image. Each one runs the Checks workflow before it can be merged.
+version: 2
+updates:
+    -   package-ecosystem: "gradle"
+        directory: "/"
+        schedule:
+            interval: "weekly"
+        groups:
+            gradle:
+                patterns: ["*"]
+
+    -   package-ecosystem: "github-actions"
+        directory: "/"
+        schedule:
+            interval: "weekly"
+
+    -   package-ecosystem: "docker"
+        directory: "/server"
+        schedule:
+            interval: "weekly"

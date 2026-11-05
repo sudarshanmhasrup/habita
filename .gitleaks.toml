@@ -1,0 +1,10 @@
+# gitleaks settings: the default rules, minus test sources, whose fake tokens and hashes are
+# fixtures, not secrets. Everything else, including deploy files and app code, is scanned.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test fixtures"
+paths = [
+    '(^|/)src/[A-Za-z]*[Tt]est/',
+]

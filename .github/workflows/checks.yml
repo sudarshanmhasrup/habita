@@ -1,0 +1,68 @@
+name: "Checks"
+
+# Runs on every pull request, so a change that breaks any module, a migration or a secret never
+# reaches main. Make both jobs required checks in the branch protection rule for main.
+on:
+    pull_request:
+    push:
+        branches: [main]
+
+concurrency:
+    group: checks-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+    test:
+        name: "Test every module"
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            -   uses: actions/checkout@v7
+                with:
+                    persist-credentials: false
+
+            -   uses: actions/setup-java@v6
+                with:
+                    distribution: temurin
+                    java-version: 21
+
+            -   uses: gradle/actions/setup-gradle@v6
+
+            -   name: "Test, verify migrations and build the app"
+                run: >-
+                    ./gradlew
+                    :shared:jvmTest
+                    :server:test
+                    :core:desktopTest
+                    :feature:gym:desktopTest
+                    :feature:expense:desktopTest
+                    :server:verifySqlDelightMigration
+                    :core:verifySqlDelightMigration
+                    :feature:gym:verifySqlDelightMigration
+                    :feature:expense:verifySqlDelightMigration
+                    :android:assembleDebug
+
+    secrets:
+        name: "Scan for secrets"
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            -   uses: actions/checkout@v7
+                with:
+                    fetch-depth: 0
+                    persist-credentials: false
+
+            -   name: "Run gitleaks over the full history"
+                env:
+                    VERSION: "8.28.0"
+                run: |
+                    base="https://github.com/gitleaks/gitleaks/releases/download/v$VERSION"
+                    archive="gitleaks_${VERSION}_linux_x64.tar.gz"
+                    curl -sSLO "$base/$archive"
+                    curl -sSL "$base/gitleaks_${VERSION}_checksums.txt" | grep " $archive\$" | sha256sum -c -
+                    tar -xzf "$archive" gitleaks
+                    ./gitleaks git --redact --verbose --exit-code 1 .
