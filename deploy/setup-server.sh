@@ -43,7 +43,9 @@ chmod 440 "/etc/sudoers.d/90-$ADMIN_USER"
 visudo -cf "/etc/sudoers.d/90-$ADMIN_USER"
 
 echo "==> Allowing SSH keys only, without root"
-cat > /etc/ssh/sshd_config.d/90-habita.conf <<'EOF'
+# sshd keeps the first value it reads and loads these files in name order, so this one must sort
+# before a provider's 50-cloud-init.conf, which can turn password login back on.
+cat > /etc/ssh/sshd_config.d/00-habita.conf <<'EOF'
 PermitRootLogin no
 PasswordAuthentication no
 KbdInteractiveAuthentication no
