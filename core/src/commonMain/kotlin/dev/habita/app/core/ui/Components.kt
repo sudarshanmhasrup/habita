@@ -188,9 +188,9 @@ fun TwoPane(
 val PaneGap = 16.dp
 
 /**
- * A card. On light it is white and sits on the warm page with a soft shadow; on dark it fades a
- * little lighter at the top with a hairline edge. Clickable when [onClick] is set, and then it
- * sinks slightly while pressed.
+ * A card: a tinted surface on the page. On dark it fades a little lighter at the top with a
+ * hairline edge; a card the same colour as the page gets a soft shadow instead, so it still
+ * stands out. Clickable when [onClick] is set, and then it sinks slightly while pressed.
  */
 @Composable
 fun HabitaCard(
@@ -208,7 +208,7 @@ fun HabitaCard(
         modifier
             .then(if (onClick != null) Modifier.pressScale(interaction, 0.985f) else Modifier)
             .then(
-                if (plainCard && !colors.isDark) {
+                if (plainCard && !colors.isDark && color == colors.background) {
                     Modifier.shadow(10.dp, CardShape, ambientColor = CardShadow, spotColor = CardShadow)
                 } else {
                     Modifier
@@ -225,7 +225,7 @@ fun HabitaCard(
             .then(
                 when {
                     borderColor != Color.Transparent -> Modifier.border(1.dp, borderColor, CardShape)
-                    plainCard -> Modifier.border(1.dp, colors.border.copy(alpha = if (colors.isDark) 1f else 0.6f), CardShape)
+                    plainCard && colors.isDark -> Modifier.border(1.dp, colors.border, CardShape)
                     else -> Modifier
                 },
             )
