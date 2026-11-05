@@ -12,7 +12,6 @@ import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.ui.HabitaScreen
 import dev.habita.app.feature.auth.LoginScreen
 import dev.habita.app.feature.expense.ExpenseScreen
-import dev.habita.app.feature.expense.ScanPayBar
 import dev.habita.app.feature.gym.GymScreen
 
 /**
@@ -50,7 +49,6 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
                         onToggleTheme = { settings.setDarkTheme(!darkTheme) },
                         onOpenGym = { screen = Screen.Gym },
                         onOpenExpense = { screen = Screen.Expense },
-                        bottomBar = { ScanPayBar(app.expense) },
                     )
                 }
                 Screen.Gym -> GymScreen(app.gym, onExit = { screen = Screen.Home })

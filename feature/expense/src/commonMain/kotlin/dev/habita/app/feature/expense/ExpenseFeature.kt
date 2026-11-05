@@ -69,12 +69,7 @@ class ExpenseFeature(core: Core) {
 
     /** Shows the expense screen next time the app is in front, on [expenseId] when it's set. */
     fun requestOpen(expenseId: String?) {
-        _openRequest.value = OpenRequest(expenseId, null, nowMillis())
-    }
-
-    /** Shows the expense screen on paying the QR code [scanned] from elsewhere, such as home. */
-    fun requestPay(scanned: String) {
-        _openRequest.value = OpenRequest(null, scanned, nowMillis())
+        _openRequest.value = OpenRequest(expenseId, nowMillis())
     }
 
     internal fun consumeOpenRequest() {
@@ -85,8 +80,5 @@ class ExpenseFeature(core: Core) {
     fun startOfThisMonth(): Long = startOf(monthOf(nowMillis()))
 }
 
-/**
- * Open the expense screen: on one payment when [expenseId] is set, or on paying a QR when [scan]
- * holds its text. [at] tells repeats apart.
- */
-data class OpenRequest(val expenseId: String?, val scan: String?, val at: Long)
+/** Open the expense screen, on one payment when [expenseId] is set. [at] tells repeats apart. */
+data class OpenRequest(val expenseId: String?, val at: Long)

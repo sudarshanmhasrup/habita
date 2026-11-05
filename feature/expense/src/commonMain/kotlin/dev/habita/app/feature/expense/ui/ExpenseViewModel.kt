@@ -11,10 +11,6 @@ import dev.habita.app.feature.expense.data.MonthSummary
 import dev.habita.app.feature.expense.data.PaymentMode
 import dev.habita.app.feature.expense.data.SmsOutcome
 import dev.habita.app.feature.expense.data.YearMonth
-import dev.habita.app.feature.expense.data.PendingPayment
-import dev.habita.app.feature.expense.data.UpiRequest
-import dev.habita.app.feature.expense.data.UpiStatus
-import dev.habita.app.feature.expense.data.formatRupees
 import dev.habita.app.feature.expense.data.monthOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,19 +30,6 @@ internal sealed interface ExpenseRoute {
 
     /** The monthly income and each category's limit. */
     data object Budget : ExpenseRoute
-
-    /** Paying a scanned UPI QR. */
-    data object Pay : ExpenseRoute
-}
-
-/** The form for paying a scanned QR. A QR with its own amount keeps it. */
-internal data class PayDraft(
-    val request: UpiRequest,
-    val amountText: String,
-    val description: String,
-    val categoryId: String?,
-) {
-    val amountFixed: Boolean get() = request.amountPaise != null
 }
 
 /** The form for adding or editing a payment. */
@@ -76,11 +59,6 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
 
     private val _draft = MutableStateFlow<ExpenseDraft?>(null)
     val draft: StateFlow<ExpenseDraft?> = _draft.asStateFlow()
-
-    private val _payDraft = MutableStateFlow<PayDraft?>(null)
-    val payDraft: StateFlow<PayDraft?> = _payDraft.asStateFlow()
-
-    val pending = repository.pending.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _message = MutableStateFlow<String?>(null)
 
@@ -114,7 +92,6 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
         if (_route.value == ExpenseRoute.Month) return false
         _route.value = ExpenseRoute.Month
         _draft.value = null
-        _payDraft.value = null
         return true
     }
 
@@ -213,74 +190,6 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
                 1 -> "Added 1 payment from your SMS."
                 else -> "Added $added payments from your SMS."
             }
-        }
-    }
-
-    /** Opens the pay screen for a scanned QR, or says why it can't be paid. */
-    fun onScanned(text: String?) {
-        if (text == null) return
-        val request = UpiRequest.parse(text)
-        if (request == null) {
-            _message.value = "That isn't a UPI payment QR."
-            return
-        }
-        viewModelScope.launch {
-            _payDraft.value = PayDraft(
-                request = request,
-                amountText = request.amountPaise?.let { formatRupees(it, symbol = false).replace(",", "") } ?: "",
-                description = request.note ?: request.displayName,
-                categoryId = repository.categoryFor(request.payeeId),
-            )
-            _route.value = ExpenseRoute.Pay
-        }
-    }
-
-    fun updatePay(change: (PayDraft) -> PayDraft) {
-        _payDraft.value = _payDraft.value?.let(change)
-    }
-
-    /**
-     * Remembers the payment so its bank SMS is saved with this description and category, then
-     * returns its id and the request to hand to the UPI app.
-     */
-    suspend fun startPay(amountPaise: Long): Pair<String, String>? {
-        val draft = _payDraft.value ?: return null
-        val payment = PendingPayment(
-            id = newId(),
-            amountPaise = amountPaise,
-            payeeId = draft.request.payeeId,
-            payeeName = draft.request.displayName,
-            description = draft.description.trim().ifEmpty { draft.request.displayName },
-            categoryId = draft.categoryId,
-            startedAt = nowMillis(),
-        )
-        repository.startPayment(payment)
-        return payment.id to draft.request.toUri(amountPaise, draft.description)
-    }
-
-    /** What happened in the UPI app; `null` means there was no UPI app to open. */
-    fun onPayResult(paymentId: String, amountPaise: Long, status: UpiStatus?) {
-        viewModelScope.launch {
-            _message.value = when (status) {
-                null -> {
-                    repository.dropPayment(paymentId)
-                    "No UPI app found. Install GPay or PhonePe to pay from here."
-                }
-                UpiStatus.FAILURE -> {
-                    repository.dropPayment(paymentId)
-                    "The payment didn't go through."
-                }
-                UpiStatus.SUCCESS -> "Paid ${formatRupees(amountPaise)}. It's saved as soon as the bank SMS arrives."
-                UpiStatus.UNKNOWN -> "It's saved when the bank SMS arrives. If you didn't pay, tap Didn't pay below."
-            }
-            back()
-        }
-    }
-
-    /** A started payment whose SMS never came: [paid] saves it, otherwise it's dropped. */
-    fun settle(paymentId: String, paid: Boolean) {
-        viewModelScope.launch {
-            if (paid) repository.settlePayment(paymentId) else repository.dropPayment(paymentId)
         }
     }
 
