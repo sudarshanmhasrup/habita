@@ -15,7 +15,8 @@ services:
                 max-file: "3"
 
     caddy:
-        image: caddy:2
+        # A fixed version, so a restart never pulls a different Caddy. Bump it on purpose.
+        image: caddy:2.11.8
         restart: unless-stopped
         depends_on:
             - server
