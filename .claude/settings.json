@@ -1,0 +1,42 @@
+{
+    "$schema": "https://json.schemastore.org/claude-code-settings.json",
+    "permissions": {
+        "deny": [
+            "Read(/deploy/.env)",
+            "Read(/deploy/.env.*)",
+            "Read(~/.habita-signing/**)",
+            "Bash(git push -f*)",
+            "Bash(git push --force*)",
+            "Bash(git push * -f*)",
+            "Bash(git push * --force*)",
+            "Bash(git push main)",
+            "Bash(git push * main)",
+            "Bash(git push * HEAD:main)"
+        ],
+        "ask": [
+            "Edit(/deploy/**)",
+            "Edit(/.github/**)",
+            "Edit(/android/signing/**)",
+            "Edit(/.claude/**)",
+            "Edit(/server/Dockerfile)",
+            "Edit(/gradle/libs.versions.toml)",
+            "Edit(/scripts/sign-apk.sh)",
+            "Edit(/server/src/main/kotlin/dev/habita/server/auth/**)",
+            "Edit(/AGENTS.md)",
+            "Edit(/CLAUDE.md)"
+        ]
+    },
+    "hooks": {
+        "PreToolUse": [
+            {
+                "matcher": "Edit|Write",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/protect-migrations.sh"
+                    }
+                ]
+            }
+        ]
+    }
+}
