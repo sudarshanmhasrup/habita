@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
 
 /**
  * Payments, categories and the monthly income, kept on the phone. Every change marks the record
@@ -37,10 +36,6 @@ class ExpenseRepository(core: Core) {
 
     val categories: Flow<List<Category>> =
         categoryQueries.all(::toCategory).asFlow().mapToList(Dispatchers.Default)
-
-    /** Payments started from a scanned QR, waiting for their bank SMS. */
-    val pending: Flow<List<PendingPayment>> = values.select(PENDING).asFlow().mapToOneOrNull(Dispatchers.Default)
-        .map { decodePending(it) }
 
     val income: Flow<Long> = values.select(INCOME).asFlow().mapToOneOrNull(Dispatchers.Default)
         .map { it?.toLongOrNull() ?: Defaults.INCOME_PAISE }
@@ -77,28 +72,6 @@ class ExpenseRepository(core: Core) {
                     .executeAsOneOrNull() != null
             }
             if (duplicate) return@transactionWithResult SmsOutcome.Duplicate
-            // A payment started from a QR in the app: save it as it was described there.
-            val pendingList = readPending()
-            val started = pendingList.filter { it.matches(debit.amountPaise, receivedAt) }.maxByOrNull { it.startedAt }
-            if (started != null) {
-                writePending(pendingList - started)
-                val expense = Expense(
-                    id = newId(),
-                    amountPaise = debit.amountPaise,
-                    description = started.description,
-                    payee = debit.payee ?: started.payeeId,
-                    categoryId = started.categoryId,
-                    mode = PaymentMode.ONLINE,
-                    source = ExpenseSource.SMS,
-                    smsRef = debit.reference,
-                    paidAt = receivedAt,
-                )
-                write(expense)
-                remember(expense)
-                started.categoryId?.let { rules.save(BankSms.payeeKey(started.payeeId), it) }
-                val category = started.categoryId?.let { id -> categoryQueries.all(::toCategory).executeAsList().firstOrNull { it.id == id } }
-                return@transactionWithResult SmsOutcome.Recorded(expense, category)
-            }
             val categoryId = debit.payee?.let { rules.forPayee(BankSms.payeeKey(it)).executeAsOneOrNull() }
             val category = categoryId?.let { id ->
                 categoryQueries.all(::toCategory).executeAsList().firstOrNull { it.id == id && !it.archived }
@@ -116,47 +89,6 @@ class ExpenseRepository(core: Core) {
             )
             write(expense)
             SmsOutcome.Recorded(expense, category)
-        }
-    }
-
-    /**
-     * The category last used for a UPI id, so a scanned QR starts with it picked. Tries the id,
-     * then its name part, which is how most bank SMS name the payee.
-     */
-    suspend fun categoryFor(payeeId: String): String? = io {
-        rules.forPayee(BankSms.payeeKey(payeeId)).executeAsOneOrNull()
-            ?: rules.forPayee(BankSms.payeeKey(payeeId.substringBefore('@'))).executeAsOneOrNull()
-    }
-
-    /** Remembers a payment handed to the UPI app, until its bank SMS arrives. */
-    suspend fun startPayment(payment: PendingPayment) = io {
-        database.transaction { writePending(readPending() + payment) }
-    }
-
-    /** Forgets a started payment: it failed, or wasn't made. */
-    suspend fun dropPayment(id: String) = io {
-        database.transaction { writePending(readPending().filterNot { it.id == id }) }
-    }
-
-    /** Saves a started payment whose SMS never came, as paid when it was started. */
-    suspend fun settlePayment(id: String) = io {
-        database.transaction {
-            val all = readPending()
-            val payment = all.firstOrNull { it.id == id } ?: return@transaction
-            writePending(all - payment)
-            val expense = Expense(
-                id = newId(),
-                amountPaise = payment.amountPaise,
-                description = payment.description,
-                payee = payment.payeeId,
-                categoryId = payment.categoryId,
-                mode = PaymentMode.ONLINE,
-                source = ExpenseSource.MANUAL,
-                smsRef = null,
-                paidAt = payment.startedAt,
-            )
-            write(expense)
-            remember(expense)
         }
     }
 
@@ -217,19 +149,10 @@ class ExpenseRepository(core: Core) {
         rules.save(BankSms.payeeKey(payee), categoryId)
     }
 
-    private fun readPending(): List<PendingPayment> = decodePending(values.select(PENDING).executeAsOneOrNull())
-
-    private fun writePending(list: List<PendingPayment>) = values.save(PENDING, json.encodeToString(list))
-
-    private fun decodePending(text: String?): List<PendingPayment> =
-        text?.let { runCatching { json.decodeFromString<List<PendingPayment>>(it) }.getOrNull() }.orEmpty()
-
     private suspend fun <T> io(block: () -> T): T = withContext(Dispatchers.Default) { block() }
 
     private companion object {
         const val INCOME = "income_paise"
-        const val PENDING = "pending_payments"
-        val json = Json { ignoreUnknownKeys = true }
         const val DUPLICATE_WINDOW = 2 * 60 * 1000L
 
         fun toCategory(id: String, name: String, limit: Long, position: Long, archived: Long) =

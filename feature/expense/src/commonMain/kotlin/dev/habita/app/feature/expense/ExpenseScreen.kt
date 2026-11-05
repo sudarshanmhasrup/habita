@@ -18,10 +18,8 @@ import dev.habita.app.feature.expense.ui.EditExpenseScreen
 import dev.habita.app.feature.expense.ui.ExpenseRoute
 import dev.habita.app.feature.expense.ui.ExpenseViewModel
 import dev.habita.app.feature.expense.ui.MonthScreen
-import dev.habita.app.feature.expense.ui.PayScreen
 import dev.habita.app.feature.expense.ui.rememberFileSaver
 import dev.habita.app.feature.expense.ui.rememberSmsAccess
-import dev.habita.app.feature.expense.ui.rememberUpi
 import kotlinx.coroutines.launch
 
 /** The expense tracker: the month, adding and editing payments, and the budget. */
@@ -37,9 +35,6 @@ fun ExpenseScreen(feature: ExpenseFeature, onExit: () -> Unit) {
     val deleted by viewModel.deleted.collectAsStateWithLifecycle()
     val openRequest by feature.openRequest.collectAsStateWithLifecycle()
     val sms = rememberSmsAccess()
-    val upi = rememberUpi()
-    val payDraft by viewModel.payDraft.collectAsStateWithLifecycle()
-    val pending by viewModel.pending.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val saveFile = rememberFileSaver { saved ->
         viewModel.showMessage(
@@ -55,10 +50,7 @@ fun ExpenseScreen(feature: ExpenseFeature, onExit: () -> Unit) {
     LaunchedEffect(openRequest) {
         val request = openRequest ?: return@LaunchedEffect
         feature.consumeOpenRequest()
-        when {
-            request.expenseId != null -> viewModel.openEdit(request.expenseId)
-            request.scan != null -> viewModel.onScanned(request.scan)
-        }
+        request.expenseId?.let(viewModel::openEdit)
     }
 
     NavigationBackHandler(
@@ -72,9 +64,7 @@ fun ExpenseScreen(feature: ExpenseFeature, onExit: () -> Unit) {
                 ExpenseRoute.Month -> MonthScreen(
                     month = month,
                     summary = summary,
-                    pending = pending,
                     sms = sms,
-                    canScan = upi.supported,
                     message = message,
                     deleted = deleted,
                     canGoBack = viewModel.canGoBack,
@@ -83,8 +73,6 @@ fun ExpenseScreen(feature: ExpenseFeature, onExit: () -> Unit) {
                     onPrevious = viewModel::previousMonth,
                     onNext = viewModel::nextMonth,
                     onAdd = { viewModel.openEdit(null) },
-                    onScan = { upi.scan(viewModel::onScanned) },
-                    onSettle = viewModel::settle,
                     onOpen = { viewModel.openEdit(it) },
                     onSort = viewModel::setCategory,
                     onBudget = viewModel::openBudget,
@@ -103,21 +91,6 @@ fun ExpenseScreen(feature: ExpenseFeature, onExit: () -> Unit) {
                         onChange = viewModel::updateDraft,
                         onSave = viewModel::saveDraft,
                         onDelete = viewModel::deleteDraft,
-                    )
-                }
-
-                ExpenseRoute.Pay -> payDraft?.let {
-                    PayScreen(
-                        draft = it,
-                        categories = categories.filter { category -> !category.archived },
-                        onBack = { viewModel.back() },
-                        onChange = viewModel::updatePay,
-                        onPay = { amount ->
-                            scope.launch {
-                                val (paymentId, uri) = viewModel.startPay(amount) ?: return@launch
-                                upi.pay(uri) { status -> viewModel.onPayResult(paymentId, amount, status) }
-                            }
-                        },
                     )
                 }
 

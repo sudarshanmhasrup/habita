@@ -13,7 +13,6 @@ bcrypt = "0.10.2"
 coroutines = "1.11.0"
 lifecycle = "2.11.0"
 navigationEvent = "1.1.0"
-playServicesCodeScanner = "16.1.0"
 
 # android module's configuration information
 android-group = "dev.habita.app"
@@ -49,7 +48,6 @@ server-version = "1.0.0"
 
 [libraries]
 activity = { module = "androidx.activity:activity-compose", version.ref = "activity" }
-play-services-code-scanner = { module = "com.google.android.gms:play-services-code-scanner", version.ref = "playServicesCodeScanner" }
 splash-screen = { module = "androidx.core:core-splashscreen", version.ref = "splashScreen" }
 compose-multiplatform-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMultiplatform" }
 compose-multiplatform-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeMultiplatform" }

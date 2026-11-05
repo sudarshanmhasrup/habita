@@ -39,7 +39,6 @@ internal fun HomeScreen(
     onToggleTheme: () -> Unit,
     onOpenGym: () -> Unit,
     onOpenExpense: () -> Unit,
-    bottomBar: @Composable () -> Unit = {},
 ) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
@@ -70,7 +69,6 @@ internal fun HomeScreen(
             },
             second = { Features(gymStatus, expenseStatus, onOpenGym, onOpenExpense) },
         )
-        Box(Modifier.fillMaxWidth().padding(horizontal = Space.screen, vertical = Space.item)) { bottomBar() }
     }
 }
 

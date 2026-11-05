@@ -40,7 +40,6 @@ import dev.habita.app.core.ui.LocalWideLayout
 import dev.habita.app.core.ui.Overline
 import dev.habita.app.core.ui.PrimaryButton
 import dev.habita.app.core.ui.ProgressBar
-import dev.habita.app.core.ui.SecondaryButton
 import dev.habita.app.core.ui.TextAction
 import dev.habita.app.core.ui.TopBar
 import dev.habita.app.core.ui.TwoPane
@@ -49,7 +48,6 @@ import dev.habita.app.feature.expense.data.CategorySpend
 import dev.habita.app.feature.expense.data.Expense
 import dev.habita.app.feature.expense.data.ExpenseSource
 import dev.habita.app.feature.expense.data.MonthSummary
-import dev.habita.app.feature.expense.data.PendingPayment
 import dev.habita.app.feature.expense.data.YearMonth
 import dev.habita.app.feature.expense.data.dayLabel
 import dev.habita.app.feature.expense.data.formatRupees
@@ -63,9 +61,7 @@ import kotlinx.coroutines.delay
 internal fun MonthScreen(
     month: YearMonth,
     summary: MonthSummary?,
-    pending: List<PendingPayment>,
     sms: SmsAccess,
-    canScan: Boolean,
     message: String?,
     deleted: Expense?,
     canGoBack: Boolean,
@@ -74,8 +70,6 @@ internal fun MonthScreen(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onAdd: () -> Unit,
-    onScan: () -> Unit,
-    onSettle: (paymentId: String, paid: Boolean) -> Unit,
     onOpen: (String) -> Unit,
     onSort: (expenseId: String, categoryId: String) -> Unit,
     onBudget: () -> Unit,
@@ -101,10 +95,6 @@ internal fun MonthScreen(
                 MonthSwitcher(month, canGoBack, canGoForward, onPrevious, onNext)
                 Gap(Space.item)
                 if (summary != null) Overview(summary)
-                if (pending.isNotEmpty() && !canGoForward) {
-                    Gap(Space.section)
-                    Waiting(pending, onSettle)
-                }
                 if (sms.supported && !canGoForward) {
                     Gap(Space.item)
                     SmsCard(sms, onImport)
@@ -152,10 +142,7 @@ internal fun MonthScreen(
                 }
                 Gap(Space.inside)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.inside)) {
-                if (canScan) SecondaryButton("Scan QR", onScan, Modifier.weight(1f))
-                PrimaryButton("Add expense", onAdd, Modifier.weight(1f))
-            }
+            PrimaryButton("Add expense", onAdd, Modifier.fillMaxWidth())
         }
     }
 }
@@ -210,33 +197,6 @@ private fun Overview(summary: MonthSummary) {
             height = 6.dp,
             color = if (summary.leftPaise < 0) colors.error else colors.accent,
         )
-    }
-}
-
-/** Payments handed to the UPI app whose bank SMS hasn't come yet. */
-@Composable
-private fun ColumnScope.Waiting(pending: List<PendingPayment>, onSettle: (String, Boolean) -> Unit) {
-    val colors = HabitaTheme.colors
-    val type = HabitaTheme.typography
-    Overline("Waiting for bank SMS · ${pending.size}", color = colors.accent)
-    Gap(Space.item)
-    Column(verticalArrangement = Arrangement.spacedBy(Space.inside)) {
-        pending.sortedByDescending { it.startedAt }.forEach { payment ->
-            HabitaCard(Modifier.fillMaxWidth()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        HText(payment.description, type.bodyStrong, maxLines = 1)
-                        HText("${payment.payeeName} · ${timeLabel(payment.startedAt)}", type.caption, color = colors.muted, maxLines = 1)
-                    }
-                    HText(formatRupees(payment.amountPaise), type.title)
-                }
-                Gap(Space.item)
-                Row(horizontalArrangement = Arrangement.spacedBy(Space.inside)) {
-                    SmallPill("Paid") { onSettle(payment.id, true) }
-                    SmallPill("Didn't pay") { onSettle(payment.id, false) }
-                }
-            }
-        }
     }
 }
 

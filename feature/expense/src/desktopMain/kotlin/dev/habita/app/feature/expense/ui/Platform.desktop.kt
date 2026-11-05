@@ -1,7 +1,6 @@
 package dev.habita.app.feature.expense.ui
 
 import androidx.compose.runtime.Composable
-import dev.habita.app.feature.expense.data.UpiStatus
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
@@ -18,16 +17,6 @@ internal actual fun rememberSmsAccess(): SmsAccess = object : SmsAccess {
     override fun requestOpenOnPayment() = Unit
 
     override suspend fun inbox(since: Long): List<InboxSms> = emptyList()
-}
-
-/** No UPI apps on desktop. */
-@Composable
-internal actual fun rememberUpi(): UpiAccess = object : UpiAccess {
-    override val supported = false
-
-    override fun scan(onResult: (String?) -> Unit) = onResult(null)
-
-    override fun pay(uri: String, onResult: (UpiStatus?) -> Unit) = onResult(null)
 }
 
 @Composable

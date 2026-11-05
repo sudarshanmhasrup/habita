@@ -1,7 +1,6 @@
 package dev.habita.app.feature.expense.ui
 
 import android.Manifest
-import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -18,11 +17,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
-import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
-import dev.habita.app.feature.expense.data.UpiStatus
-import dev.habita.app.feature.expense.data.upiStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -80,43 +74,6 @@ internal actual fun rememberSmsAccess(): SmsAccess {
                     }
                 }
                 messages
-            }
-        }
-    }
-}
-
-@Composable
-internal actual fun rememberUpi(): UpiAccess {
-    val context = LocalContext.current
-    val pending = remember { arrayOfNulls<(UpiStatus?) -> Unit>(1) }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val callback = pending[0] ?: return@rememberLauncherForActivityResult
-        pending[0] = null
-        // Apps put "Status=SUCCESS&txnId=…" under "response"; some leave it out entirely.
-        val data = result.data
-        val response = data?.getStringExtra("response") ?: data?.getStringExtra("Status")?.let { "Status=$it" }
-        callback(upiStatus(response))
-    }
-    return remember(launcher) {
-        object : UpiAccess {
-            override val supported = true
-
-            override fun scan(onResult: (String?) -> Unit) {
-                val options = GmsBarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
-                GmsBarcodeScanning.getClient(context, options).startScan()
-                    .addOnSuccessListener { onResult(it.rawValue) }
-                    .addOnCanceledListener { onResult(null) }
-                    .addOnFailureListener { onResult(null) }
-            }
-
-            override fun pay(uri: String, onResult: (UpiStatus?) -> Unit) {
-                pending[0] = onResult
-                try {
-                    launcher.launch(Intent(Intent.ACTION_VIEW, Uri.parse(uri)))
-                } catch (_: ActivityNotFoundException) {
-                    pending[0] = null
-                    onResult(null)
-                }
             }
         }
     }
