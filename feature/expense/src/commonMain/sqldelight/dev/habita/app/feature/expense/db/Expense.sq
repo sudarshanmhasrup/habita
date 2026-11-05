@@ -1,0 +1,50 @@
+-- One payment. Amounts are in paise. category_id is null until the payment is sorted. sms_ref is
+-- the bank's reference number, so the same SMS is never recorded twice. dirty marks records the
+-- server doesn't have yet, for when sync is added.
+CREATE TABLE expense (
+    id TEXT NOT NULL PRIMARY KEY,
+    amount_paise INTEGER NOT NULL,
+    description TEXT NOT NULL,
+    payee TEXT,
+    category_id TEXT,
+    mode TEXT NOT NULL,
+    source TEXT NOT NULL,
+    sms_ref TEXT,
+    paid_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    dirty INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE INDEX expense_paid_at ON expense(paid_at);
+
+CREATE UNIQUE INDEX expense_sms_ref ON expense(sms_ref) WHERE sms_ref IS NOT NULL;
+
+inRange:
+SELECT * FROM expense WHERE deleted = 0 AND paid_at >= ? AND paid_at < ? ORDER BY paid_at DESC;
+
+byId:
+SELECT * FROM expense WHERE id = ?;
+
+bySmsRef:
+SELECT * FROM expense WHERE sms_ref = ?;
+
+-- A payment with the same amount close in time, for SMS without a reference number.
+nearDuplicate:
+SELECT * FROM expense WHERE deleted = 0 AND amount_paise = ? AND paid_at BETWEEN ? AND ? LIMIT 1;
+
+save:
+INSERT OR REPLACE INTO expense VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1);
+
+setCategory:
+UPDATE expense SET category_id = ?, updated_at = ?, dirty = 1 WHERE id = ?;
+
+remove:
+UPDATE expense SET deleted = 1, updated_at = ?, dirty = 1 WHERE id = ?;
+
+restore:
+UPDATE expense SET deleted = 0, updated_at = ?, dirty = 1 WHERE id = ?;
+
+-- Earliest payment, so the month picker knows where history starts.
+firstPaidAt:
+SELECT MIN(paid_at) FROM expense WHERE deleted = 0;

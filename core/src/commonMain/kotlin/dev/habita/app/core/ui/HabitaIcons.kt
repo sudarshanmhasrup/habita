@@ -29,6 +29,10 @@ object HabitaIcons {
     val Trophy = icon("Trophy", "M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7")
     val Play = icon("Play", "M8 5.5v13l10-6.5z")
     val Cloud = icon("Cloud", "M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 9.5A4.3 4.3 0 0 0 7 18z")
+    val Scan = icon(
+        "Scan",
+        "M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M8 8h3v3H8zM13 8h3v3h-3zM8 13h3v3H8zM13 13h3v3h-3z",
+    )
     val Phone = icon("Phone", "M8 3h8a1.5 1.5 0 0 1 1.5 1.5v15A1.5 1.5 0 0 1 16 21H8a1.5 1.5 0 0 1-1.5-1.5v-15A1.5 1.5 0 0 1 8 3zM11 18h2")
 
     private fun icon(name: String, path: String): ImageVector =

@@ -369,7 +369,8 @@ fun Chip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifie
 }
 
 /**
- * A labelled text field. The outline turns to the accent while it has focus.
+ * A labelled text field. The outline turns to the accent while it has focus. [fieldModifier]
+ * applies to the field itself, for example to focus it.
  */
 @Composable
 fun LabeledField(
@@ -381,6 +382,7 @@ fun LabeledField(
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     enabled: Boolean = true,
+    fieldModifier: Modifier = Modifier,
 ) {
     val colors = HabitaTheme.colors
     val interaction = remember { MutableInteractionSource() }
@@ -399,7 +401,7 @@ fun LabeledField(
             keyboardActions = keyboardActions,
             visualTransformation = visualTransformation,
             interactionSource = interaction,
-            modifier = Modifier
+            modifier = fieldModifier
                 .fillMaxWidth()
                 .height(56.dp)
                 .background(colors.card, RoundedCornerShape(16.dp))
@@ -523,13 +525,13 @@ private fun StepperButton(icon: ImageVector, label: String, onClick: () -> Unit)
 
 /** A thin progress bar; [progress] runs from 0 to 1. */
 @Composable
-fun ProgressBar(progress: Float, modifier: Modifier = Modifier, height: Dp = 4.dp) {
+fun ProgressBar(progress: Float, modifier: Modifier = Modifier, height: Dp = 4.dp, color: Color = HabitaTheme.colors.accent) {
     val colors = HabitaTheme.colors
     Canvas(modifier.fillMaxWidth().height(height)) {
         val y = size.height / 2
         drawLine(colors.border, Offset(0f, y), Offset(size.width, y), size.height, StrokeCap.Round)
         val end = size.width * progress.coerceIn(0f, 1f)
-        if (end > 0f) drawLine(colors.accent, Offset(0f, y), Offset(end, y), size.height, StrokeCap.Round)
+        if (end > 0f) drawLine(color, Offset(0f, y), Offset(end, y), size.height, StrokeCap.Round)
     }
 }
 

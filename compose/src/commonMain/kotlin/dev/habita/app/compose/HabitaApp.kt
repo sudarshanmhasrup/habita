@@ -3,6 +3,7 @@ package dev.habita.app.compose
 import dev.habita.app.core.AppConfig
 import dev.habita.app.core.Core
 import dev.habita.app.core.data.DatabaseFactory
+import dev.habita.app.feature.expense.ExpenseFeature
 import dev.habita.app.feature.gym.GymFeature
 
 /**
@@ -12,4 +13,5 @@ import dev.habita.app.feature.gym.GymFeature
 class HabitaApp(config: AppConfig, databases: DatabaseFactory) {
     val core = Core(config, databases)
     val gym = GymFeature(core)
+    val expense = ExpenseFeature(core)
 }

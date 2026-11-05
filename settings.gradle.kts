@@ -35,7 +35,7 @@ dependencyResolutionManagement {
     }
 }
 
-val modules = listOf("android", "compose", "core", "shared", "server", "feature:auth", "feature:gym")
+val modules = listOf("android", "compose", "core", "shared", "server", "feature:auth", "feature:gym", "feature:expense")
 modules.forEach { module ->
     include(":$module")
 }

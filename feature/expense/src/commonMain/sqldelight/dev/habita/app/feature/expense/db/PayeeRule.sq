@@ -1,0 +1,11 @@
+-- The category last chosen for a payee, so the next payment to them is sorted on its own.
+CREATE TABLE payee_rule (
+    payee TEXT NOT NULL PRIMARY KEY,
+    category_id TEXT NOT NULL
+);
+
+forPayee:
+SELECT category_id FROM payee_rule WHERE payee = ?;
+
+save:
+INSERT OR REPLACE INTO payee_rule VALUES (?, ?);
