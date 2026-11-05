@@ -19,6 +19,7 @@ class HabitaApplication : Application(), ExpenseHost {
                 loginEnabled = BuildConfig.LOGIN_ENABLED,
             ),
             databases = AndroidDatabaseFactory(this),
+            installer = AndroidAppInstaller(this),
         )
     }
 

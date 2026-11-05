@@ -1,0 +1,74 @@
+name: "Android"
+
+# Every change to the app on main becomes an update on the server, which the app offers on its
+# home screen. Build numbers only go up, so a re-run publishes a newer number too.
+on:
+    push:
+        branches: [main]
+        paths:
+            - "android/**"
+            - "compose/**"
+            - "core/**"
+            - "feature/**"
+            - "shared/**"
+            - "gradle/**"
+            - "*.kts"
+            - "scripts/sign-apk.sh"
+            - ".github/workflows/android.yml"
+    workflow_dispatch:
+
+concurrency:
+    group: android-release
+    cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+    release:
+        name: "Build, sign and publish"
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        env:
+            HABITA_SERVER_URL: ${{ vars.HABITA_SERVER_URL }}
+            HABITA_NAME: ${{ vars.HABITA_NAME }}
+            HABITA_LOGIN: "true"
+        steps:
+            -   uses: actions/checkout@v7
+                with:
+                    persist-credentials: false
+
+            -   uses: actions/setup-java@v6
+                with:
+                    distribution: temurin
+                    java-version: 21
+
+            -   uses: gradle/actions/setup-gradle@v6
+
+            -   name: "Pick the build number"
+                run: echo "HABITA_VERSION_CODE=$((1000 + GITHUB_RUN_NUMBER * 10 + GITHUB_RUN_ATTEMPT))" >> "$GITHUB_ENV"
+
+            -   name: "Build the release APK"
+                run: ./gradlew :android:assembleRelease
+
+            -   name: "Sign"
+                env:
+                    HABITA_KEYSTORE_BASE64: ${{ secrets.HABITA_KEYSTORE_BASE64 }}
+                    HABITA_KEYSTORE_PASSWORD: ${{ secrets.HABITA_KEYSTORE_PASSWORD }}
+                run: |
+                    export HABITA_KEYSTORE="$RUNNER_TEMP/habita-release.jks"
+                    echo "$HABITA_KEYSTORE_BASE64" | base64 --decode > "$HABITA_KEYSTORE"
+                    scripts/sign-apk.sh .build/android/outputs/apk/release/android-release-unsigned.apk "$RUNNER_TEMP/habita.apk"
+                    rm -f "$HABITA_KEYSTORE"
+
+            -   name: "Publish to the server"
+                env:
+                    HABITA_PUBLISH_TOKEN: ${{ secrets.HABITA_PUBLISH_TOKEN }}
+                run: |
+                    curl --fail-with-body -sS -X POST \
+                        -H "Authorization: Bearer $HABITA_PUBLISH_TOKEN" \
+                        -H "X-Version-Code: $HABITA_VERSION_CODE" \
+                        -H "X-Version-Name: 1.0.0 ($HABITA_VERSION_CODE)" \
+                        -H "Content-Type: application/vnd.android.package-archive" \
+                        --data-binary "@$RUNNER_TEMP/habita.apk" \
+                        "${HABITA_SERVER_URL%/}/app/android/releases"

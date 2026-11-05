@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import dev.habita.app.core.theme.Accent
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.theme.Space
+import dev.habita.app.core.update.UpdateState
 import dev.habita.app.core.ui.CountingText
 import dev.habita.app.core.ui.Divider
 import dev.habita.app.core.ui.Gap
@@ -57,6 +58,8 @@ internal fun HomeScreen(
     accent: Accent,
     gym: GymToday?,
     expense: ExpenseToday?,
+    update: UpdateState,
+    onInstallUpdate: () -> Unit,
     onDarkTheme: (Boolean) -> Unit,
     onAccent: (Accent) -> Unit,
     onStartWorkout: (workoutId: String) -> Unit,
@@ -95,6 +98,10 @@ internal fun HomeScreen(
                 Gap(Space.section)
             },
             second = {
+                if (update != UpdateState.None) {
+                    UpdateCard(update, onInstallUpdate, Modifier.appear(0))
+                    Gap(Space.item)
+                }
                 if (gym != null) {
                     GymCard(gym, onStartWorkout, onOpenGym, Modifier.appear(1))
                     Gap(Space.item)
@@ -114,6 +121,42 @@ internal fun HomeScreen(
         onAccent = onAccent,
         onClose = { themeOpen = false },
     )
+    }
+}
+
+/** A newer build on the server: install it, follow the download, or see why it failed. */
+@Composable
+private fun UpdateCard(update: UpdateState, onInstall: () -> Unit, modifier: Modifier) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
+    val release = when (update) {
+        is UpdateState.Available -> update.release
+        is UpdateState.Downloading -> update.release
+        is UpdateState.Installing -> update.release
+        is UpdateState.Failed -> update.release
+        UpdateState.None -> return
+    }
+    HabitaCard(modifier.fillMaxWidth(), borderColor = colors.accent) {
+        Overline("Update", color = colors.accent)
+        Gap(Space.tiny)
+        HText("Habita ${release.versionName} is ready", type.title)
+        Gap(2.dp)
+        HText(
+            when (update) {
+                is UpdateState.Downloading -> "Downloading… ${(update.progress * 100).toInt()}%"
+                is UpdateState.Installing -> "Confirm the install when Android asks."
+                is UpdateState.Failed -> update.message
+                else -> "${release.sizeBytes / (1024 * 1024)} MB · your data stays as it is."
+            },
+            type.caption,
+            color = if (update is UpdateState.Failed) colors.error else colors.muted,
+        )
+        Gap(Space.item)
+        when (update) {
+            is UpdateState.Downloading -> ProgressBar(update.progress, height = 6.dp)
+            is UpdateState.Installing -> Unit
+            else -> PrimaryButton(if (update is UpdateState.Failed) "Try again" else "Install", onInstall, Modifier.fillMaxWidth())
+        }
     }
 }
 
