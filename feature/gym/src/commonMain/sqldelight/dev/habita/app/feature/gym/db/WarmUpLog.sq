@@ -20,11 +20,14 @@ SELECT * FROM warm_up_log WHERE session_id = ?;
 selectDirty:
 SELECT * FROM warm_up_log WHERE dirty = 1;
 
-updatedAt:
-SELECT updated_at FROM warm_up_log WHERE id = ?;
+selectById:
+SELECT * FROM warm_up_log WHERE id = ?;
 
 save:
 INSERT OR REPLACE INTO warm_up_log VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 markClean:
 UPDATE warm_up_log SET dirty = 0 WHERE id = ? AND updated_at = ?;
+
+markAllDirty:
+UPDATE warm_up_log SET dirty = 1;

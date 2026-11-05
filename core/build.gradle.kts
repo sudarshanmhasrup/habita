@@ -54,6 +54,12 @@ kotlin {
                 api(libs.sqldelight.sqlite.driver)
             }
         }
+
+        val desktopTest by getting {
+            dependencies {
+                implementation(libs.kotlin.test)
+            }
+        }
     }
 }
 

@@ -14,10 +14,11 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 /**
- * Payments, categories and the monthly income, kept on the phone. Every change marks the record
- * dirty, ready for syncing once the server supports expenses.
+ * Payments, categories and the monthly income, kept on the phone and synced when the server is
+ * reachable. Every change records its time, marks the record dirty and asks for a sync.
  */
 class ExpenseRepository(core: Core) {
+    private val sync = core.sync
     private val database = ExpenseDatabase(core.databases.open("expense.db", ExpenseDatabase.Schema))
     private val expenses = database.expenseQueries
     private val categoryQueries = database.categoryQueries
@@ -25,13 +26,15 @@ class ExpenseRepository(core: Core) {
     private val values = database.expenseValueQueries
 
     init {
-        // A new install starts with the user's budget, so the screen is useful from the first open.
+        // A new install starts with the default categories, so the screen is useful from the first
+        // open. They count as never edited (time 0, not dirty): another device's real budget wins.
         database.transaction {
             if (categoryQueries.count().executeAsOne() == 0L) {
-                Defaults.categories.forEach { categoryQueries.save(it.id, it.name, it.limitPaise, it.position.toLong(), 0) }
+                Defaults.categories.forEach { categoryQueries.save(it.id, it.name, it.limitPaise, it.position.toLong(), 0, 0, 0) }
             }
-            if (values.select(INCOME).executeAsOneOrNull() == null) values.save(INCOME, Defaults.INCOME_PAISE.toString())
+            if (values.select(INCOME).executeAsOneOrNull() == null) values.save(INCOME, Defaults.INCOME_PAISE.toString(), 0, 0)
         }
+        expenseSyncTables(database).forEach(sync::register)
     }
 
     val categories: Flow<List<Category>> =
@@ -89,11 +92,11 @@ class ExpenseRepository(core: Core) {
             )
             write(expense)
             SmsOutcome.Recorded(expense, category)
-        }
+        }.also { if (it is SmsOutcome.Recorded) sync.request() }
     }
 
     /** Saves a new or edited payment. A payment with a payee teaches its category for next time. */
-    suspend fun save(expense: Expense) = io {
+    suspend fun save(expense: Expense) = change {
         database.transaction {
             write(expense)
             remember(expense)
@@ -101,30 +104,30 @@ class ExpenseRepository(core: Core) {
     }
 
     /** Sorts a payment into [categoryId], and remembers it for the payee's next payment. */
-    suspend fun setCategory(expenseId: String, categoryId: String) = io {
+    suspend fun setCategory(expenseId: String, categoryId: String) = change {
         database.transaction {
             expenses.setCategory(categoryId, nowMillis(), expenseId)
             expenses.byId(expenseId, ::toExpense).executeAsOneOrNull()?.let(::remember)
         }
     }
 
-    suspend fun delete(expenseId: String) = io { expenses.remove(nowMillis(), expenseId) }
+    suspend fun delete(expenseId: String) = change { expenses.remove(nowMillis(), expenseId) }
 
-    suspend fun restore(expenseId: String) = io { expenses.restore(nowMillis(), expenseId) }
+    suspend fun restore(expenseId: String) = change { expenses.restore(nowMillis(), expenseId) }
 
-    suspend fun setLimit(categoryId: String, limitPaise: Long) = io { categoryQueries.setLimit(limitPaise, categoryId) }
+    suspend fun setLimit(categoryId: String, limitPaise: Long) = change { categoryQueries.setLimit(limitPaise, nowMillis(), categoryId) }
 
-    suspend fun setIncome(paise: Long) = io { values.save(INCOME, paise.toString()) }
+    suspend fun setIncome(paise: Long) = change { values.save(INCOME, paise.toString(), nowMillis(), 1) }
 
-    suspend fun addCategory(name: String, limitPaise: Long) = io {
+    suspend fun addCategory(name: String, limitPaise: Long) = change {
         database.transaction {
             val position = categoryQueries.nextPosition().executeAsOne()
-            categoryQueries.save(newId(), name.trim(), limitPaise, position, 0)
+            categoryQueries.save(newId(), name.trim(), limitPaise, position, 0, nowMillis(), 1)
         }
     }
 
-    suspend fun archiveCategory(category: Category) = io {
-        categoryQueries.save(category.id, category.name, category.limitPaise, category.position.toLong(), 1)
+    suspend fun archiveCategory(category: Category) = change {
+        categoryQueries.save(category.id, category.name, category.limitPaise, category.position.toLong(), 1, nowMillis(), 1)
     }
 
     private fun write(expense: Expense) {
@@ -151,12 +154,25 @@ class ExpenseRepository(core: Core) {
 
     private suspend fun <T> io(block: () -> T): T = withContext(Dispatchers.Default) { block() }
 
+    /** A local edit: saved now, synced soon. */
+    private suspend fun change(block: () -> Unit) {
+        io(block)
+        sync.request()
+    }
+
     private companion object {
         const val INCOME = "income_paise"
         const val DUPLICATE_WINDOW = 2 * 60 * 1000L
 
-        fun toCategory(id: String, name: String, limit: Long, position: Long, archived: Long) =
-            Category(id, name, limit, position.toInt(), archived != 0L)
+        fun toCategory(
+            id: String,
+            name: String,
+            limit: Long,
+            position: Long,
+            archived: Long,
+            @Suppress("UNUSED_PARAMETER") updatedAt: Long,
+            @Suppress("UNUSED_PARAMETER") dirty: Long,
+        ) = Category(id, name, limit, position.toInt(), archived != 0L)
 
         fun toExpense(
             id: String,

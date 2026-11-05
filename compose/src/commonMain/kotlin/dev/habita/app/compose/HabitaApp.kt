@@ -14,4 +14,8 @@ class HabitaApp(config: AppConfig, databases: DatabaseFactory) {
     val core = Core(config, databases)
     val gym = GymFeature(core)
     val expense = ExpenseFeature(core)
+
+    init {
+        core.sync.start()
+    }
 }

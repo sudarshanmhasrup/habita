@@ -79,9 +79,9 @@ data as one JSON file, ready to review yourself or with an AI before you change 
 |------------------|------------------------------------------------------------------------|
 | `android`        | Android entry point                                                    |
 | `compose`        | Compose Multiplatform entry point: home screen and navigation          |
-| `core`           | App-wide pieces: theme, UI components, settings, server client         |
+| `core`           | App-wide pieces: theme, UI components, settings, server client, sync   |
 | `feature/auth`   | The login screen                                                       |
-| `feature/gym`    | The gym flow, its local database and sync                              |
+| `feature/gym`    | The gym flow and its local database                                    |
 | `shared`         | Code for every platform and the server: models, progression, summaries |
 | `server`         | Ktor server: login, sync, targets, summaries and export                |
 | `program`        | The workout plan                                                       |
@@ -161,11 +161,12 @@ To use a server running on your computer from the Android emulator, set
 `HABITA_SERVER_URL=http://10.0.2.2:8080`. Debug builds allow plain HTTP for this; release builds
 need HTTPS.
 
-Every set is saved on the phone as it is done. Android's automatic backup includes it, and the gym
-screen's "Save a backup file" button writes everything to a JSON file you choose, in the same
-format as the server's export. With the login on, everything is synced in the
-background when the server is reachable, including workouts done before the login was turned on,
-and the server's workout plan replaces the built-in one.
+Every set and payment is saved on the phone as it is done, so the app works with no connection.
+Android's automatic backup includes it, and the gym screen's "Save a backup file" button writes the
+gym's records to a JSON file you choose. With the login on, workouts, payments, categories and the
+income sync in the background whenever the server is reachable, including what was saved before
+the login was turned on, and the server's workout plan replaces the built-in one. How syncing
+works is in the [server README](server/README.md#sync).
 
 ## Deploying your own server
 

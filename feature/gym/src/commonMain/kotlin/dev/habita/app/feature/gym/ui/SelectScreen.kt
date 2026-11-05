@@ -40,7 +40,7 @@ import dev.habita.app.core.ui.PrimaryButton
 import dev.habita.app.core.ui.SecondaryButton
 import dev.habita.app.core.ui.TopBar
 import dev.habita.app.core.ui.TwoPane
-import dev.habita.app.feature.gym.data.SyncState
+import dev.habita.app.core.sync.SyncState
 import dev.habita.app.feature.gym.workout.ActiveWorkout
 import dev.habita.app.shared.gym.Program
 import dev.habita.app.shared.gym.Workout

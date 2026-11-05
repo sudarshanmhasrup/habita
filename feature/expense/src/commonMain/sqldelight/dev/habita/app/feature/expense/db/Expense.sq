@@ -1,6 +1,6 @@
 -- One payment. Amounts are in paise. category_id is null until the payment is sorted. sms_ref is
 -- the bank's reference number, so the same SMS is never recorded twice. dirty marks records the
--- server doesn't have yet, for when sync is added.
+-- server doesn't have yet.
 CREATE TABLE expense (
     id TEXT NOT NULL PRIMARY KEY,
     amount_paise INTEGER NOT NULL,
@@ -48,3 +48,16 @@ UPDATE expense SET deleted = 0, updated_at = ?, dirty = 1 WHERE id = ?;
 -- Earliest payment, so the month picker knows where history starts.
 firstPaidAt:
 SELECT MIN(paid_at) FROM expense WHERE deleted = 0;
+
+-- A payment from the server, already synced.
+saveSynced:
+INSERT OR REPLACE INTO expense VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);
+
+selectDirty:
+SELECT * FROM expense WHERE dirty = 1;
+
+markClean:
+UPDATE expense SET dirty = 0 WHERE id = ? AND updated_at = ?;
+
+markAllDirty:
+UPDATE expense SET dirty = 1;
