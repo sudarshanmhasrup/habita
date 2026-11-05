@@ -47,6 +47,10 @@ sqldelight {
     databases {
         create("ExpenseDatabase") {
             packageName.set("dev.habita.app.feature.expense.db")
+            // The schema of every released version lives here as N.db; check applies the migrations to
+            // each and fails if the result differs from the current schema.
+            schemaOutputDirectory.set(file("src/commonMain/sqldelight/databases"))
+            verifyMigrations.set(true)
         }
     }
 }
