@@ -6,10 +6,15 @@ import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.prepareRequest
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.contentLength
+import io.ktor.utils.io.readAvailable
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
@@ -63,6 +68,50 @@ class HabitaApi(serverUrl: String, private val settings: Settings) {
     suspend inline fun <reified T> get(path: String): T =
         request(path) { method = HttpMethod.Get }.body()
 
+    /** Like [get], but `null` when the server answers 204 No Content. */
+    suspend inline fun <reified T> getOrNull(path: String): T? {
+        val response = request(path) { method = HttpMethod.Get }
+        return if (response.status == HttpStatusCode.NoContent) null else response.body()
+    }
+
+    /**
+     * Streams a large response, such as an app update, to [write] in chunks instead of holding it
+     * in memory. [onProgress] gets the share done, from 0 to 1, when the size is known.
+     */
+    suspend fun download(path: String, onProgress: (Float) -> Unit = {}, write: (ByteArray, Int) -> Unit) {
+        if (!isConfigured) throw ApiException.NotConfigured()
+        val token = settings.token.value
+        try {
+            client.prepareRequest(baseUrl + path.removePrefix("/")) {
+                method = HttpMethod.Get
+                token?.let { bearerAuth(it) }
+                timeout { requestTimeoutMillis = DOWNLOAD_TIMEOUT_MILLIS }
+            }.execute { response ->
+                if (response.status == HttpStatusCode.Unauthorized) throw ApiException.Unauthorized(response.status.description)
+                if (!response.status.isSuccess()) throw ApiException.Server(response.status.value, response.status.description)
+                val total = response.contentLength()
+                val channel = response.bodyAsChannel()
+                val buffer = ByteArray(64 * 1024)
+                var done = 0L
+                while (true) {
+                    val read = channel.readAvailable(buffer)
+                    if (read == -1) break
+                    if (read > 0) {
+                        write(buffer, read)
+                        done += read
+                        if (total != null && total > 0) onProgress((done.toFloat() / total).coerceIn(0f, 1f))
+                    }
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: ApiException) {
+            throw e
+        } catch (e: Exception) {
+            throw ApiException.Offline(e)
+        }
+    }
+
     suspend inline fun <reified B, reified T> post(path: String, body: B): T =
         request(path) {
             method = HttpMethod.Post
@@ -93,3 +142,6 @@ class HabitaApi(serverUrl: String, private val settings: Settings) {
         throw ApiException.Server(response.status.value, message)
     }
 }
+
+/** An update can take a while on a slow connection. */
+private const val DOWNLOAD_TIMEOUT_MILLIS = 10 * 60 * 1000L

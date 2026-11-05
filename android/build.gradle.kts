@@ -35,8 +35,11 @@ android {
         applicationId = libs.versions.android.group.get()
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = libs.versions.android.versionCode.get().toInt()
-        versionName = libs.versions.android.version.get()
+        // CI passes HABITA_VERSION_CODE so every published build is newer than the last; local
+        // builds use the catalog's number.
+        val build = rawSetting("HABITA_VERSION_CODE").toIntOrNull()
+        versionCode = build ?: libs.versions.android.versionCode.get().toInt()
+        versionName = libs.versions.android.version.get() + (build?.let { " ($it)" } ?: "")
 
         buildConfigField("String", "SERVER_URL", appSetting("HABITA_SERVER_URL"))
         buildConfigField("String", "USER_NAME", appSetting("HABITA_NAME"))

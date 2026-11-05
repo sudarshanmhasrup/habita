@@ -8,6 +8,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.habita.app.core.theme.HabitaTheme
+import dev.habita.app.core.update.UpdateState
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import dev.habita.app.core.ui.HabitaScreen
 import dev.habita.app.core.ui.ScreenTransition
 import dev.habita.app.feature.auth.LoginScreen
@@ -25,6 +28,7 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
     val token by settings.token.collectAsStateWithLifecycle()
     val darkTheme by settings.darkTheme.collectAsStateWithLifecycle()
     val accent by settings.accent.collectAsStateWithLifecycle()
+    val update by (app.updates?.state ?: noUpdates).collectAsStateWithLifecycle()
     val gymToday by app.gym.today.collectAsStateWithLifecycle(null)
     val expenseToday by app.expense.today.collectAsStateWithLifecycle(null)
     val expenseRequest by app.expense.openRequest.collectAsStateWithLifecycle()
@@ -52,6 +56,8 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
                         accent = accent,
                         gym = gymToday,
                         expense = expenseToday,
+                        update = update,
+                        onInstallUpdate = { app.updates?.install() },
                         onDarkTheme = settings::setDarkTheme,
                         onAccent = settings::setAccent,
                         onStartWorkout = { workoutId ->
@@ -74,3 +80,6 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
 }
 
 private enum class Screen { Home, Gym, Expense }
+
+/** Platforms without an installer (iOS, desktop) never have an update to show. */
+private val noUpdates: StateFlow<UpdateState> = MutableStateFlow(UpdateState.None)
