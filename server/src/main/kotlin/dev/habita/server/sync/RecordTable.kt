@@ -15,6 +15,7 @@ fun recordTables(database: HabitaDatabase): List<RecordTable> = listOf(
     SyncCollections.EXPENSES,
     SyncCollections.EXPENSE_CATEGORIES,
     SyncCollections.EXPENSE_SETTINGS,
+    SyncCollections.APP_PREFERENCES,
 ).map { RecordTable(it, database) }
 
 class RecordTable(override val collection: String, database: HabitaDatabase) : SyncTable {
