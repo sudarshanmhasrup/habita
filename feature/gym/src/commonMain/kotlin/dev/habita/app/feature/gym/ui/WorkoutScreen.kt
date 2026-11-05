@@ -2,6 +2,7 @@ package dev.habita.app.feature.gym.ui
 
 import dev.habita.app.core.ui.Motion
 import dev.habita.app.core.ui.ContentSwap
+import dev.habita.app.core.ui.Scrim
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.animation.slideOutVertically
@@ -150,14 +151,7 @@ private fun ActiveWorkout.stepKey(): Any = listOf(phase, rest != null, currentWa
 private fun BoxScope.FinishPanel(visible: Boolean, workoutName: String, onFinish: () -> Unit, onKeepGoing: () -> Unit) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
-    AnimatedVisibility(visible, enter = fadeIn(tween(Motion.SHORT)), exit = fadeOut(tween(Motion.SHORT))) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.35f))
-                .clickable(interactionSource = null, indication = null, onClick = onKeepGoing),
-        )
-    }
+    Scrim(visible, onDismiss = onKeepGoing)
     AnimatedVisibility(
         visible,
         modifier = Modifier.align(Alignment.BottomCenter),
@@ -407,7 +401,9 @@ private fun WarmUpSetContent(active: ActiveWorkout, data: GymData, viewModel: Gy
     val exercise = active.exercises[slotIndex]
     val step = data.step(exercise.id) ?: exercise.defaultStep
     val working = active.nextSet(slotIndex).weightGrams
-    val suggested = working?.let { Progression.warmUpWeight(it, step) }
+    // Half the working weight once it's known. The first time there is none, so start at one
+    // step, the lightest sensible load, ready to adjust.
+    val suggested = working?.let { Progression.warmUpWeight(it, step) } ?: step.takeIf { exercise.isWeighted }
     var weightText by remember(active.sessionId, slotIndex) { mutableStateOf(suggested?.let(::formatKg) ?: "") }
     var repsText by remember(active.sessionId, slotIndex) { mutableStateOf(Progression.WARM_UP_REPS.toString()) }
     val weightGrams = parseKg(weightText)
