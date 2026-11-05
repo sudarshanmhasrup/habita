@@ -18,6 +18,9 @@ import java.security.MessageDigest
 
 const val SESSION_AUTH = "session"
 
+/** CI publishing a new Android build. */
+const val PUBLISH_AUTH = "publish"
+
 /** Login attempts from one client address. */
 val LOGIN_LIMIT = RateLimitName("login")
 

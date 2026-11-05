@@ -7,6 +7,8 @@ services:
         environment:
             HABITA_EMAIL: ${HABITA_EMAIL:?Set HABITA_EMAIL in .env}
             HABITA_PASSWORD_HASH: ${HABITA_PASSWORD_HASH:?Set HABITA_PASSWORD_HASH in .env}
+            # Optional: lets CI publish Android updates. Without it, publishing is off.
+            HABITA_PUBLISH_TOKEN: ${HABITA_PUBLISH_TOKEN:-}
         volumes:
             - ./data:/data
         logging:

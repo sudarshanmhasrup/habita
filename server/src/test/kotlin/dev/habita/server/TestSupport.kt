@@ -21,6 +21,7 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
+import kotlin.io.path.createTempDirectory
 import kotlin.io.path.createTempFile
 
 const val EMAIL = "me@example.com"
@@ -32,15 +33,20 @@ const val KG = 1000
 /** A low bcrypt cost keeps tests fast; production hashes use the default of 12. */
 val PASSWORD_HASH: String = Passwords.hash(PASSWORD.toCharArray(), cost = 4)
 
+const val PUBLISH_TOKEN = "publish-token-for-tests-0123456789abcdef"
+
 fun testConfig(
     databasePath: String = createTempFile("habita", ".db").toString(),
     programPath: String = "program/PROGRAM.md",
+    publishToken: String? = PUBLISH_TOKEN,
 ) = ServerConfig(
     port = 0,
     email = EMAIL,
     passwordHash = PASSWORD_HASH,
     databasePath = databasePath,
     programPath = programPath,
+    releasesPath = createTempDirectory("habita-releases").toString(),
+    publishToken = publishToken,
 )
 
 fun serverTest(

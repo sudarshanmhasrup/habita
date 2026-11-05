@@ -1,7 +1,13 @@
 {$HABITA_DOMAIN} {
 	encode zstd gzip
 
-	request_body {
+	# Published Android builds are larger than any other request; everything else stays small.
+	@publish path /app/android/releases
+	@other not path /app/android/releases
+	request_body @publish {
+		max_size 100MB
+	}
+	request_body @other {
 		max_size 10MB
 	}
 

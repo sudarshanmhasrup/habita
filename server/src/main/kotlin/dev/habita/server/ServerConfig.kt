@@ -1,5 +1,7 @@
 package dev.habita.server
 
+import java.io.File
+
 /**
  * Server settings, read from environment variables so no secret lives in the repository.
  */
@@ -9,6 +11,10 @@ data class ServerConfig(
     val passwordHash: String,
     val databasePath: String,
     val programPath: String,
+    /** Where published Android builds are kept. */
+    val releasesPath: String = File(databasePath).absoluteFile.parentFile.resolve("releases").path,
+    /** The token CI publishes builds with; without one, publishing is off. */
+    val publishToken: String? = null,
 ) {
     companion object {
         private val bcryptPattern = Regex("^\\$2[aby]\\$\\d{2}\\$.{53}$")
@@ -27,7 +33,14 @@ data class ServerConfig(
                 passwordHash = passwordHash,
                 databasePath = environment["HABITA_DATABASE"] ?: ".build/habita.db",
                 programPath = environment["HABITA_PROGRAM"] ?: "program/PROGRAM.md",
-            )
+            ).let { config ->
+                config.copy(
+                    releasesPath = environment["HABITA_RELEASES"] ?: config.releasesPath,
+                    publishToken = environment["HABITA_PUBLISH_TOKEN"]?.takeIf { it.isNotBlank() }?.also {
+                        require(it.length >= 32) { "HABITA_PUBLISH_TOKEN must be at least 32 characters" }
+                    },
+                )
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ package dev.habita.server
 
 import dev.habita.server.auth.LOGIN_GLOBAL_LIMIT
 import dev.habita.server.auth.LOGIN_LIMIT
+import dev.habita.server.auth.PUBLISH_AUTH
 import dev.habita.server.auth.Passwords
 import dev.habita.server.auth.SESSION_AUTH
 import dev.habita.server.auth.Session
@@ -16,6 +17,9 @@ import dev.habita.server.routes.exportRoutes
 import dev.habita.server.routes.gymRoutes
 import dev.habita.server.routes.syncRoutes
 import dev.habita.server.sync.SyncEngine
+import dev.habita.server.updates.Releases
+import dev.habita.server.updates.publishRoutes
+import dev.habita.server.updates.releaseRoutes
 import dev.habita.server.sync.gymTables
 import dev.habita.server.sync.recordTables
 import io.ktor.http.HttpStatusCode
@@ -24,6 +28,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
+import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.bearer
 import io.ktor.server.engine.embeddedServer
@@ -40,6 +45,8 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.io.File
+import java.security.MessageDigest
 import kotlin.time.Duration.Companion.minutes
 
 @Serializable
@@ -104,7 +111,15 @@ fun Application.module(config: ServerConfig, clock: () -> Long = System::current
             rateLimiter(limit = 120, refillPeriod = 1.minutes)
         }
     }
+    val releases = Releases(File(config.releasesPath))
     install(Authentication) {
+        // CI publishes builds with its own token, compared in constant time. No token, no publishing.
+        bearer(PUBLISH_AUTH) {
+            authenticate { credential ->
+                val expected = config.publishToken ?: return@authenticate null
+                if (MessageDigest.isEqual(credential.token.toByteArray(), expected.toByteArray())) UserIdPrincipal("ci") else null
+            }
+        }
         bearer(SESSION_AUTH) {
             authenticate { credential ->
                 val tokenHash = Tokens.hash(credential.token)
@@ -122,6 +137,10 @@ fun Application.module(config: ServerConfig, clock: () -> Long = System::current
             gymRoutes(program, store, clock)
             syncRoutes(sync, clock)
             exportRoutes(store, records, clock)
+            releaseRoutes(releases)
+        }
+        authenticate(PUBLISH_AUTH) {
+            publishRoutes(releases, clock)
         }
     }
 }

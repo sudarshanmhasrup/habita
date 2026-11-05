@@ -50,7 +50,7 @@ class RouteAuthTest {
     @Test
     fun `every protected route refuses a request without a token`() = serverTest { client ->
         val protectedRoutes = endpoints().filter { it.protected }
-        assertTrue(protectedRoutes.size >= 8, "Expected the data routes, found $protectedRoutes")
+        assertTrue(protectedRoutes.size >= 11, "Expected the data routes, found $protectedRoutes")
 
         protectedRoutes.forEach { endpoint ->
             val path = endpoint.path.replace(Regex("""\{[^}]*}"""), "x")
