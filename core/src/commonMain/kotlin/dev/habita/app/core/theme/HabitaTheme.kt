@@ -11,16 +11,17 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-private val LocalColors = staticCompositionLocalOf { LightColors }
+private val LocalColors = staticCompositionLocalOf { Accent.Default.palette(dark = false) }
 private val LocalTypography = staticCompositionLocalOf<HabitaTypography> { error("No HabitaTheme") }
 
 /**
- * The app's look: light or dark, tinted with [accent]. Switching either blends every colour to
- * the new one instead of jumping.
+ * The app's look: light or dark, in the palette of [accent], which tints the page, cards, borders
+ * and text as well as the actions. Switching either blends every colour to the new one instead of
+ * jumping.
  */
 @Composable
 fun HabitaTheme(darkTheme: Boolean, accent: Accent = Accent.Default, content: @Composable () -> Unit) {
-    val colors = animated(accent.applyTo(if (darkTheme) DarkColors else LightColors))
+    val colors = animated(accent.palette(darkTheme))
     CompositionLocalProvider(
         LocalColors provides colors,
         LocalTypography provides habitaTypography(),
