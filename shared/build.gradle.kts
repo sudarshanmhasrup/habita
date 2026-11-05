@@ -22,6 +22,9 @@ kotlin {
         minSdk = libs.versions.android.minSdk.get().toInt()
     }
 
+    iosArm64()
+    iosSimulatorArm64()
+
     sourceSets {
         commonMain.dependencies {
             api(libs.kotlinx.serialization.json)

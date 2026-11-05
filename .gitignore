@@ -20,3 +20,7 @@ deploy/backups
 
 # Gradle problems report, written to the root build folder
 /build
+
+# Xcode user state
+xcuserdata
+*.xcuserstate

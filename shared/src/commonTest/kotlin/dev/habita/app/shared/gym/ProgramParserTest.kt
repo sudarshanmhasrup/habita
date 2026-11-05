@@ -56,7 +56,7 @@ class ProgramParserTest {
     """.trimIndent()
 
     @Test
-    fun `parses exercises, warm-ups and workouts`() {
+    fun `parses exercises and warm-ups and workouts`() {
         val program = ProgramParser.parse(valid)
 
         assertEquals(

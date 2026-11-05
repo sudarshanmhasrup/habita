@@ -28,6 +28,9 @@ kotlin {
         }
     }
 
+    iosArm64()
+    iosSimulatorArm64()
+
     sourceSets {
         commonMain.dependencies {
             api(projects.shared)
@@ -39,7 +42,6 @@ kotlin {
             api(libs.kotlinx.coroutines.core)
             api(libs.ktor.client.core)
             implementation(libs.compose.multiplatform.resources)
-            implementation(libs.ktor.client.cio)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.sqldelight.coroutines)
@@ -47,11 +49,13 @@ kotlin {
 
         androidMain.dependencies {
             api(libs.sqldelight.android.driver)
+            implementation(libs.ktor.client.cio)
         }
 
         val desktopMain by getting {
             dependencies {
                 api(libs.sqldelight.sqlite.driver)
+                implementation(libs.ktor.client.cio)
             }
         }
 
@@ -59,6 +63,11 @@ kotlin {
             dependencies {
                 implementation(libs.kotlin.test)
             }
+        }
+
+        iosMain.dependencies {
+            api(libs.sqldelight.native.driver)
+            implementation(libs.ktor.client.darwin)
         }
     }
 }
