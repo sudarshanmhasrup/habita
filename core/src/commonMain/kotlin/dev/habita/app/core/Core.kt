@@ -1,6 +1,7 @@
 package dev.habita.app.core
 
 import dev.habita.app.core.data.DatabaseFactory
+import dev.habita.app.core.data.PreferenceSyncTable
 import dev.habita.app.core.data.Settings
 import dev.habita.app.core.db.CoreDatabase
 import dev.habita.app.core.network.HabitaApi
@@ -31,7 +32,9 @@ data class AppConfig(
 class Core(val config: AppConfig, val databases: DatabaseFactory) {
     val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    val settings: Settings = Settings(CoreDatabase(databases.open("core.db", CoreDatabase.Schema)), scope)
+    private val database = CoreDatabase(databases.open("core.db", CoreDatabase.Schema))
+
+    val settings: Settings = Settings(database, scope)
 
     val api: HabitaApi = HabitaApi(config.serverUrl, settings)
 
@@ -41,4 +44,10 @@ class Core(val config: AppConfig, val databases: DatabaseFactory) {
         checkpoint = settings,
         loggedIn = settings.token.map { it != null }.stateIn(scope, SharingStarted.Eagerly, settings.token.value != null),
     )
+
+    init {
+        // The theme and other preferences sync like any feature's data.
+        sync.register(PreferenceSyncTable(database))
+        settings.onPreferenceChanged = sync::request
+    }
 }

@@ -1,0 +1,27 @@
+-- Preferences that follow the user to every device, such as the theme. updated_at and dirty
+-- drive syncing, as for other synced records. The login token and the sync cursor stay in
+-- setting, on this device only.
+CREATE TABLE preference (
+    key TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    dirty INTEGER NOT NULL
+);
+
+select:
+SELECT value FROM preference WHERE key = ?;
+
+byKey:
+SELECT * FROM preference WHERE key = ?;
+
+save:
+INSERT OR REPLACE INTO preference (key, value, updated_at, dirty) VALUES (?, ?, ?, ?);
+
+selectDirty:
+SELECT * FROM preference WHERE dirty = 1;
+
+markClean:
+UPDATE preference SET dirty = 0 WHERE key = ? AND updated_at = ?;
+
+markAllDirty:
+UPDATE preference SET dirty = 1;
