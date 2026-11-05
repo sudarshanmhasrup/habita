@@ -1,6 +1,6 @@
 # Runtime image only. CI builds the JAR first with ./gradlew :server:buildFatJar, because the
 # Gradle build needs the Android SDK, which does not belong in a server image.
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:25-jre
 
 LABEL org.opencontainers.image.source="https://github.com/sudarshanmhasrup/habita"
 LABEL org.opencontainers.image.description="Habita server"
