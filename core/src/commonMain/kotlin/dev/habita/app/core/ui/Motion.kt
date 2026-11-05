@@ -1,5 +1,13 @@
 package dev.habita.app.core.ui
 
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
@@ -144,4 +152,33 @@ fun CountingText(
         shown.animateTo(value.toFloat(), tween(Motion.LONG + 200, easing = Motion.Ease))
     }
     HText(format(shown.value.toLong()), style, modifier, color = color, maxLines = 1)
+}
+
+/**
+ * Dims everything behind a panel and closes it on a tap. Screens are padded clear of the system
+ * bars and kept narrow on tablets, so the dimming is drawn well past this box's edges; the window
+ * cuts it off at the screen, which then dims evenly, bars and margins included.
+ */
+@Composable
+fun BoxScope.Scrim(visible: Boolean, onDismiss: () -> Unit) {
+    AnimatedVisibility(
+        visible,
+        modifier = Modifier.matchParentSize(),
+        enter = fadeIn(tween(Motion.SHORT)),
+        exit = fadeOut(tween(Motion.SHORT)),
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .drawBehind {
+                    val reach = 10_000f
+                    drawRect(
+                        Color.Black.copy(alpha = 0.32f),
+                        topLeft = Offset(-reach, -reach),
+                        size = Size(size.width + 2 * reach, size.height + 2 * reach),
+                    )
+                }
+                .clickable(interactionSource = null, indication = null, onClick = onDismiss),
+        )
+    }
 }

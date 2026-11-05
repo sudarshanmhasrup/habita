@@ -44,6 +44,7 @@ import dev.habita.app.core.ui.HabitaIcons
 import dev.habita.app.core.ui.Motion
 import dev.habita.app.core.ui.Overline
 import dev.habita.app.core.ui.PrimaryButton
+import dev.habita.app.core.ui.Scrim
 
 /**
  * The theme: light or dark, and the accent colour. Each tap applies at once, so the screen behind
@@ -60,14 +61,7 @@ internal fun BoxScope.ThemeSheet(
 ) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
-    AnimatedVisibility(visible, enter = fadeIn(tween(Motion.SHORT)), exit = fadeOut(tween(Motion.SHORT))) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.3f))
-                .clickable(interactionSource = null, indication = null, onClick = onClose),
-        )
-    }
+    Scrim(visible, onDismiss = onClose)
     AnimatedVisibility(
         visible,
         modifier = Modifier.align(Alignment.BottomCenter),
