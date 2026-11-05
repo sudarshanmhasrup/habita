@@ -3,6 +3,7 @@ package dev.habita.app.feature.gym.data
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
+import dev.habita.app.feature.gym.db.Exercise_step
 import dev.habita.app.feature.gym.db.GymDatabase
 import dev.habita.app.feature.gym.db.Set_log
 import dev.habita.app.feature.gym.db.Warm_up_log
@@ -10,6 +11,7 @@ import dev.habita.app.feature.gym.db.Workout_session
 import dev.habita.app.feature.gym.workout.ActiveWorkout
 import dev.habita.app.shared.api.ProgramResponse
 import dev.habita.app.shared.api.SyncChanges
+import dev.habita.app.shared.api.SyncCollections
 import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.ExerciseStep
 import dev.habita.app.shared.gym.SetLog
@@ -22,9 +24,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 
 /**
- * The gym's local database. Local writes are marked dirty until the server has them. Records from
- * the server replace local ones unless the local copy is newer, the same last-write-wins rule the
- * server uses.
+ * The gym's local database. Local writes are marked dirty until the server has them. Which server
+ * copies to keep is decided by the app's sync engine ([dev.habita.app.core.sync.SyncEngine]).
  */
 class GymStore(private val database: GymDatabase) {
     private val sessions = database.workoutSessionQueries
@@ -36,7 +37,7 @@ class GymStore(private val database: GymDatabase) {
 
     fun <T> transaction(block: () -> T): T = database.transactionWithResult { block() }
 
-    // Program, cursor and the workout in progress
+    // Program and the workout in progress
 
     val program: Flow<ProgramResponse?> = watchValue(PROGRAM) { json.decodeFromString<ProgramResponse>(it) }
 
@@ -51,10 +52,6 @@ class GymStore(private val database: GymDatabase) {
     fun saveActive(active: ActiveWorkout?) {
         if (active == null) values.remove(ACTIVE) else values.save(ACTIVE, json.encodeToString(active))
     }
-
-    fun cursor(): Long = readValue(CURSOR) { it.toLong() } ?: 0
-
-    private fun saveCursor(cursor: Long) = values.save(CURSOR, cursor.toString())
 
     private fun <T> readValue(key: String, decode: (String) -> T): T? =
         values.select(key).executeAsOneOrNull()?.let { runCatching { decode(it) }.getOrNull() }
@@ -100,19 +97,28 @@ class GymStore(private val database: GymDatabase) {
             sessions = sessions.selectAll().executeAsList().map { it.toModel() },
             sets = sets.selectAll().executeAsList().map { it.toModel() },
             warmUps = warmUps.selectAll().executeAsList().map { it.toModel() },
-            steps = steps.selectAll().executeAsList().map { ExerciseStep(it.exercise_id, it.step.toInt(), it.updated_at) },
+            steps = steps.selectAll().executeAsList().map { it.toModel() },
         )
     }
 
     // Sync
 
-    fun dirty(): SyncChanges = transaction {
-        SyncChanges(
-            sessions = sessions.selectDirty().executeAsList().map { it.toModel() },
-            sets = sets.selectDirty().executeAsList().map { it.toModel() },
-            warmUps = warmUps.selectDirty().executeAsList().map { it.toModel() },
-            steps = steps.selectDirty().executeAsList().map { ExerciseStep(it.exercise_id, it.step.toInt(), it.updated_at) },
-        )
+    /** Unsent records of one collection. */
+    fun dirty(collection: String): SyncChanges = when (collection) {
+        SyncCollections.GYM_SESSIONS -> SyncChanges(sessions = sessions.selectDirty().executeAsList().map { it.toModel() })
+        SyncCollections.GYM_SETS -> SyncChanges(sets = sets.selectDirty().executeAsList().map { it.toModel() })
+        SyncCollections.GYM_WARM_UPS -> SyncChanges(warmUps = warmUps.selectDirty().executeAsList().map { it.toModel() })
+        SyncCollections.GYM_STEPS -> SyncChanges(steps = steps.selectDirty().executeAsList().map { it.toModel() })
+        else -> SyncChanges()
+    }
+
+    /** One record of [collection] and whether it is unsent, or `null` when there is none. */
+    fun local(collection: String, id: String): Pair<SyncChanges, Boolean>? = when (collection) {
+        SyncCollections.GYM_SESSIONS -> sessions.selectById(id).executeAsOneOrNull()?.let { SyncChanges(sessions = listOf(it.toModel())) to (it.dirty == 1L) }
+        SyncCollections.GYM_SETS -> sets.selectById(id).executeAsOneOrNull()?.let { SyncChanges(sets = listOf(it.toModel())) to (it.dirty == 1L) }
+        SyncCollections.GYM_WARM_UPS -> warmUps.selectById(id).executeAsOneOrNull()?.let { SyncChanges(warmUps = listOf(it.toModel())) to (it.dirty == 1L) }
+        SyncCollections.GYM_STEPS -> steps.selectById(id).executeAsOneOrNull()?.let { SyncChanges(steps = listOf(it.toModel())) to (it.dirty == 1L) }
+        else -> null
     }
 
     /** Clears the dirty mark of pushed records, unless they changed again since. */
@@ -123,17 +129,22 @@ class GymStore(private val database: GymDatabase) {
         pushed.steps.forEach { steps.markClean(it.exerciseId, it.updatedAt) }
     }
 
-    /** Applies records pulled from the server and moves the cursor past them. */
-    fun merge(pulled: SyncChanges, cursor: Long) = transaction {
-        pulled.sessions.forEach { if (wins(it.updatedAt, sessions.updatedAt(it.id).executeAsOneOrNull())) save(it, dirty = false) }
-        pulled.sets.forEach { if (wins(it.updatedAt, sets.updatedAt(it.id).executeAsOneOrNull())) save(it, dirty = false) }
-        pulled.warmUps.forEach { if (wins(it.updatedAt, warmUps.updatedAt(it.id).executeAsOneOrNull())) save(it, dirty = false) }
-        pulled.steps.forEach { if (wins(it.updatedAt, steps.updatedAt(it.exerciseId).executeAsOneOrNull())) save(it, dirty = false) }
-        saveCursor(cursor)
+    /** Saves records from the server as they are, already synced. */
+    fun applyRemote(pulled: SyncChanges) = transaction {
+        pulled.sessions.forEach { save(it, dirty = false) }
+        pulled.sets.forEach { save(it, dirty = false) }
+        pulled.warmUps.forEach { save(it, dirty = false) }
+        pulled.steps.forEach { save(it, dirty = false) }
     }
 
-    /** A pulled record replaces the local one unless the local one is newer. */
-    private fun wins(incoming: Long, local: Long?) = local == null || incoming >= local
+    fun markAllDirty(collection: String) {
+        when (collection) {
+            SyncCollections.GYM_SESSIONS -> sessions.markAllDirty()
+            SyncCollections.GYM_SETS -> sets.markAllDirty()
+            SyncCollections.GYM_WARM_UPS -> warmUps.markAllDirty()
+            SyncCollections.GYM_STEPS -> steps.markAllDirty()
+        }
+    }
 
     private fun save(session: WorkoutSession, dirty: Boolean) = sessions.save(
         session.id, session.workoutId, session.programVersion, session.startedAt, session.mainStartedAt,
@@ -156,7 +167,6 @@ class GymStore(private val database: GymDatabase) {
     private companion object {
         const val PROGRAM = "program"
         const val ACTIVE = "active_workout"
-        const val CURSOR = "sync_cursor"
     }
 }
 
@@ -192,8 +202,10 @@ private fun Warm_up_log.toModel() = WarmUpLog(
     id = id,
     sessionId = session_id,
     position = position.toInt(),
-    status = WarmUpStatus.valueOf(status),
+    status = WarmUpStatus.entries.firstOrNull { it.name == status } ?: WarmUpStatus.entries.first(),
     completedAt = completed_at,
     updatedAt = updated_at,
     deleted = deleted == 1L,
 )
+
+private fun Exercise_step.toModel() = ExerciseStep(exercise_id, step.toInt(), updated_at)

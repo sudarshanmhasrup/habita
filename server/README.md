@@ -1,7 +1,7 @@
 # Habita server
 
 A single-user Ktor server. It serves the workout plan from [PROGRAM.md](../program/PROGRAM.md),
-stores workout logs in SQLite and syncs them with the app.
+stores workout logs and expenses in SQLite and syncs them with the app.
 
 ## Configuration
 
@@ -50,6 +50,37 @@ attempts a minute from each address and 30 a minute in total, so a stranger can'
 | `GET /workouts/next`          | The next workout in the rotation                           |
 | `GET /workouts/{id}/targets`  | Today's weight and target for each exercise                |
 | `GET /sessions/{id}/summary`  | End-of-workout numbers                                     |
-| `POST /sync/push`             | Saves local changes, returns the new cursor                |
-| `GET /sync/pull?since=<n>`    | Everything changed after cursor `n`                        |
-| `GET /export`                 | Every program version and every log as one JSON file       |
+| `POST /sync/push`             | Saves local changes; returns the cursor and refused records |
+| `GET /sync/pull?since=<n>`    | Changes after cursor `n`, a page at a time (`&limit=`)     |
+| `GET /export`                 | Every program version and every record as one JSON file    |
+
+## Sync
+
+Every feature syncs the same way. A record travels as `{ id, updatedAt, deleted, data }`, grouped
+by collection name, such as `gym.sets` or `expense.expenses` (`SyncCollections` in `shared/`).
+
+- **Last write wins.** A record replaces the stored copy when its `updatedAt` is later. On a tie
+  the copy whose data sorts last wins, so every device settles on the same one (`winsOver` in
+  `shared/`). The app applies the same rule, so both sides agree.
+- **Bad records are refused one by one** and listed in the push reply; the rest are saved.
+- **Clocks.** A time more than 5 minutes ahead of the server is pulled back, so a phone with a
+  wrong clock can't make a record impossible to edit.
+- **Deletes** are kept as tombstones (`deleted: true`), so they reach every device.
+- **Cursor.** Every saved record gets the next server sequence number. Pull returns changes after
+  the app's cursor, oldest first, with `hasMore` while there are more pages.
+- **Server id.** Pull also returns `serverId`, made once per database. If it changes, for example
+  after restoring an older backup, the app sends everything it has again.
+
+The app pulls before it pushes, and keeps a local edit that hasn't reached the server yet unless
+the server's copy wins over it.
+
+### Adding a synced feature
+
+1. Name its collections in `SyncCollections` (`shared/.../api/Sync.kt`).
+2. Server: if the server never reads the data, add the names to `recordTables` in
+   `server/.../sync/RecordTable.kt`. That's all. If the server needs the data (as the gym does,
+   for targets), write a typed `SyncTable` like those in `GymTables.kt`.
+3. App: give each local table `updated_at` and `dirty` columns, set both on every local edit, and
+   call `core.sync.request()`. Implement `LocalSyncTable` (see `ExpenseSync.kt`) and register it
+   with `core.sync.register` at startup.
+4. Any schema change needs a migration (`.sqm`) on the side it touches.

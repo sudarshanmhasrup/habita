@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.habita.app.feature.gym.data.GymRepository
 import dev.habita.app.feature.gym.data.SessionReport
-import dev.habita.app.feature.gym.data.SyncState
+import dev.habita.app.core.sync.SyncState
 import dev.habita.app.feature.gym.workout.ActiveWorkout
 import dev.habita.app.feature.gym.workout.Phase
 import dev.habita.app.shared.gym.Effort

@@ -20,11 +20,12 @@ SELECT * FROM workout_session WHERE id = ?;
 selectDirty:
 SELECT * FROM workout_session WHERE dirty = 1;
 
-updatedAt:
-SELECT updated_at FROM workout_session WHERE id = ?;
 
 save:
 INSERT OR REPLACE INTO workout_session VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 markClean:
 UPDATE workout_session SET dirty = 0 WHERE id = ? AND updated_at = ?;
+
+markAllDirty:
+UPDATE workout_session SET dirty = 1;

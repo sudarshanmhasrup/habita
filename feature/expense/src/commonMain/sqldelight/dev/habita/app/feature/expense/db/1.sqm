@@ -1,0 +1,10 @@
+-- Version 2: categories and the income sync too. What this phone already has counts as edited
+-- just after the built-in defaults, so it goes to the server once and wins over a fresh install's
+-- defaults. The list of payments waiting for an SMS went with Scan & pay.
+ALTER TABLE category ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE category ADD COLUMN dirty INTEGER NOT NULL DEFAULT 0;
+UPDATE category SET updated_at = 1, dirty = 1;
+ALTER TABLE expense_value ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE expense_value ADD COLUMN dirty INTEGER NOT NULL DEFAULT 0;
+DELETE FROM expense_value WHERE key = 'pending_payments';
+UPDATE expense_value SET updated_at = 1, dirty = 1;

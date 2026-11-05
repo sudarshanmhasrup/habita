@@ -29,11 +29,14 @@ SELECT * FROM set_log WHERE exercise_id IN ?;
 selectDirty:
 SELECT * FROM set_log WHERE dirty = 1;
 
-updatedAt:
-SELECT updated_at FROM set_log WHERE id = ?;
+selectById:
+SELECT * FROM set_log WHERE id = ?;
 
 save:
 INSERT OR REPLACE INTO set_log VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 markClean:
 UPDATE set_log SET dirty = 0 WHERE id = ? AND updated_at = ?;
+
+markAllDirty:
+UPDATE set_log SET dirty = 1;

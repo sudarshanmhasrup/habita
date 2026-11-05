@@ -1,11 +1,15 @@
 -- A spending category with its monthly limit in paise. Removed categories are kept, archived, so
--- old payments still show their name.
+-- old payments still show their name. updated_at and dirty drive syncing: a category the server
+-- doesn't have yet is dirty. The built-in categories start at updated_at 0 and clean, so any real
+-- edit, on any device, wins over them.
 CREATE TABLE category (
     id TEXT NOT NULL PRIMARY KEY,
     name TEXT NOT NULL,
     limit_paise INTEGER NOT NULL,
     position INTEGER NOT NULL,
-    archived INTEGER NOT NULL DEFAULT 0
+    archived INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL DEFAULT 0,
+    dirty INTEGER NOT NULL DEFAULT 0
 );
 
 all:
@@ -14,11 +18,24 @@ SELECT * FROM category ORDER BY position;
 count:
 SELECT COUNT(*) FROM category;
 
+byId:
+SELECT * FROM category WHERE id = ?;
+
 save:
-INSERT OR REPLACE INTO category VALUES (?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO category (id, name, limit_paise, position, archived, updated_at, dirty)
+VALUES (?, ?, ?, ?, ?, ?, ?);
 
 setLimit:
-UPDATE category SET limit_paise = ? WHERE id = ?;
+UPDATE category SET limit_paise = ?, updated_at = ?, dirty = 1 WHERE id = ?;
 
 nextPosition:
 SELECT COALESCE(MAX(position), -1) + 1 FROM category;
+
+selectDirty:
+SELECT * FROM category WHERE dirty = 1;
+
+markClean:
+UPDATE category SET dirty = 0 WHERE id = ? AND updated_at = ?;
+
+markAllDirty:
+UPDATE category SET dirty = 1;
