@@ -17,3 +17,6 @@ local.properties
 deploy/.env
 deploy/data
 deploy/backups
+
+# Gradle problems report, written to the root build folder
+/build
