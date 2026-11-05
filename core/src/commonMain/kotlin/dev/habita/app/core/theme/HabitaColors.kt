@@ -4,11 +4,12 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 
 /**
- * The palette. Light mode is plain white with light grey cards; dark mode is graphite. Main
- * buttons, the chosen chip and the full-body card use [highlight]: black on light, white on dark.
- * [accent] is one blue, kept for live state such as the current set, the rest timer and progress.
- * The effort colors are one blue ramp, light to strong as the effort goes up (reversed on dark,
- * where strong means bright), and always come with a text label.
+ * The palette: warm and calm. Light mode is a warm off-white page with white cards that sit on it
+ * with soft depth; dark mode is a deep green-black. [accent] is one deep green, used for the main
+ * actions and live state such as the current set, the rest timer and progress. [highlight] is the
+ * colour of main buttons and the chosen chip. The effort colours are one green ramp, light to
+ * strong as the effort goes up (reversed on dark, where strong means bright), and always come
+ * with a text label.
  */
 @Immutable
 data class HabitaColors(
@@ -35,44 +36,44 @@ data class HabitaColors(
 
 val LightColors = HabitaColors(
     isDark = false,
-    background = Color(0xFFFFFFFF),
-    backgroundTop = Color(0xFFFFFFFF),
-    card = Color(0xFFF4F4F5),
-    cardTop = Color(0xFFF4F4F5),
-    border = Color(0xFFE4E4E7),
-    text = Color(0xFF111113),
-    muted = Color(0xFF6B6B73),
-    accent = Color(0xFF1D5FD6),
-    accentTint = Color(0xFFE8F0FE),
+    background = Color(0xFFF7F5F0),
+    backgroundTop = Color(0xFFFBFAF6),
+    card = Color(0xFFFFFFFF),
+    cardTop = Color(0xFFFFFFFF),
+    border = Color(0xFFE8E4DA),
+    text = Color(0xFF15201A),
+    muted = Color(0xFF6B766F),
+    accent = Color(0xFF2F6F4E),
+    accentTint = Color(0xFFDFEDE4),
     onAccent = Color(0xFFFFFFFF),
-    highlight = Color(0xFF111113),
+    highlight = Color(0xFF2F6F4E),
     onHighlight = Color(0xFFFFFFFF),
-    inverseCard = Color(0xFF111113),
-    onInverseCard = Color(0xFFFFFFFF),
+    inverseCard = Color(0xFF1C2E24),
+    onInverseCard = Color(0xFFF3F1EA),
     error = Color(0xFFB42318),
-    effortEasy = Color(0xFFB9D0FB),
-    effortMedium = Color(0xFF5B8DEF),
-    effortHard = Color(0xFF1D4FB8),
+    effortEasy = Color(0xFFC9E2D3),
+    effortMedium = Color(0xFF6FAE8A),
+    effortHard = Color(0xFF2F6F4E),
 )
 
 val DarkColors = HabitaColors(
     isDark = true,
-    background = Color(0xFF0C0C0D),
-    backgroundTop = Color(0xFF19191B),
-    card = Color(0xFF161618),
-    cardTop = Color(0xFF212124),
-    border = Color(0xFF2A2A2E),
-    text = Color(0xFFF4F4F5),
-    muted = Color(0xFF8E8E96),
-    accent = Color(0xFF6EA2FF),
-    accentTint = Color(0xFF16233C),
-    onAccent = Color(0xFF0C0C0D),
-    highlight = Color(0xFFF4F4F5),
-    onHighlight = Color(0xFF0C0C0D),
-    inverseCard = Color(0xFFF4F4F5),
-    onInverseCard = Color(0xFF0C0C0D),
+    background = Color(0xFF0E1311),
+    backgroundTop = Color(0xFF141C18),
+    card = Color(0xFF161C19),
+    cardTop = Color(0xFF1B231F),
+    border = Color(0xFF26302B),
+    text = Color(0xFFE8EEEA),
+    muted = Color(0xFF8E9A93),
+    accent = Color(0xFF6FBF94),
+    accentTint = Color(0xFF1E3329),
+    onAccent = Color(0xFF0E1311),
+    highlight = Color(0xFF6FBF94),
+    onHighlight = Color(0xFF0E1311),
+    inverseCard = Color(0xFFE8EEEA),
+    onInverseCard = Color(0xFF0E1311),
     error = Color(0xFFF97066),
-    effortEasy = Color(0xFF213F75),
-    effortMedium = Color(0xFF4479E0),
-    effortHard = Color(0xFF9BBFFF),
+    effortEasy = Color(0xFF244232),
+    effortMedium = Color(0xFF3F8A63),
+    effortHard = Color(0xFF8FD3AE),
 )
