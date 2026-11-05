@@ -49,7 +49,7 @@ class SessionTest {
 
     @Test
     fun `logins from many addresses share a ceiling`() = serverTest { client ->
-        repeat(30) { index -> client.loginFrom("203.0.113.$index", password = "wrong") }
+        repeat(120) { index -> client.loginFrom("203.0.${index / 100}.${index % 100}", password = "wrong") }
 
         assertEquals(HttpStatusCode.TooManyRequests, client.loginFrom("198.51.100.20").status)
     }

@@ -38,7 +38,7 @@ Every route except `/health` and `/auth/login` needs an `Authorization: Bearer <
 
 A token lasts 90 days from login and ends after 30 days unused; the app then asks for the login
 again. Changing `HABITA_PASSWORD_HASH` ends every session at the next start. Login allows 5
-attempts a minute from each address and 30 a minute in total, so a stranger can't lock you out.
+attempts a minute from each address and 120 a minute in total, so a stranger can't lock you out.
 
 | Route                         | Purpose                                                    |
 |-------------------------------|------------------------------------------------------------|

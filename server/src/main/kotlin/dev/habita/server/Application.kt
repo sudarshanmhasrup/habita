@@ -92,13 +92,16 @@ fun Application.module(config: ServerConfig, clock: () -> Long = System::current
         }
     }
     install(RateLimit) {
-        // Per address, so a stranger can't lock the owner out, with a ceiling for spread attacks.
+        // Per address, so a stranger can't lock the owner out. The overall ceiling only keeps a
+        // spread-out attack from tying the CPU up in bcrypt (about 0.25 s a try): 120 a minute
+        // takes two dozen addresses working together to fill, and phones already logged in
+        // never need to log in, so filling it only delays a new device.
         register(LOGIN_LIMIT) {
             rateLimiter(limit = 5, refillPeriod = 1.minutes)
             requestKey { call -> call.request.origin.remoteAddress }
         }
         register(LOGIN_GLOBAL_LIMIT) {
-            rateLimiter(limit = 30, refillPeriod = 1.minutes)
+            rateLimiter(limit = 120, refillPeriod = 1.minutes)
         }
     }
     install(Authentication) {
