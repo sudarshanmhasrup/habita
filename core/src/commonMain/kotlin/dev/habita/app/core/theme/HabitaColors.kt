@@ -4,8 +4,8 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 
 /**
- * The palette: calm, with one deep green. Light mode is a plain white page with white cards set
- * apart by a soft shadow and a hairline edge; dark mode is a deep green-black. [accent] is one deep green, used for the main
+ * The palette: calm, with one deep green. Light mode is a plain white page with soft warm-grey
+ * cards; dark mode is a deep green-black. [accent] is one deep green, used for the main
  * actions and live state such as the current set, the rest timer and progress. [highlight] is the
  * colour of main buttons and the chosen chip. The effort colours are one green ramp, light to
  * strong as the effort goes up (reversed on dark, where strong means bright), and always come
@@ -38,9 +38,9 @@ val LightColors = HabitaColors(
     isDark = false,
     background = Color(0xFFFFFFFF),
     backgroundTop = Color(0xFFFFFFFF),
-    card = Color(0xFFFFFFFF),
-    cardTop = Color(0xFFFFFFFF),
-    border = Color(0xFFE8E4DA),
+    card = Color(0xFFF5F4F0),
+    cardTop = Color(0xFFF5F4F0),
+    border = Color(0xFFE6E4DD),
     text = Color(0xFF15201A),
     muted = Color(0xFF6B766F),
     accent = Color(0xFF2F6F4E),
