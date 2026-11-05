@@ -10,6 +10,12 @@ DATABASE=data/habita.db
 BACKUPS=backups
 KEEP_DAYS=30
 
+# data/ belongs to the container's user, so only root can read the database.
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Run it as root: sudo ./backup.sh" >&2
+    exit 1
+fi
+
 if [ ! -f "$DATABASE" ]; then
     echo "$(date -u +%FT%TZ) No database yet, nothing to back up."
     exit 0
