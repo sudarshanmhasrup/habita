@@ -1,0 +1,17 @@
+-- Version 4: one sync format for every feature. Collections the server does not read, such as
+-- expenses, are kept as records; the server id tells the app when the database was replaced.
+CREATE TABLE sync_record (
+    collection TEXT NOT NULL,
+    id TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    deleted INTEGER NOT NULL,
+    data TEXT NOT NULL,
+    server_seq INTEGER NOT NULL,
+    PRIMARY KEY (collection, id)
+);
+CREATE INDEX sync_record_server_seq ON sync_record (server_seq);
+CREATE TABLE sync_server (
+    id INTEGER NOT NULL PRIMARY KEY,
+    server_id TEXT NOT NULL
+);
+CREATE INDEX exercise_step_server_seq ON exercise_step (server_seq);

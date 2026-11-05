@@ -1,0 +1,26 @@
+-- Records of collections the server stores without reading them, such as expenses. The app owns
+-- their meaning; the server only orders changes and hands them to other devices.
+CREATE TABLE sync_record (
+    collection TEXT NOT NULL,
+    id TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    deleted INTEGER NOT NULL,
+    data TEXT NOT NULL,
+    server_seq INTEGER NOT NULL,
+    PRIMARY KEY (collection, id)
+);
+
+CREATE INDEX sync_record_server_seq ON sync_record (server_seq);
+
+selectById:
+SELECT * FROM sync_record WHERE collection = ? AND id = ?;
+
+save:
+INSERT OR REPLACE INTO sync_record VALUES (?, ?, ?, ?, ?, ?);
+
+-- Up to :limit changes in one collection after :since, oldest first.
+changedSince:
+SELECT * FROM sync_record WHERE collection = :collection AND server_seq > :since ORDER BY server_seq LIMIT :limit;
+
+selectAll:
+SELECT * FROM sync_record WHERE collection = ? ORDER BY server_seq;

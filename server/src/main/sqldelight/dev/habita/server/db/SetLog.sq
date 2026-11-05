@@ -17,8 +17,8 @@ CREATE TABLE set_log (
 CREATE INDEX set_log_server_seq ON set_log (server_seq);
 CREATE INDEX set_log_exercise ON set_log (exercise_id);
 
-updatedAt:
-SELECT updated_at FROM set_log WHERE id = ?;
+selectById:
+SELECT * FROM set_log WHERE id = ?;
 
 save:
 INSERT OR REPLACE INTO set_log VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
@@ -26,5 +26,6 @@ INSERT OR REPLACE INTO set_log VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 selectAll:
 SELECT * FROM set_log ORDER BY completed_at;
 
+-- Up to :limit changes after :since, oldest first.
 changedSince:
-SELECT * FROM set_log WHERE server_seq > ? ORDER BY server_seq;
+SELECT * FROM set_log WHERE server_seq > :since ORDER BY server_seq LIMIT :limit;

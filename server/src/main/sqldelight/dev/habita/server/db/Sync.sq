@@ -6,8 +6,21 @@ CREATE TABLE sync_counter (
 
 INSERT INTO sync_counter (id, value) VALUES (1, 0);
 
+-- A random id made when the database is created. When it changes, for example after restoring
+-- an older backup, the app knows its cursor is meaningless and sends everything again.
+CREATE TABLE sync_server (
+    id INTEGER NOT NULL PRIMARY KEY,
+    server_id TEXT NOT NULL
+);
+
 increment:
 UPDATE sync_counter SET value = value + 1 WHERE id = 1;
 
 current:
 SELECT value FROM sync_counter WHERE id = 1;
+
+serverId:
+SELECT server_id FROM sync_server WHERE id = 1;
+
+saveServerId:
+INSERT OR IGNORE INTO sync_server (id, server_id) VALUES (1, ?);
