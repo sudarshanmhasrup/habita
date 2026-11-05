@@ -14,7 +14,8 @@ last time and tells you what to lift today, so there is nothing to remember or w
 | Deployment     | Done: Docker image, CI, HTTPS, server hardening, backups                |
 | Android app    | Done: home, the full gym flow, effort-based suggestions, summary charts |
 | Desktop app    | Planned, sharing the Compose Multiplatform UI with Android              |
-| iOS and web    | Planned for later                                                       |
+| iOS app        | Runs the same Compose UI as Android; not yet tested on a real iPhone    |
+| Web            | Planned for later                                                       |
 | Other features | Planned for later: expense tracker, to-do list, roadmap, month planner  |
 
 ## How the gym feature works
@@ -78,6 +79,7 @@ data as one JSON file, ready to review yourself or with an AI before you change 
 | Path             | Purpose                                                                |
 |------------------|------------------------------------------------------------------------|
 | `android`        | Android entry point                                                    |
+| `ios`            | iOS entry point: an Xcode project that shows the `compose` UI          |
 | `compose`        | Compose Multiplatform entry point: home screen and navigation          |
 | `core`           | App-wide pieces: theme, UI components, settings, server client, sync   |
 | `feature/auth`   | The login screen                                                       |
@@ -99,7 +101,8 @@ offline that the server gives online.
 
 ## Getting started
 
-You need JDK 21 and, for the Android app, Android Studio with the Android SDK.
+You need JDK 21 and, for the Android app, Android Studio with the Android SDK. For the iOS app
+you need a Mac with Apple silicon and Xcode.
 
 Clone the repository:
 
@@ -167,6 +170,23 @@ gym's records to a JSON file you choose. With the login on, workouts, payments, 
 income sync in the background whenever the server is reachable, including what was saved before
 the login was turned on, and the server's workout plan replaces the built-in one. How syncing
 works is in the [server README](server/README.md#sync).
+
+### Build the iOS app
+
+The iOS app reads the same `local.properties` settings as Android. Open
+`ios/Habita.xcodeproj` in Xcode, pick a simulator and press Run. Xcode runs Gradle to build the
+shared code as the `HabitaKit` framework first, so the first build takes a few minutes. It needs
+iOS 18.5 or later.
+
+From the command line:
+
+```sh
+xcodebuild -project ios/Habita.xcodeproj -scheme Habita \
+    -destination 'generic/platform=iOS Simulator' -derivedDataPath .build/ios build
+```
+
+To run on an iPhone, choose your team under Signing & Capabilities in Xcode. The simulator shares
+your computer's network, so a local server is at `HABITA_SERVER_URL=http://localhost:8080`.
 
 ## Deploying your own server
 

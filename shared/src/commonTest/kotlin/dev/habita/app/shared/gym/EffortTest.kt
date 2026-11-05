@@ -108,7 +108,7 @@ class EffortTest {
     }
 
     @Test
-    fun `the warm-up set is about half, rounded to the step`() {
+    fun `the warm-up set is about half and rounded to the step`() {
         assertEquals(8 * KG, Progression.warmUpWeight(15 * KG, 2 * KG))
         assertEquals(10 * KG, Progression.warmUpWeight(20 * KG, 5 * KG))
         assertEquals(2 * KG, Progression.warmUpWeight(2 * KG, 2 * KG))

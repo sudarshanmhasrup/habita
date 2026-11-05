@@ -19,7 +19,7 @@ class SummaryTest {
     ) = Summary.of(session, testProgram, sessions, sets, steps = emptyMap(), now = 10 * DAY)
 
     @Test
-    fun `measures total, warm-up and main time`() {
+    fun `measures total and warm-up and main time`() {
         val result = summary()
 
         assertEquals(60 * 60 * 1000L, result.totalMillis)
