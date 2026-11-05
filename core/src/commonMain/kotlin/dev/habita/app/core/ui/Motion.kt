@@ -108,12 +108,16 @@ private fun <S> AnimatedContentTransitionScope<S>.screenTransform(forward: Boole
     return (enter togetherWith exit).using(SizeTransform(clip = false))
 }
 
-/** A gentler switch for content inside a screen, such as a set changing to a rest. */
+/**
+ * A gentler switch for content inside a screen, such as a set changing to a rest. Only a change
+ * of [key] animates; other changes to [target] update in place.
+ */
 @Composable
-fun <S> ContentSwap(target: S, modifier: Modifier = Modifier, content: @Composable (S) -> Unit) {
+fun <S> ContentSwap(target: S, modifier: Modifier = Modifier, key: (S) -> Any? = { it }, content: @Composable (S) -> Unit) {
     AnimatedContent(
         targetState = target,
         modifier = modifier,
+        contentKey = key,
         transitionSpec = {
             (fadeIn(tween(Motion.MEDIUM, easing = Motion.Ease)) + scaleIn(tween(Motion.MEDIUM, easing = Motion.Ease), initialScale = 0.98f))
                 .togetherWith(fadeOut(tween(Motion.SHORT)))

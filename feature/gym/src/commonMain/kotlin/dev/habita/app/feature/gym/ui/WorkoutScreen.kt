@@ -1,5 +1,15 @@
 package dev.habita.app.feature.gym.ui
 
+import dev.habita.app.core.ui.Motion
+import dev.habita.app.core.ui.ContentSwap
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -79,14 +89,8 @@ internal fun WorkoutScreen(
     onBack: () -> Unit,
 ) {
     KeepScreenOn()
-    val colors = HabitaTheme.colors
     var confirmFinish by remember(active.sessionId) { mutableStateOf(false) }
-    LaunchedEffect(confirmFinish) {
-        if (confirmFinish) {
-            delay(4000)
-            confirmFinish = false
-        }
-    }
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         TopBar(
             "Gym",
@@ -94,17 +98,15 @@ internal fun WorkoutScreen(
             Modifier.padding(start = Space.screen, end = Space.item, top = Space.inside),
         ) {
             Elapsed(active.startedAt)
-            TextAction(
-                text = if (confirmFinish) "Tap again to finish" else "Finish",
-                onClick = { if (confirmFinish) viewModel.finish() else confirmFinish = true },
-                color = if (confirmFinish) colors.error else colors.accent,
-            )
+            TextAction(text = "Finish", onClick = { confirmFinish = true })
         }
         ProgressBar(
             active.progress,
             Modifier.padding(start = Space.screen, end = Space.screen, top = Space.inside, bottom = Space.tiny),
             height = 4.dp,
         )
+        // Each step of the workout (a warm-up, a set, a rest) eases in as the last one leaves.
+        ContentSwap(active, Modifier.weight(1f), key = { it.stepKey() }) { active ->
         val rest = active.rest
         when {
             active.phase == Phase.WARM_UP -> WarmUpContent(active, viewModel)
@@ -125,6 +127,51 @@ internal fun WorkoutScreen(
                 active.currentSlot?.let { NextUp(active, data, it, label = "Up next") }
             }
             active.currentSlot != null -> ExerciseContent(active, data, viewModel)
+        }
+        }
+    }
+    FinishPanel(
+        visible = confirmFinish,
+        workoutName = active.workout.name,
+        onFinish = {
+            confirmFinish = false
+            viewModel.finish()
+        },
+        onKeepGoing = { confirmFinish = false },
+    )
+    }
+}
+
+/** What identifies one step of the workout, so moving to the next one animates. */
+private fun ActiveWorkout.stepKey(): Any = listOf(phase, rest != null, currentWarmUp, currentSlot, loggedSets.size, warmUpSetsDone.size)
+
+/** Asks before finishing, over a dimmed screen. Tapping outside keeps the workout going. */
+@Composable
+private fun BoxScope.FinishPanel(visible: Boolean, workoutName: String, onFinish: () -> Unit, onKeepGoing: () -> Unit) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
+    AnimatedVisibility(visible, enter = fadeIn(tween(Motion.SHORT)), exit = fadeOut(tween(Motion.SHORT))) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.35f))
+                .clickable(interactionSource = null, indication = null, onClick = onKeepGoing),
+        )
+    }
+    AnimatedVisibility(
+        visible,
+        modifier = Modifier.align(Alignment.BottomCenter),
+        enter = slideInVertically(tween(Motion.MEDIUM, easing = Motion.Ease)) { it } + fadeIn(),
+        exit = slideOutVertically(tween(Motion.SHORT)) { it } + fadeOut(),
+    ) {
+        HabitaCard(Modifier.fillMaxWidth().padding(Space.item)) {
+            HText("Finish $workoutName?", type.title)
+            Gap(Space.tiny)
+            HText("Sets you haven't done are left out of today's numbers.", type.body, color = colors.muted)
+            Gap(Space.card)
+            PrimaryButton("Finish workout", onFinish, Modifier.fillMaxWidth())
+            Gap(Space.inside)
+            SecondaryButton("Keep going", onKeepGoing, Modifier.fillMaxWidth())
         }
     }
 }

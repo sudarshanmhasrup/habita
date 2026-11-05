@@ -23,6 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.habita.app.core.Core
 import dev.habita.app.core.theme.HabitaTheme
+import dev.habita.app.core.ui.appear
 import dev.habita.app.core.ui.Gap
 import dev.habita.app.core.ui.HText
 import dev.habita.app.core.ui.HabitaScreen
@@ -63,11 +64,13 @@ private fun LoginContent(
                     .padding(24.dp),
                 verticalArrangement = Arrangement.Bottom,
             ) {
-                HText("habita", type.wordmark)
+                // The wordmark arrives first, then the form, one part after another.
+                HText("habita", type.wordmark, modifier = Modifier.appear(0))
                 Gap(8.dp)
-                HText("Your personal space.", type.body, color = colors.muted)
+                HText("Your personal space.", type.body, color = colors.muted, modifier = Modifier.appear(1))
                 Gap(40.dp)
                 LabeledField(
+                    modifier = Modifier.appear(2),
                     label = "Email",
                     value = state.email,
                     onValueChange = onEmailChange,
@@ -76,6 +79,7 @@ private fun LoginContent(
                 )
                 Gap(20.dp)
                 LabeledField(
+                    modifier = Modifier.appear(3),
                     label = "Password",
                     value = state.password,
                     onValueChange = onPasswordChange,
@@ -91,7 +95,7 @@ private fun LoginContent(
                     text = if (state.loading) "Logging in…" else "Log in",
                     onClick = onLogin,
                     enabled = state.canSubmit,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().appear(4),
                 )
                 Gap(16.dp)
                 HText(

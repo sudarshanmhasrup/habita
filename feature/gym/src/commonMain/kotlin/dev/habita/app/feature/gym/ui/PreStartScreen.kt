@@ -15,6 +15,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.theme.Space
+import dev.habita.app.core.ui.appear
 import dev.habita.app.core.ui.Divider
 import dev.habita.app.core.ui.Gap
 import dev.habita.app.core.ui.HText
@@ -54,9 +55,9 @@ internal fun PreStartScreen(
             HText(workout.name, type.headline)
             Gap(Space.card)
             Row(horizontalArrangement = Arrangement.spacedBy(Space.item)) {
-                StatTile("Exercises", "${workout.exercises.size}", Modifier.weight(1f))
-                StatTile("Sets", "${workout.exercises.sumOf { it.sets }}", Modifier.weight(1f))
-                StatTile("Minutes", "~${estimateMinutes(workout, warmUp)}", Modifier.weight(1f))
+                StatTile("Exercises", "${workout.exercises.size}", Modifier.weight(1f).appear(0))
+                StatTile("Sets", "${workout.exercises.sumOf { it.sets }}", Modifier.weight(1f).appear(0))
+                StatTile("Minutes", "~${estimateMinutes(workout, warmUp)}", Modifier.weight(1f).appear(0))
             }
             if (warmUp != null) {
                 Gap(Space.section)
@@ -65,7 +66,7 @@ internal fun PreStartScreen(
                     HText("then ${warmUp.restSeconds / 60} min break", type.caption, color = colors.muted)
                 }
                 Gap(Space.item)
-                HabitaCard(Modifier.fillMaxWidth()) {
+                HabitaCard(Modifier.fillMaxWidth().appear(1)) {
                     Column(verticalArrangement = Arrangement.spacedBy(Space.item)) {
                         warmUp.items.forEach { item ->
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -113,7 +114,7 @@ private fun ExerciseList(program: Program, workoutId: String, targets: List<Exer
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     val workout = program.workout(workoutId) ?: return
-    HabitaCard(Modifier.fillMaxWidth()) {
+    HabitaCard(Modifier.fillMaxWidth().appear(2)) {
         workout.exercises.forEachIndexed { index, slot ->
             val exercise = program.exercise(slot.exerciseId) ?: return@forEachIndexed
             if (index > 0) {

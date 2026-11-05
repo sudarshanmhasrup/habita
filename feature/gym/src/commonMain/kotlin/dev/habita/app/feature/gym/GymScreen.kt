@@ -1,6 +1,5 @@
 package dev.habita.app.feature.gym
 
-import androidx.compose.animation.Crossfade
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,6 +15,7 @@ import androidx.navigationevent.compose.rememberNavigationEventState
 import dev.habita.app.core.Core
 import dev.habita.app.core.data.nowMillis
 import dev.habita.app.core.ui.HabitaScreen
+import dev.habita.app.core.ui.ScreenTransition
 import dev.habita.app.feature.gym.data.GymRepository
 import dev.habita.app.feature.gym.ui.GymRoute
 import dev.habita.app.feature.gym.ui.GymViewModel
@@ -131,7 +131,8 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
 
     HabitaScreen {
         val current = data ?: return@HabitaScreen
-        Crossfade(route) { screen ->
+        // Deeper screens slide in from the right; going back slides the other way.
+        ScreenTransition(route, isForward = { from, to -> to.depth > from.depth }) { screen ->
             when (screen) {
                 GymRoute.Select -> SelectScreen(
                     data = current,

@@ -29,6 +29,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.theme.Space
+import dev.habita.app.core.ui.appear
+import dev.habita.app.core.ui.CountingText
 import dev.habita.app.core.ui.ControlShape
 import dev.habita.app.core.ui.Divider
 import dev.habita.app.core.ui.Gap
@@ -94,7 +96,7 @@ internal fun MonthScreen(
                 Gap(Space.item)
                 MonthSwitcher(month, canGoBack, canGoForward, onPrevious, onNext)
                 Gap(Space.item)
-                if (summary != null) Overview(summary)
+                if (summary != null) Overview(summary, onBudget, Modifier.appear(0))
                 if (sms.supported && !canGoForward) {
                     Gap(Space.item)
                     SmsCard(sms, onImport)
@@ -107,9 +109,10 @@ internal fun MonthScreen(
             second = {
                 if (wide) Gap(56.dp)
                 if (summary != null) {
-                    Categories(summary, onBudget)
-                    Gap(Space.section)
+                    // What was paid comes first; the budget, which changes rarely, after it.
                     Payments(summary, onOpen)
+                    Gap(Space.section)
+                    Categories(summary, onBudget)
                     Gap(Space.card)
                 }
             },
@@ -172,19 +175,31 @@ private fun RoundArrow(icon: ImageVector, label: String, enabled: Boolean, onCli
     }
 }
 
-/** What's left of the income, and how much went out. */
+/**
+ * What's left of the income and how much went out. Without an income set, only what was spent,
+ * with a way to set the income, since "left" would mean nothing.
+ */
 @Composable
-private fun Overview(summary: MonthSummary) {
+private fun Overview(summary: MonthSummary, onBudget: () -> Unit, modifier: Modifier) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
-    HabitaCard(Modifier.fillMaxWidth()) {
-        Overline("Left from income")
+    val big = type.timer.copy(fontSize = type.display.fontSize * 1.2f, lineHeight = type.display.lineHeight * 1.15f)
+    HabitaCard(modifier.fillMaxWidth()) {
+        if (summary.incomePaise <= 0) {
+            Overline("Spent this month")
+            Gap(Space.tiny)
+            CountingText(summary.spentPaise, { formatRupees(it) }, big)
+            Gap(Space.inside)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HText("Add your income to see what's left.", type.caption, color = colors.muted, modifier = Modifier.weight(1f))
+                TextAction("Set income", onBudget)
+            }
+            return@HabitaCard
+        }
+        val over = summary.leftPaise < 0
+        Overline(if (over) "Over your income" else "Left from income")
         Gap(Space.tiny)
-        HText(
-            formatRupees(summary.leftPaise),
-            type.timer.copy(fontSize = type.display.fontSize * 1.25f, lineHeight = type.display.lineHeight * 1.2f),
-            color = if (summary.leftPaise < 0) colors.error else colors.text,
-        )
+        CountingText(if (over) -summary.leftPaise else summary.leftPaise, { formatRupees(it) }, big, color = if (over) colors.error else colors.text)
         Gap(Space.tiny)
         HText(
             "Spent ${formatRupees(summary.spentPaise)} of ${formatRupees(summary.incomePaise)}",
@@ -193,9 +208,9 @@ private fun Overview(summary: MonthSummary) {
         )
         Gap(Space.item)
         ProgressBar(
-            if (summary.incomePaise > 0) summary.spentPaise.toFloat() / summary.incomePaise else 0f,
+            summary.spentPaise.toFloat() / summary.incomePaise,
             height = 6.dp,
-            color = if (summary.leftPaise < 0) colors.error else colors.accent,
+            color = if (over) colors.error else colors.accent,
         )
     }
 }
@@ -206,16 +221,14 @@ private fun ColumnScope.SmsCard(sms: SmsAccess, onImport: () -> Unit) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     if (!sms.granted) {
-        HabitaCard(Modifier.fillMaxWidth(), borderColor = colors.accent) {
-            HText("Track payments from bank SMS", type.title)
-            Gap(Space.tiny)
-            HText(
-                "Each bank debit SMS becomes a payment, with a notification to pick its category. The SMS never leave the phone.",
-                type.caption,
-                color = colors.muted,
-            )
-            Gap(Space.item)
-            PrimaryButton("Turn on", sms::request, Modifier.fillMaxWidth())
+        HabitaCard(Modifier.fillMaxWidth().appear(1), contentPadding = PaddingValues(start = Space.card, end = Space.inside, top = 14.dp, bottom = 14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    HText("Log payments from bank SMS", type.bodyStrong)
+                    HText("SMS never leave the phone.", type.caption, color = colors.muted)
+                }
+                TextAction("Turn on", sms::request)
+            }
         }
     } else {
         if (!sms.canOpenOnPayment) {
@@ -249,7 +262,7 @@ private fun ColumnScope.ToSort(summary: MonthSummary, onOpen: (String) -> Unit, 
     Gap(Space.item)
     Column(verticalArrangement = Arrangement.spacedBy(Space.inside)) {
         summary.unsorted.forEach { expense ->
-            HabitaCard(Modifier.fillMaxWidth(), onClick = { onOpen(expense.id) }, contentPadding = PaddingValues(vertical = Space.card)) {
+            HabitaCard(Modifier.fillMaxWidth().appear(2), onClick = { onOpen(expense.id) }, contentPadding = PaddingValues(vertical = Space.card)) {
                 Row(Modifier.padding(horizontal = Space.card), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         HText(expense.description, type.bodyStrong, maxLines = 1)
@@ -313,8 +326,14 @@ private fun ColumnScope.Categories(summary: MonthSummary, onBudget: () -> Unit) 
         TextAction("Edit", onBudget)
     }
     Gap(Space.tiny)
-    HabitaCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = Space.card, vertical = Space.inside)) {
-        summary.categories.forEachIndexed { index, spend ->
+    // Only categories with a limit or some spending; the rest are in the budget editor.
+    val shown = summary.categories.filter { it.category.limitPaise > 0 || it.spentPaise > 0 }
+    if (shown.isEmpty()) {
+        HText("Nothing spent yet. Set limits under Edit.", HabitaTheme.typography.caption, color = HabitaTheme.colors.muted)
+        return
+    }
+    HabitaCard(Modifier.fillMaxWidth().appear(3), contentPadding = PaddingValues(horizontal = Space.card, vertical = Space.inside)) {
+        shown.forEachIndexed { index, spend ->
             if (index > 0) Divider()
             CategoryRow(spend)
         }
@@ -366,7 +385,7 @@ private fun ColumnScope.Payments(summary: MonthSummary, onOpen: (String) -> Unit
             HText(formatRupees(payments.sumOf { it.amountPaise }), type.caption, color = colors.muted)
         }
         Gap(Space.inside)
-        HabitaCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
+        HabitaCard(Modifier.fillMaxWidth().appear(2), contentPadding = PaddingValues(0.dp)) {
             payments.forEachIndexed { index, expense ->
                 if (index > 0) Divider(Modifier.padding(start = Space.card))
                 PaymentRow(expense, expense.categoryId?.let { names[it] }, onOpen)
