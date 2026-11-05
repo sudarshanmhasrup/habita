@@ -1,0 +1,11 @@
+-- Version 2: the theme becomes a synced preference. A theme already chosen on this device moves
+-- over and counts as edited, so it goes to the server once.
+CREATE TABLE preference (
+    key TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    dirty INTEGER NOT NULL
+);
+INSERT INTO preference (key, value, updated_at, dirty)
+SELECT key, value, 1, 1 FROM setting WHERE key = 'dark_theme';
+DELETE FROM setting WHERE key = 'dark_theme';

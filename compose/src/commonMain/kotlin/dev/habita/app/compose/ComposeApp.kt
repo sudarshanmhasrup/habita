@@ -24,6 +24,7 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
     val settings = app.core.settings
     val token by settings.token.collectAsStateWithLifecycle()
     val darkTheme by settings.darkTheme.collectAsStateWithLifecycle()
+    val accent by settings.accent.collectAsStateWithLifecycle()
     val gymToday by app.gym.today.collectAsStateWithLifecycle(null)
     val expenseToday by app.expense.today.collectAsStateWithLifecycle(null)
     val expenseRequest by app.expense.openRequest.collectAsStateWithLifecycle()
@@ -35,7 +36,7 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
     // A payment notification was tapped: the expense screen takes the request from here.
     LaunchedEffect(expenseRequest) { if (expenseRequest != null) screen = Screen.Expense }
 
-    HabitaTheme(darkTheme) {
+    HabitaTheme(darkTheme, accent) {
         // Home is the root: opening a feature slides forward, leaving it slides back.
         ScreenTransition(
             target = if (loggedOut) null else screen,
@@ -48,9 +49,11 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
                         userName = app.core.config.userName,
                         hour = currentHour(),
                         darkTheme = darkTheme,
+                        accent = accent,
                         gym = gymToday,
                         expense = expenseToday,
-                        onToggleTheme = { settings.setDarkTheme(!darkTheme) },
+                        onDarkTheme = settings::setDarkTheme,
+                        onAccent = settings::setAccent,
                         onStartWorkout = { workoutId ->
                             app.gym.requestOpen(workoutId)
                             screen = Screen.Gym

@@ -14,12 +14,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.habita.app.core.theme.Accent
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.theme.Space
 import dev.habita.app.core.ui.CountingText
@@ -49,9 +54,11 @@ internal fun HomeScreen(
     userName: String,
     hour: Int,
     darkTheme: Boolean,
+    accent: Accent,
     gym: GymToday?,
     expense: ExpenseToday?,
-    onToggleTheme: () -> Unit,
+    onDarkTheme: (Boolean) -> Unit,
+    onAccent: (Accent) -> Unit,
     onStartWorkout: (workoutId: String) -> Unit,
     onOpenGym: () -> Unit,
     onOpenExpense: () -> Unit,
@@ -60,6 +67,8 @@ internal fun HomeScreen(
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     val wide = LocalWideLayout.current
+    var themeOpen by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().padding(start = Space.screen, end = Space.screen, top = Space.item),
@@ -67,9 +76,9 @@ internal fun HomeScreen(
         ) {
             Overline(todayLabel(), Modifier.weight(1f))
             IconCircleButton(
-                icon = if (darkTheme) HabitaIcons.Sun else HabitaIcons.Moon,
-                contentDescription = if (darkTheme) "Switch to light mode" else "Switch to dark mode",
-                onClick = onToggleTheme,
+                icon = HabitaIcons.Palette,
+                contentDescription = "Theme",
+                onClick = { themeOpen = true },
             )
         }
         TwoPane(
@@ -96,6 +105,15 @@ internal fun HomeScreen(
                 Gap(Space.card)
             },
         )
+    }
+    ThemeSheet(
+        visible = themeOpen,
+        darkTheme = darkTheme,
+        accent = accent,
+        onDarkTheme = onDarkTheme,
+        onAccent = onAccent,
+        onClose = { themeOpen = false },
+    )
     }
 }
 
