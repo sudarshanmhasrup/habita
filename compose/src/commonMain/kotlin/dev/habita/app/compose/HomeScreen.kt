@@ -1,9 +1,9 @@
 package dev.habita.app.compose
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,34 +11,51 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.theme.Space
-import dev.habita.app.core.ui.IconBadge
+import dev.habita.app.core.ui.CountingText
+import dev.habita.app.core.ui.Divider
 import dev.habita.app.core.ui.Gap
-import dev.habita.app.core.ui.HIcon
 import dev.habita.app.core.ui.HText
 import dev.habita.app.core.ui.HabitaCard
 import dev.habita.app.core.ui.HabitaIcons
 import dev.habita.app.core.ui.IconCircleButton
 import dev.habita.app.core.ui.LocalWideLayout
+import dev.habita.app.core.ui.Overline
+import dev.habita.app.core.ui.PrimaryButton
+import dev.habita.app.core.ui.ProgressBar
+import dev.habita.app.core.ui.SecondaryButton
 import dev.habita.app.core.ui.TwoPane
+import dev.habita.app.core.ui.appear
+import dev.habita.app.feature.expense.ExpenseToday
+import dev.habita.app.feature.expense.data.formatRupees
+import dev.habita.app.feature.gym.GymToday
 
-/** The only screen: the date, a greeting, the feature list and the theme toggle. */
+/**
+ * The only screen: the date, a greeting and today at a glance. The gym card starts today's
+ * workout in one tap; the expense card shows what's left this month and adds a payment.
+ */
 @Composable
 internal fun HomeScreen(
     userName: String,
     hour: Int,
     darkTheme: Boolean,
-    gymStatus: String?,
-    expenseStatus: String?,
+    gym: GymToday?,
+    expense: ExpenseToday?,
     onToggleTheme: () -> Unit,
+    onStartWorkout: (workoutId: String) -> Unit,
     onOpenGym: () -> Unit,
     onOpenExpense: () -> Unit,
+    onAddExpense: () -> Unit,
 ) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
@@ -48,7 +65,7 @@ internal fun HomeScreen(
             Modifier.fillMaxWidth().padding(start = Space.screen, end = Space.screen, top = Space.item),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            HText(todayLabel(), type.label, color = colors.muted, modifier = Modifier.weight(1f))
+            Overline(todayLabel(), Modifier.weight(1f))
             IconCircleButton(
                 icon = if (darkTheme) HabitaIcons.Sun else HabitaIcons.Moon,
                 contentDescription = if (darkTheme) "Switch to light mode" else "Switch to dark mode",
@@ -57,67 +74,139 @@ internal fun HomeScreen(
         }
         TwoPane(
             Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = Space.screen, vertical = if (wide) 48.dp else Space.section),
+            contentPadding = PaddingValues(horizontal = Space.screen, vertical = if (wide) 48.dp else Space.card),
             first = {
-                if (userName.isBlank()) {
-                    HText(partOfDay(hour), type.display)
-                } else {
-                    HText(partOfDay(hour) + ",", type.body, color = colors.muted)
-                    Gap(2.dp)
-                    HText(userName, type.display)
+                Column(Modifier.appear(0)) {
+                    HText(if (userName.isBlank()) partOfDay(hour) else partOfDay(hour) + ",", type.body, color = colors.muted)
+                    if (userName.isNotBlank()) {
+                        Gap(2.dp)
+                        HText(userName, type.display)
+                    }
                 }
+                Gap(Space.section)
             },
-            second = { Features(gymStatus, expenseStatus, onOpenGym, onOpenExpense) },
+            second = {
+                if (gym != null) {
+                    GymCard(gym, onStartWorkout, onOpenGym, Modifier.appear(1))
+                    Gap(Space.item)
+                }
+                if (expense != null) {
+                    ExpenseCard(expense, onOpenExpense, onAddExpense, Modifier.appear(2))
+                }
+                Gap(Space.card)
+            },
         )
     }
 }
 
-/** The features, one tile each: the gym and the expense tracker. */
 @Composable
-private fun ColumnScope.Features(gymStatus: String?, expenseStatus: String?, onOpenGym: () -> Unit, onOpenExpense: () -> Unit) {
+private fun GymCard(gym: GymToday, onStart: (String) -> Unit, onOpen: () -> Unit, modifier: Modifier) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
-    HText("Your space", type.overline, color = colors.muted)
-    Gap(Space.item)
-    HabitaCard(Modifier.fillMaxWidth(), onClick = onOpenGym, contentPadding = PaddingValues(16.dp)) {
-        FeatureRow(HabitaIcons.Dumbbell, "Gym", gymStatus) { OpenArrow() }
-    }
-    Gap(Space.inside)
-    HabitaCard(Modifier.fillMaxWidth(), onClick = onOpenExpense, contentPadding = PaddingValues(16.dp)) {
-        FeatureRow(HabitaIcons.Wallet, "Expenses", expenseStatus) { OpenArrow() }
-    }
-}
-
-/** A small round arrow at the end of a feature tile. */
-@Composable
-private fun OpenArrow() {
-    val colors = HabitaTheme.colors
-    Box(Modifier.size(36.dp).background(colors.highlight, CircleShape), contentAlignment = Alignment.Center) {
-        HIcon(HabitaIcons.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp), tint = colors.onHighlight)
-    }
-}
-
-@Composable
-private fun FeatureRow(
-    icon: ImageVector,
-    title: String,
-    detail: String?,
-    enabled: Boolean = true,
-    trailing: @Composable () -> Unit,
-) {
-    val colors = HabitaTheme.colors
-    val type = HabitaTheme.typography
-    val tint = if (enabled) colors.text else colors.muted
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        IconBadge(icon, tint = tint)
-        Gap(Space.item)
-        Column(Modifier.weight(1f)) {
-            HText(title, type.title, color = tint, maxLines = 1)
-            if (detail != null) HText(detail, type.caption, color = colors.muted, maxLines = 1)
+    HabitaCard(modifier.fillMaxWidth(), onClick = onOpen) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Overline(if (gym.inProgress) "Gym · in progress" else "Gym · up next", Modifier.weight(1f), color = colors.accent)
+            HText(weekLine(gym.workoutsThisWeek), type.caption, color = colors.muted)
         }
-        Gap(Space.item)
-        trailing()
+        Gap(Space.inside)
+        HText(gym.name, type.headline)
+        Gap(2.dp)
+        HText(gym.detail, type.body, color = colors.muted)
+        Gap(Space.card)
+        WeekDots(gym.trainedDays, gym.todayIndex)
+        Gap(Space.card)
+        PrimaryButton(if (gym.inProgress) "Resume workout" else "Start workout", { onStart(gym.workoutId) }, Modifier.fillMaxWidth())
     }
+}
+
+/** Monday to Sunday as dots: filled for a day with a workout, ringed for today. */
+@Composable
+private fun WeekDots(trained: Set<Int>, today: Int) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        listOf("M", "T", "W", "T", "F", "S", "S").forEachIndexed { index, letter ->
+            val done = index in trained
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.semantics(mergeDescendants = true) { if (done) contentDescription = "Worked out" },
+            ) {
+                HText(letter, type.caption, color = if (index == today) colors.text else colors.muted)
+                Gap(6.dp)
+                Box(
+                    Modifier
+                        .size(28.dp)
+                        .background(if (done) colors.accent else colors.accentTint.copy(alpha = if (colors.isDark) 0.6f else 0.55f), CircleShape)
+                        .then(if (index == today && !done) Modifier.border(1.5.dp, colors.accent, CircleShape) else Modifier),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (done) HText("✓", type.caption, color = colors.onAccent, textAlign = TextAlign.Center)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExpenseCard(expense: ExpenseToday, onOpen: () -> Unit, onAdd: () -> Unit, modifier: Modifier) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
+    HabitaCard(modifier.fillMaxWidth(), onClick = onOpen) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Overline("${expense.monthName} · expenses", Modifier.weight(1f), color = colors.accent)
+            if (expense.toSort > 0) {
+                HText(if (expense.toSort == 1) "1 to sort" else "${expense.toSort} to sort", type.caption, color = colors.accent)
+            }
+        }
+        Gap(Space.inside)
+        if (expense.incomeSet) {
+            val over = expense.leftPaise < 0
+            CountingText(
+                value = if (over) -expense.leftPaise else expense.leftPaise,
+                format = { formatRupees(it) },
+                style = type.number,
+                color = if (over) colors.error else colors.text,
+            )
+            HText(
+                if (over) "over this month's income" else "left of ${formatRupees(expense.incomePaise)}",
+                type.body,
+                color = colors.muted,
+            )
+            Gap(Space.item)
+            ProgressBar(
+                progress = if (expense.incomePaise > 0) expense.spentPaise.toFloat() / expense.incomePaise else 0f,
+                height = 6.dp,
+                color = if (over) colors.error else colors.accent,
+            )
+        } else {
+            CountingText(value = expense.spentPaise, format = { formatRupees(it) }, style = type.number)
+            HText("spent this month · set an income to see what's left", type.body, color = colors.muted)
+        }
+        if (expense.recent.isNotEmpty()) {
+            Gap(Space.card)
+            expense.recent.forEachIndexed { index, payment ->
+                if (index > 0) Divider(Modifier.padding(vertical = 10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        HText(payment.description, type.bodyStrong, maxLines = 1)
+                        HText(payment.category, type.caption, color = colors.muted, maxLines = 1)
+                    }
+                    HText(formatRupees(payment.amountPaise), type.bodyStrong)
+                }
+            }
+        }
+        Gap(Space.card)
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.inside)) {
+            SecondaryButton("See month", onOpen, Modifier.weight(1f))
+            PrimaryButton("Add expense", onAdd, Modifier.weight(1f))
+        }
+    }
+}
+
+private fun weekLine(count: Int): String = when (count) {
+    0 -> "None yet this week"
+    1 -> "1 this week"
+    else -> "$count this week"
 }
 
 internal fun partOfDay(hour: Int): String = when (hour) {

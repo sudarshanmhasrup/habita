@@ -24,23 +24,69 @@ import dev.habita.app.feature.gym.ui.SelectScreen
 import dev.habita.app.feature.gym.ui.SummaryScreen
 import dev.habita.app.feature.gym.ui.WorkoutScreen
 import dev.habita.app.feature.gym.ui.backupDate
+import dev.habita.app.feature.gym.ui.daysBetween
+import dev.habita.app.feature.gym.ui.estimateMinutes
+import dev.habita.app.feature.gym.ui.startOfWeek
 import dev.habita.app.feature.gym.ui.rememberFileSaver
 import dev.habita.app.shared.gym.Rotation
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+
+/**
+ * What the home screen shows about the gym: today's workout ([inProgress] when one is running),
+ * how long it takes, and which days of this week (0 is Monday) had a finished workout.
+ */
+data class GymToday(
+    val workoutId: String,
+    val name: String,
+    val detail: String,
+    val inProgress: Boolean,
+    val trainedDays: Set<Int>,
+    val todayIndex: Int,
+    val workoutsThisWeek: Int,
+)
 
 /** The gym feature. Create it once at startup, so syncing starts as soon as the user is logged in. */
 class GymFeature(core: Core) {
     internal val repository = GymRepository(core)
 
-    /** One line for the home screen: the workout in progress, or the next one in the rotation. */
-    val status: Flow<String?> = combine(repository.program, repository.sessions, repository.active) { program, sessions, active ->
-        when {
-            active != null -> "In progress · ${active.workout.name}"
-            program != null -> "Up next · ${Rotation.next(program.program, sessions).name}"
-            else -> null
-        }
+    private val _openRequest = MutableStateFlow<Pair<String, Long>?>(null)
+
+    /** A workout to open from outside the gym, such as home's Start button. */
+    internal val openRequest: StateFlow<Pair<String, Long>?> = _openRequest.asStateFlow()
+
+    /** Shows [workoutId] ready to start, or the workout in progress, next time the gym opens. */
+    fun requestOpen(workoutId: String) {
+        _openRequest.value = workoutId to nowMillis()
+    }
+
+    internal fun consumeOpenRequest() {
+        _openRequest.value = null
+    }
+
+    val today: Flow<GymToday?> = combine(repository.program, repository.sessions, repository.active) { program, sessions, active ->
+        val plan = program?.program ?: return@combine null
+        val workout = active?.workout ?: Rotation.next(plan, sessions)
+        val now = nowMillis()
+        val weekStart = startOfWeek(now)
+        val trained = sessions
+            .filter { !it.deleted && it.endedAt != null && it.startedAt >= weekStart }
+            .map { daysBetween(weekStart, it.startedAt) }
+            .toSet()
+        val warmUp = plan.warmUps.firstOrNull { it.id == workout.warmUpId }
+        GymToday(
+            workoutId = workout.id,
+            name = workout.name,
+            detail = "${workout.exercises.size} exercises · ~${estimateMinutes(workout, warmUp)} min",
+            inProgress = active != null,
+            trainedDays = trained,
+            todayIndex = daysBetween(weekStart, now),
+            workoutsThisWeek = trained.size,
+        )
     }
 }
 
@@ -51,6 +97,14 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
     LaunchedEffect(viewModel) { viewModel.open() }
     val route by viewModel.route.collectAsStateWithLifecycle()
     val data by viewModel.data.collectAsStateWithLifecycle()
+    val openRequest by feature.openRequest.collectAsStateWithLifecycle()
+    // Opened from home's Start button: go straight to that workout, unless one is running.
+    LaunchedEffect(openRequest, data != null) {
+        val (workoutId, _) = openRequest ?: return@LaunchedEffect
+        val current = data ?: return@LaunchedEffect
+        feature.consumeOpenRequest()
+        if (current.active == null) viewModel.openWorkout(workoutId)
+    }
     val preStartTargets by viewModel.preStartTargets.collectAsStateWithLifecycle()
     val report by viewModel.report.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()

@@ -6,6 +6,7 @@ import dev.habita.app.feature.expense.data.Category
 import dev.habita.app.feature.expense.data.ExpenseRepository
 import dev.habita.app.feature.expense.data.SmsOutcome
 import dev.habita.app.feature.expense.data.formatRupees
+import dev.habita.app.feature.expense.data.monthLabel
 import dev.habita.app.feature.expense.data.monthOf
 import dev.habita.app.feature.expense.data.startOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -29,18 +30,6 @@ class ExpenseFeature(core: Core) {
 
     /** A request from outside the app, such as a notification, to show the expense screen. */
     val openRequest: StateFlow<OpenRequest?> = _openRequest.asStateFlow()
-
-    /** One line for the home screen: payments to sort, or what's left of this month's income. */
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val status: Flow<String> = flow { emit(monthOf(nowMillis())) }
-        .flatMapLatest { repository.summary(it) }
-        .map { summary ->
-            when (val count = summary.unsorted.size) {
-                0 -> "${formatRupees(summary.leftPaise)} left this month"
-                1 -> "1 payment to sort"
-                else -> "$count payments to sort"
-            }
-        }
 
     /** Saves the payment in a bank SMS, or returns `null` when the SMS isn't a payment. */
     suspend fun recordSms(body: String, sender: String?, receivedAt: Long = nowMillis()): SmsOutcome? =
@@ -67,9 +56,36 @@ class ExpenseFeature(core: Core) {
             .take(count)
     }
 
+    /**
+     * This month for the home screen: what's left of the income (or only what was spent, when no
+     * income is set), payments waiting for a category, and the latest payments.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val today: Flow<ExpenseToday> = flow { emit(monthOf(nowMillis())) }
+        .flatMapLatest { repository.summary(it) }
+        .map { summary ->
+            val names = summary.categories.associate { it.category.id to it.category.name }
+            ExpenseToday(
+                monthName = monthLabel(summary.month).substringBefore(' '),
+                incomeSet = summary.incomePaise > 0,
+                incomePaise = summary.incomePaise,
+                spentPaise = summary.spentPaise,
+                leftPaise = summary.leftPaise,
+                toSort = summary.unsorted.size,
+                recent = summary.expenses.sortedByDescending { it.paidAt }.take(3).map {
+                    RecentPayment(it.description, it.categoryId?.let(names::get) ?: "To sort", it.amountPaise)
+                },
+            )
+        }
+
     /** Shows the expense screen next time the app is in front, on [expenseId] when it's set. */
     fun requestOpen(expenseId: String?) {
         _openRequest.value = OpenRequest(expenseId, nowMillis())
+    }
+
+    /** Shows the form for a new payment next time the expense screen opens. */
+    fun requestAdd() {
+        _openRequest.value = OpenRequest(null, nowMillis(), add = true)
     }
 
     internal fun consumeOpenRequest() {
@@ -80,5 +96,21 @@ class ExpenseFeature(core: Core) {
     fun startOfThisMonth(): Long = startOf(monthOf(nowMillis()))
 }
 
-/** Open the expense screen, on one payment when [expenseId] is set. [at] tells repeats apart. */
-data class OpenRequest(val expenseId: String?, val at: Long)
+/**
+ * Open the expense screen: on one payment when [expenseId] is set, or on a new one with [add].
+ * [at] tells repeats apart.
+ */
+data class OpenRequest(val expenseId: String?, val at: Long, val add: Boolean = false)
+
+/** This month at a glance, for the home screen. Amounts are in paise. */
+data class ExpenseToday(
+    val monthName: String,
+    val incomeSet: Boolean,
+    val incomePaise: Long,
+    val spentPaise: Long,
+    val leftPaise: Long,
+    val toSort: Int,
+    val recent: List<RecentPayment>,
+)
+
+data class RecentPayment(val description: String, val category: String, val amountPaise: Long)

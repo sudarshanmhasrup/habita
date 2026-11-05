@@ -50,7 +50,10 @@ fun ExpenseScreen(feature: ExpenseFeature, onExit: () -> Unit) {
     LaunchedEffect(openRequest) {
         val request = openRequest ?: return@LaunchedEffect
         feature.consumeOpenRequest()
-        request.expenseId?.let(viewModel::openEdit)
+        when {
+            request.add -> viewModel.openEdit(null)
+            request.expenseId != null -> viewModel.openEdit(request.expenseId)
+        }
     }
 
     NavigationBackHandler(

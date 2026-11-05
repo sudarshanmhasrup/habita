@@ -1,6 +1,5 @@
 package dev.habita.app.compose
 
-import androidx.compose.animation.Crossfade
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -10,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.ui.HabitaScreen
+import dev.habita.app.core.ui.ScreenTransition
 import dev.habita.app.feature.auth.LoginScreen
 import dev.habita.app.feature.expense.ExpenseScreen
 import dev.habita.app.feature.gym.GymScreen
@@ -24,8 +24,8 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
     val settings = app.core.settings
     val token by settings.token.collectAsStateWithLifecycle()
     val darkTheme by settings.darkTheme.collectAsStateWithLifecycle()
-    val gymStatus by app.gym.status.collectAsStateWithLifecycle(null)
-    val expenseStatus by app.expense.status.collectAsStateWithLifecycle(null)
+    val gymToday by app.gym.today.collectAsStateWithLifecycle(null)
+    val expenseToday by app.expense.today.collectAsStateWithLifecycle(null)
     val expenseRequest by app.expense.openRequest.collectAsStateWithLifecycle()
     var screen by rememberSaveable { mutableStateOf(Screen.Home) }
 
@@ -36,7 +36,11 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
     LaunchedEffect(expenseRequest) { if (expenseRequest != null) screen = Screen.Expense }
 
     HabitaTheme(darkTheme) {
-        Crossfade(if (loggedOut) null else screen) { current ->
+        // Home is the root: opening a feature slides forward, leaving it slides back.
+        ScreenTransition(
+            target = if (loggedOut) null else screen,
+            isForward = { from, to -> from == null || (from == Screen.Home && to != null) },
+        ) { current ->
             when (current) {
                 null -> LoginScreen(app.core)
                 Screen.Home -> HabitaScreen {
@@ -44,11 +48,19 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
                         userName = app.core.config.userName,
                         hour = currentHour(),
                         darkTheme = darkTheme,
-                        gymStatus = gymStatus,
-                        expenseStatus = expenseStatus,
+                        gym = gymToday,
+                        expense = expenseToday,
                         onToggleTheme = { settings.setDarkTheme(!darkTheme) },
+                        onStartWorkout = { workoutId ->
+                            app.gym.requestOpen(workoutId)
+                            screen = Screen.Gym
+                        },
                         onOpenGym = { screen = Screen.Gym },
                         onOpenExpense = { screen = Screen.Expense },
+                        onAddExpense = {
+                            app.expense.requestAdd()
+                            screen = Screen.Expense
+                        },
                     )
                 }
                 Screen.Gym -> GymScreen(app.gym, onExit = { screen = Screen.Home })
