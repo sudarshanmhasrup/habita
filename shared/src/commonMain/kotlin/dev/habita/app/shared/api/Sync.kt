@@ -37,6 +37,7 @@ object SyncCollections {
     const val EXPENSES = "expense.expenses"
     const val EXPENSE_CATEGORIES = "expense.categories"
     const val EXPENSE_SETTINGS = "expense.settings"
+    const val APP_PREFERENCES = "app.preferences"
 }
 
 /** Local changes for the server, grouped by collection. */

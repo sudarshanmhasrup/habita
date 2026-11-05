@@ -150,6 +150,17 @@ class SyncTest {
     }
 
     @Test
+    fun `preferences such as the theme sync like any record`() = serverTest { client ->
+        val token = client.token()
+        val accent = SyncRecord("accent", NOW, data = buildJsonObject { put("value", "plum") })
+
+        val result = client.push(token, mapOf(SyncCollections.APP_PREFERENCES to listOf(accent))).body<SyncPushResult>()
+
+        assertTrue(result.rejected.isEmpty())
+        assertEquals(listOf(accent), client.pull(token).collections[SyncCollections.APP_PREFERENCES])
+    }
+
+    @Test
     fun `a clock far ahead can't lock a record forever`() {
         var now = NOW
         serverTest(clock = { now }) { client ->
