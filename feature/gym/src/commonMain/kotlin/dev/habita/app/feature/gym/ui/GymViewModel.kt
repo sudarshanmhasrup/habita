@@ -31,6 +31,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 internal sealed interface GymRoute {
+    /** How far in the flow the screen is, so transitions know which way to slide. */
+    val depth: Int
+        get() = when (this) {
+            Select -> 0
+            is PreStart -> 1
+            Workout -> 2
+            is Summary -> 3
+        }
+
     data object Select : GymRoute
 
     data class PreStart(val workoutId: String) : GymRoute

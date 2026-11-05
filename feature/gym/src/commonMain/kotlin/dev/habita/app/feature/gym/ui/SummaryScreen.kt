@@ -1,5 +1,13 @@
 package dev.habita.app.feature.gym.ui
 
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Box
@@ -18,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.theme.Space
+import dev.habita.app.core.ui.appear
 import dev.habita.app.core.ui.Gap
 import dev.habita.app.core.ui.HIcon
 import dev.habita.app.core.ui.HText
@@ -85,7 +94,7 @@ private fun ColumnScope.Overview(report: SessionReport) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     Row(horizontalArrangement = Arrangement.spacedBy(Space.item)) {
-        StatTile("Time", formatDuration(summary.totalMillis), Modifier.weight(1f))
+        StatTile("Time", formatDuration(summary.totalMillis), Modifier.weight(1f).appear(0))
         StatTile(
             "Volume",
             "${formatVolume(summary.volumeKg)} kg",
@@ -95,8 +104,8 @@ private fun ColumnScope.Overview(report: SessionReport) {
     }
     Gap(Space.item)
     Row(horizontalArrangement = Arrangement.spacedBy(Space.item)) {
-        StatTile("Sets done", "${summary.setsCompleted}", Modifier.weight(1f), detail = summary.setsSkipped.takeIf { it > 0 }?.let { "$it skipped" })
-        StatTile("New bests", "${summary.personalBests.size}", Modifier.weight(1f))
+        StatTile("Sets done", "${summary.setsCompleted}", Modifier.weight(1f).appear(0), detail = summary.setsSkipped.takeIf { it > 0 }?.let { "$it skipped" })
+        StatTile("New bests", "${summary.personalBests.size}", Modifier.weight(1f).appear(0))
     }
     Gap(Space.item)
 
@@ -131,7 +140,7 @@ private fun ColumnScope.Overview(report: SessionReport) {
 
     if (summary.nextIncreases.isNotEmpty()) {
         Gap(Space.item)
-        HabitaCard(Modifier.fillMaxWidth(), borderColor = colors.accent) {
+        HabitaCard(Modifier.fillMaxWidth().appear(1), borderColor = colors.accent) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HIcon(HabitaIcons.TrendUp, contentDescription = null, tint = colors.accent)
                 Gap(Space.item)
@@ -165,7 +174,7 @@ private fun ColumnScope.Exercises(report: SessionReport) {
 
 @Composable
 private fun ChartCard(title: String, caption: String, content: @Composable () -> Unit) {
-    HabitaCard(Modifier.fillMaxWidth()) {
+    HabitaCard(Modifier.fillMaxWidth().appear(2)) {
         HText(title, HabitaTheme.typography.title)
         HText(caption, HabitaTheme.typography.caption, color = HabitaTheme.colors.muted)
         Gap(Space.card)
@@ -178,7 +187,7 @@ private fun ExerciseCard(report: ExerciseReport) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     val exercise = report.exercise
-    HabitaCard(Modifier.fillMaxWidth()) {
+    HabitaCard(Modifier.fillMaxWidth().appear(3)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             HText(exercise.name, type.bodyStrong, modifier = Modifier.weight(1f))
             when {
@@ -237,15 +246,37 @@ private fun formatCompactKg(kg: Double): String = when {
     else -> formatKg((kg * 1000).roundToInt())
 }
 
-/** A blue check in a faint blue ring, at the top of the summary. */
+/** A green check in a faint green ring, at the top of the summary. It pops in, ring first. */
 @Composable
 private fun DoneBadge() {
     val colors = HabitaTheme.colors
+    val ring = remember { Animatable(0.6f) }
+    val check = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        launch { ring.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessLow)) }
+        delay(120)
+        check.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow))
+    }
     Box(
-        Modifier.size(76.dp).background(colors.accent.copy(alpha = 0.16f), CircleShape),
+        Modifier
+            .size(76.dp)
+            .graphicsLayer {
+                scaleX = ring.value
+                scaleY = ring.value
+            }
+            .background(colors.accent.copy(alpha = 0.16f), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.size(52.dp).background(colors.accent, CircleShape), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .size(52.dp)
+                .graphicsLayer {
+                    scaleX = check.value
+                    scaleY = check.value
+                }
+                .background(colors.accent, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
             HIcon(HabitaIcons.Check, contentDescription = null, modifier = Modifier.size(26.dp), tint = colors.onAccent)
         }
     }

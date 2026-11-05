@@ -27,6 +27,7 @@ import dev.habita.app.core.data.nowMillis
 import dev.habita.app.core.network.ApiException
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.theme.Space
+import dev.habita.app.core.ui.appear
 import dev.habita.app.core.ui.Chip
 import dev.habita.app.core.ui.Divider
 import dev.habita.app.core.ui.Gap
@@ -105,7 +106,7 @@ internal fun SelectScreen(
             if (wide) Gap(56.dp)
             Overline("All workouts")
             Gap(Space.item)
-            DayCards(program, data.suggested, onOpenWorkout)
+            DayCards(program, onOpenWorkout)
             if (!wide) {
                 Gap(Space.section)
                 StorageNote(data, onBackup, backupMessage)
@@ -175,7 +176,7 @@ private fun UpNextCard(program: Program, workout: Workout, lastDone: String?, on
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     val warmUp = program.warmUps.firstOrNull { it.id == workout.warmUpId }
-    HabitaCard(Modifier.fillMaxWidth(), onClick = onOpen) {
+    HabitaCard(Modifier.fillMaxWidth().appear(1), onClick = onOpen) {
         Overline("Up next", color = colors.accent)
         Gap(Space.tiny)
         HText(workout.name, type.headline)
@@ -194,7 +195,7 @@ private fun UpNextCard(program: Program, workout: Workout, lastDone: String?, on
 @Composable
 private fun NoProgram(sync: SyncState, onRetry: () -> Unit) {
     val colors = HabitaTheme.colors
-    HabitaCard(Modifier.fillMaxWidth()) {
+    HabitaCard(Modifier.fillMaxWidth().appear(2)) {
         if (sync is SyncState.Failed) {
             val message = when (sync.error) {
                 is ApiException.Offline -> "Can't reach the server to load the workout plan. Connect once and it stays on the phone."
@@ -214,7 +215,7 @@ private fun InProgressCard(active: ActiveWorkout, onResume: () -> Unit, onDiscar
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     var confirmDiscard by remember(active.sessionId) { mutableStateOf(false) }
-    HabitaCard(Modifier.fillMaxWidth(), borderColor = colors.accent) {
+    HabitaCard(Modifier.fillMaxWidth().appear(3), borderColor = colors.accent) {
         Overline("In progress", color = colors.accent)
         Gap(Space.inside)
         HText(active.workout.name, type.title)
@@ -238,7 +239,7 @@ private fun InProgressCard(active: ActiveWorkout, onResume: () -> Unit, onDiscar
 }
 
 @Composable
-private fun DayCards(program: Program, suggested: Workout?, onOpenWorkout: (String) -> Unit) {
+private fun DayCards(program: Program, onOpenWorkout: (String) -> Unit) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     val days = program.workouts
@@ -248,7 +249,7 @@ private fun DayCards(program: Program, suggested: Workout?, onOpenWorkout: (Stri
     Column(verticalArrangement = Arrangement.spacedBy(Space.item)) {
         days.forEach { (warmUpId, workouts) ->
             val warmUp = program.warmUps.firstOrNull { it.id == warmUpId }
-            HabitaCard(Modifier.fillMaxWidth()) {
+            HabitaCard(Modifier.fillMaxWidth().appear(4)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         HText("${warmUp?.name ?: workouts.first().name} day", type.title)
@@ -260,7 +261,8 @@ private fun DayCards(program: Program, suggested: Workout?, onOpenWorkout: (Stri
                     workouts.forEach { workout ->
                         Chip(
                             text = workout.name.substringAfterLast(' '),
-                            selected = workout.id == suggested?.id,
+                            // Up next is shown above; here every workout is just a choice.
+                            selected = false,
                             onClick = { onOpenWorkout(workout.id) },
                             modifier = Modifier.weight(1f),
                         )
@@ -270,7 +272,7 @@ private fun DayCards(program: Program, suggested: Workout?, onOpenWorkout: (Stri
         }
         program.workouts.filter { it.rotation == null }.forEach { workout ->
             HabitaCard(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().appear(5),
                 onClick = { onOpenWorkout(workout.id) },
                 color = colors.inverseCard,
                 borderColor = colors.inverseCard,

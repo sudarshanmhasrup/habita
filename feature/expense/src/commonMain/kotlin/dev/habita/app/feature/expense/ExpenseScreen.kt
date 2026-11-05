@@ -1,6 +1,5 @@
 package dev.habita.app.feature.expense
 
-import androidx.compose.animation.Crossfade
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -11,6 +10,7 @@ import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import dev.habita.app.core.ui.HabitaScreen
+import dev.habita.app.core.ui.ScreenTransition
 import dev.habita.app.feature.expense.data.fileMonth
 import dev.habita.app.feature.expense.data.toMarkdown
 import dev.habita.app.feature.expense.ui.BudgetScreen
@@ -62,7 +62,8 @@ fun ExpenseScreen(feature: ExpenseFeature, onExit: () -> Unit) {
     )
 
     HabitaScreen {
-        Crossfade(route) { screen ->
+        // The month is the root: a form slides in from the right and back out to the left.
+        ScreenTransition(route, isForward = { from, to -> from == ExpenseRoute.Month && to != ExpenseRoute.Month }) { screen ->
             when (screen) {
                 ExpenseRoute.Month -> MonthScreen(
                     month = month,
