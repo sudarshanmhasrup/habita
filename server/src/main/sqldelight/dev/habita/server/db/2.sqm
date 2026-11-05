@@ -1,0 +1,6 @@
+-- Version 3: token lifetimes, and tying each token to the password it was issued under.
+-- Existing tokens count as used when they were made, and have no fingerprint, so they end and the
+-- app asks for the login once.
+ALTER TABLE auth_token ADD COLUMN last_used_at INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE auth_token ADD COLUMN password_fingerprint TEXT;
+UPDATE auth_token SET last_used_at = created_at;

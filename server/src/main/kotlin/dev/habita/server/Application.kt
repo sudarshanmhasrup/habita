@@ -1,11 +1,14 @@
 package dev.habita.server
 
+import dev.habita.server.auth.LOGIN_GLOBAL_LIMIT
 import dev.habita.server.auth.LOGIN_LIMIT
 import dev.habita.server.auth.Passwords
 import dev.habita.server.auth.SESSION_AUTH
 import dev.habita.server.auth.Session
 import dev.habita.server.auth.Tokens
 import dev.habita.server.auth.authRoutes
+import dev.habita.server.auth.checkSession
+import dev.habita.server.auth.passwordFingerprint
 import dev.habita.server.data.Store
 import dev.habita.server.data.loadProgram
 import dev.habita.server.data.openDatabase
@@ -24,6 +27,8 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.forwardedheaders.XForwardedHeaders
+import io.ktor.server.plugins.origin
 import io.ktor.server.plugins.ratelimit.RateLimit
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.response.respond
@@ -60,6 +65,15 @@ fun Application.module(config: ServerConfig, clock: () -> Long = System::current
     val store = Store(database)
     val program = loadProgram(config.programPath, store, clock())
     environment.log.info("Loaded program version ${program.version} from ${config.programPath}")
+    val fingerprint = passwordFingerprint(config.passwordHash)
+    store.deleteInvalidTokens(clock(), fingerprint)
+
+    // Caddy appends the address it saw to X-Forwarded-For and drops what the client sent, so the
+    // last entry is the real client. This is only safe because the server port is never published
+    // (deploy/compose.yaml): every request comes through Caddy.
+    install(XForwardedHeaders) {
+        useLastProxy()
+    }
 
     install(ContentNegotiation) {
         json(HabitaJson)
@@ -73,15 +87,20 @@ fun Application.module(config: ServerConfig, clock: () -> Long = System::current
         }
     }
     install(RateLimit) {
+        // Per address, so a stranger can't lock the owner out, with a ceiling for spread attacks.
         register(LOGIN_LIMIT) {
             rateLimiter(limit = 5, refillPeriod = 1.minutes)
+            requestKey { call -> call.request.origin.remoteAddress }
+        }
+        register(LOGIN_GLOBAL_LIMIT) {
+            rateLimiter(limit = 30, refillPeriod = 1.minutes)
         }
     }
     install(Authentication) {
         bearer(SESSION_AUTH) {
             authenticate { credential ->
                 val tokenHash = Tokens.hash(credential.token)
-                if (store.hasToken(tokenHash)) Session(tokenHash) else null
+                if (checkSession(store, tokenHash, fingerprint, clock())) Session(tokenHash) else null
             }
         }
     }

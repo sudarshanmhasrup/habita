@@ -118,4 +118,9 @@ docker compose start server
 
 Only ports 22, 80 and 443 are open. The Habita server itself publishes no port, so it is reachable
 only through Caddy over HTTPS. Every route except `/health` and `/auth/login` needs a login token,
-and login allows 5 attempts a minute.
+and login allows 5 attempts a minute from each address and 30 in total. The server reads each
+client's address from Caddy's `X-Forwarded-For`, which is only safe because its port stays
+unpublished: never add a `ports:` entry to the `server` service.
+
+Lost a phone? Call `POST /auth/logout-all` with any valid token, or change the password: a new
+`HABITA_PASSWORD_HASH` ends every session when the server restarts.
