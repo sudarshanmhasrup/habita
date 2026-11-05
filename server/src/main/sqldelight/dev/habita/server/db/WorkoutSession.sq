@@ -12,9 +12,6 @@ CREATE TABLE workout_session (
 
 CREATE INDEX workout_session_server_seq ON workout_session (server_seq);
 
-updatedAt:
-SELECT updated_at FROM workout_session WHERE id = ?;
-
 save:
 INSERT OR REPLACE INTO workout_session VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
@@ -24,5 +21,6 @@ SELECT * FROM workout_session WHERE id = ?;
 selectAll:
 SELECT * FROM workout_session ORDER BY started_at;
 
+-- Up to :limit changes after :since, oldest first.
 changedSince:
-SELECT * FROM workout_session WHERE server_seq > ? ORDER BY server_seq;
+SELECT * FROM workout_session WHERE server_seq > :since ORDER BY server_seq LIMIT :limit;

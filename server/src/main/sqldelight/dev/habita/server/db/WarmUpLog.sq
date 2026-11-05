@@ -11,8 +11,8 @@ CREATE TABLE warm_up_log (
 
 CREATE INDEX warm_up_log_server_seq ON warm_up_log (server_seq);
 
-updatedAt:
-SELECT updated_at FROM warm_up_log WHERE id = ?;
+selectById:
+SELECT * FROM warm_up_log WHERE id = ?;
 
 save:
 INSERT OR REPLACE INTO warm_up_log VALUES (?, ?, ?, ?, ?, ?, ?, ?);
@@ -20,5 +20,6 @@ INSERT OR REPLACE INTO warm_up_log VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 selectAll:
 SELECT * FROM warm_up_log ORDER BY completed_at;
 
+-- Up to :limit changes after :since, oldest first.
 changedSince:
-SELECT * FROM warm_up_log WHERE server_seq > ? ORDER BY server_seq;
+SELECT * FROM warm_up_log WHERE server_seq > :since ORDER BY server_seq LIMIT :limit;

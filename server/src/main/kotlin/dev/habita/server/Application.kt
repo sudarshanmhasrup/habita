@@ -15,6 +15,9 @@ import dev.habita.server.data.openDatabase
 import dev.habita.server.routes.exportRoutes
 import dev.habita.server.routes.gymRoutes
 import dev.habita.server.routes.syncRoutes
+import dev.habita.server.sync.SyncEngine
+import dev.habita.server.sync.gymTables
+import dev.habita.server.sync.recordTables
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
@@ -63,6 +66,8 @@ fun Application.module(config: ServerConfig, clock: () -> Long = System::current
     val (driver, database) = openDatabase(config.databasePath)
     monitor.subscribe(ApplicationStopped) { driver.close() }
     val store = Store(database)
+    val records = recordTables(database)
+    val sync = SyncEngine(database, gymTables(database) + records)
     val program = loadProgram(config.programPath, store, clock())
     environment.log.info("Loaded program version ${program.version} from ${config.programPath}")
     val fingerprint = passwordFingerprint(config.passwordHash)
@@ -112,8 +117,8 @@ fun Application.module(config: ServerConfig, clock: () -> Long = System::current
         authRoutes(config, store, clock)
         authenticate(SESSION_AUTH) {
             gymRoutes(program, store, clock)
-            syncRoutes(store)
-            exportRoutes(store, clock)
+            syncRoutes(sync, clock)
+            exportRoutes(store, records, clock)
         }
     }
 }

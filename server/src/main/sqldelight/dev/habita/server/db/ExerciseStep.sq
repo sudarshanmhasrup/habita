@@ -5,8 +5,10 @@ CREATE TABLE exercise_step (
     server_seq INTEGER NOT NULL
 );
 
-updatedAt:
-SELECT updated_at FROM exercise_step WHERE exercise_id = ?;
+CREATE INDEX exercise_step_server_seq ON exercise_step (server_seq);
+
+selectById:
+SELECT * FROM exercise_step WHERE exercise_id = ?;
 
 save:
 INSERT OR REPLACE INTO exercise_step VALUES (?, ?, ?, ?);
@@ -14,5 +16,6 @@ INSERT OR REPLACE INTO exercise_step VALUES (?, ?, ?, ?);
 selectAll:
 SELECT * FROM exercise_step;
 
+-- Up to :limit changes after :since, oldest first.
 changedSince:
-SELECT * FROM exercise_step WHERE server_seq > ? ORDER BY server_seq;
+SELECT * FROM exercise_step WHERE server_seq > :since ORDER BY server_seq LIMIT :limit;

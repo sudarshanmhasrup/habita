@@ -1,8 +1,8 @@
 package dev.habita.server.routes
 
-import dev.habita.app.shared.api.PushResponse
-import dev.habita.app.shared.api.SyncChanges
-import dev.habita.server.data.Store
+import dev.habita.app.shared.api.SyncPush
+import dev.habita.server.sync.SyncEngine
+import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -10,42 +10,26 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 
 /**
- * The app pushes its local changes, then pulls everything after the cursor it last saw. Pushing
- * the same records twice is harmless.
+ * The app pushes its local changes, then pulls everything after the cursor it last saw, page by
+ * page. Pushing the same records twice is harmless, and the server refuses bad records one by one
+ * instead of failing the whole push.
  */
-fun Route.syncRoutes(store: Store) {
+fun Route.syncRoutes(engine: SyncEngine, clock: () -> Long) {
     post("/sync/push") {
-        val changes = call.receive<SyncChanges>()
-        validate(changes)
-        call.respond(PushResponse(store.push(changes)))
+        val push = call.receive<SyncPush>()
+        if (push.collections.values.sumOf { it.size } > SyncEngine.MAX_PUSH) {
+            throw BadRequestException("Push at most ${SyncEngine.MAX_PUSH} records at once")
+        }
+        call.respond(engine.push(push, clock()))
     }
 
     get("/sync/pull") {
         val since = call.request.queryParameters["since"]?.let {
-            requireNotNull(it.toLongOrNull()) { "since must be a number" }
+            it.toLongOrNull() ?: throw BadRequestException("since must be a number")
         } ?: 0
-        call.respond(store.pull(since))
-    }
-}
-
-private fun validate(changes: SyncChanges) {
-    changes.sessions.forEach {
-        require(it.id.isNotBlank() && it.workoutId.isNotBlank()) { "Session ids must not be blank" }
-    }
-    changes.sets.forEach {
-        require(it.id.isNotBlank() && it.sessionId.isNotBlank() && it.exerciseId.isNotBlank()) {
-            "Set ids must not be blank"
-        }
-        require((it.setNumber > 0 || it.warmUp) && it.weightGrams >= 0 && it.target > 0 && (it.achieved ?: 0) >= 0) {
-            "Set ${it.id} has an invalid number"
-        }
-    }
-    changes.warmUps.forEach {
-        require(it.id.isNotBlank() && it.sessionId.isNotBlank() && it.position >= 0) {
-            "Warm-up ${it.id} is invalid"
-        }
-    }
-    changes.steps.forEach {
-        require(it.exerciseId.isNotBlank() && it.step > 0) { "Step for ${it.exerciseId} is invalid" }
+        val limit = call.request.queryParameters["limit"]?.let {
+            it.toIntOrNull()?.takeIf { limit -> limit > 0 } ?: throw BadRequestException("limit must be a positive number")
+        } ?: SyncEngine.MAX_PULL
+        call.respond(engine.pull(since, minOf(limit, SyncEngine.MAX_PULL)))
     }
 }

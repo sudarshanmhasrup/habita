@@ -25,29 +25,13 @@ data class ProgramResponse(
     val program: Program,
 )
 
-/**
- * A batch of records, used both to push local changes and to pull server changes.
- */
+/** Every gym record, as the gym's backup file and the server export hold them. */
 @Serializable
 data class SyncChanges(
     val sessions: List<WorkoutSession> = emptyList(),
     val sets: List<SetLog> = emptyList(),
     val warmUps: List<WarmUpLog> = emptyList(),
     val steps: List<ExerciseStep> = emptyList(),
-)
-
-/**
- * [cursor] is the server position to pass as `since` on the next pull.
- */
-@Serializable
-data class PushResponse(
-    val cursor: Long,
-)
-
-@Serializable
-data class PullResponse(
-    val cursor: Long,
-    val changes: SyncChanges,
 )
 
 @Serializable
@@ -68,9 +52,14 @@ data class ExportedProgram(
     val createdAt: Long,
 )
 
+/**
+ * Everything in one file. [changes] holds the gym; [records] every other synced collection, such
+ * as expenses, keyed by collection name.
+ */
 @Serializable
 data class Export(
     val exportedAt: Long,
     val programs: List<ExportedProgram>,
     val changes: SyncChanges,
+    val records: Map<String, List<SyncRecord>> = emptyMap(),
 )

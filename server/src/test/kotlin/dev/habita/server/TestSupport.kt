@@ -3,6 +3,9 @@ package dev.habita.server
 import dev.habita.app.shared.api.LoginRequest
 import dev.habita.app.shared.api.LoginResponse
 import dev.habita.app.shared.api.SyncChanges
+import dev.habita.app.shared.api.SyncPush
+import dev.habita.app.shared.api.SyncRecord
+import dev.habita.app.shared.api.toCollections
 import dev.habita.app.shared.gym.SetLog
 import dev.habita.app.shared.gym.WorkoutSession
 import dev.habita.server.auth.Passwords
@@ -60,11 +63,13 @@ suspend fun HttpClient.login(email: String = EMAIL, password: String = PASSWORD)
 
 suspend fun HttpClient.token(): String = login().body<LoginResponse>().token
 
-suspend fun HttpClient.push(token: String, changes: SyncChanges): HttpResponse =
+suspend fun HttpClient.push(token: String, changes: SyncChanges): HttpResponse = push(token, changes.toCollections())
+
+suspend fun HttpClient.push(token: String, collections: Map<String, List<SyncRecord>>): HttpResponse =
     post("/sync/push") {
         bearerAuth(token)
         contentType(ContentType.Application.Json)
-        setBody(changes)
+        setBody(SyncPush(collections))
     }
 
 fun session(id: String, workoutId: String, startedAt: Long, endedAt: Long? = startedAt + 60 * 60 * 1000) =
