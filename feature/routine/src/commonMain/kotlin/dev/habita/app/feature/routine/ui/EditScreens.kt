@@ -47,6 +47,7 @@ internal fun EditTaskScreen(
     onChange: (TaskDraft) -> Unit,
     onSave: () -> Unit,
     onDelete: () -> Unit,
+    onMove: (by: Int) -> Unit,
 ) {
     EditForm(
         title = if (draft.id == null) "Add task" else "Edit task",
@@ -56,6 +57,7 @@ internal fun EditTaskScreen(
         onBack = onBack,
         onSave = onSave,
         onDelete = onDelete,
+        onMove = onMove,
     ) { focus ->
         LabeledField(
             label = "Task",
@@ -91,6 +93,7 @@ internal fun EditGroupScreen(
     onChange: (GroupDraft) -> Unit,
     onSave: () -> Unit,
     onDelete: () -> Unit,
+    onMove: (by: Int) -> Unit,
 ) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
@@ -102,6 +105,7 @@ internal fun EditGroupScreen(
         onBack = onBack,
         onSave = onSave,
         onDelete = onDelete,
+        onMove = onMove,
     ) { focus ->
         LabeledField(
             label = "Name",
@@ -130,7 +134,10 @@ internal fun EditGroupScreen(
     }
 }
 
-/** The frame both forms share: title, fields, delete for an existing item, and Save at the bottom. */
+/**
+ * The frame both forms share: title, fields, then for an existing item buttons to move it and to
+ * delete it, and Save at the bottom. Moving takes effect straight away.
+ */
 @Composable
 private fun EditForm(
     title: String,
@@ -140,6 +147,7 @@ private fun EditForm(
     onBack: () -> Unit,
     onSave: () -> Unit,
     onDelete: () -> Unit,
+    onMove: (by: Int) -> Unit,
     fields: @Composable ColumnScope.(FocusRequester) -> Unit,
 ) {
     val colors = HabitaTheme.colors
@@ -161,6 +169,13 @@ private fun EditForm(
             fields(focus)
             if (!isNew) {
                 Gap(Space.section)
+                Overline("Order")
+                Gap(Space.item)
+                Row(horizontalArrangement = Arrangement.spacedBy(Space.item)) {
+                    SecondaryButton("Move up", { onMove(-1) }, Modifier.weight(1f))
+                    SecondaryButton("Move down", { onMove(1) }, Modifier.weight(1f))
+                }
+                Gap(Space.item)
                 SecondaryButton(
                     text = if (confirmDelete) "Tap again to delete" else deleteText,
                     onClick = { if (confirmDelete) onDelete() else confirmDelete = true },

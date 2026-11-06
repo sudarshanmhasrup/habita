@@ -40,25 +40,18 @@ internal class RoutineViewModel(private val repository: RoutineRepository, check
     private val _groupDraft = MutableStateFlow<GroupDraft?>(null)
     val groupDraft: StateFlow<GroupDraft?> = _groupDraft.asStateFlow()
 
-    private val _editing = MutableStateFlow(false)
-
-    /** Whether the list shows edit controls instead of ticks. */
-    val editing: StateFlow<Boolean> = _editing.asStateFlow()
-
     val checklist: StateFlow<Checklist?> = checklist.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    /** Every group in order, including the ones that are off today, for editing. */
-    val groups = repository.groups.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    // Kept up to date while the screen exists, since moving and deleting read them directly.
 
-    val tasks = repository.tasks.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /** Every group in order, including the ones that are off today. */
+    val groups = repository.groups.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private val tasks = repository.tasks.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     fun toggle(taskId: String, done: Boolean) {
         val day = checklist.value?.day ?: return
         viewModelScope.launch { repository.setDone(day.key, taskId, done) }
-    }
-
-    fun setEditing(editing: Boolean) {
-        _editing.value = editing
     }
 
     fun addTask(groupId: String) {
@@ -111,6 +104,7 @@ internal class RoutineViewModel(private val repository: RoutineRepository, check
 
     fun deleteTask(taskId: String) {
         viewModelScope.launch { repository.deleteTask(taskId) }
+        // From the list this does nothing; from the form it closes the form.
         back()
     }
 
@@ -134,11 +128,7 @@ internal class RoutineViewModel(private val repository: RoutineRepository, check
 
     /** Goes back one screen; `false` when already on the checklist. */
     fun back(): Boolean {
-        if (_route.value == RoutineRoute.Today) {
-            if (!_editing.value) return false
-            _editing.value = false
-            return true
-        }
+        if (_route.value == RoutineRoute.Today) return false
         _route.value = RoutineRoute.Today
         return true
     }

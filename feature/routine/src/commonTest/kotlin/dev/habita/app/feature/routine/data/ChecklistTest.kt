@@ -23,7 +23,8 @@ class ChecklistTest {
         assertEquals(listOf("morning", "office"), friday.groups.map { it.group.id })
         assertEquals(3, friday.total)
         assertEquals(listOf("morning"), saturday.groups.map { it.group.id })
-        assertEquals(listOf("office"), saturday.off.map { it.id })
+        assertEquals(listOf("office"), saturday.off.map { it.group.id })
+        assertEquals(listOf("o1"), saturday.off.single().adjustable.map { it.task.id })
         assertEquals(2, saturday.total)
     }
 
