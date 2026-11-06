@@ -60,6 +60,9 @@ enum class TargetReason {
 
     /** Long break since last time: same weight, no increase. */
     RETURN_AFTER_BREAK,
+
+    /** Over eight weeks off: about 20% lighter, to build back up safely. */
+    RETURN_AFTER_LONG_BREAK,
     ;
 
     /** Whether today's target is above last time's. */
@@ -85,6 +88,7 @@ data class ExerciseTarget(
  */
 object Progression {
     const val BREAK_MILLIS = 21L * 24 * 60 * 60 * 1000
+    const val LONG_BREAK_MILLIS = 56L * 24 * 60 * 60 * 1000
     const val STALL_SESSIONS = 3
 
     fun target(
@@ -111,6 +115,8 @@ object Progression {
             val lastTarget = maxOf(last.target, slot.target)
             val hitAll = last.hitAll(slot.sets, lastTarget)
             return when {
+                now - last.performedAt > LONG_BREAK_MILLIS ->
+                    result(0, maxOf(minOf(slot.target, lastTarget), lastTarget * 4 / 5), TargetReason.RETURN_AFTER_LONG_BREAK)
                 now - last.performedAt > BREAK_MILLIS -> result(0, lastTarget, TargetReason.RETURN_AFTER_BREAK)
                 hitAll && last.allFelt(Effort.EASY) -> result(0, lastTarget + step * 2, TargetReason.INCREASE_EASY)
                 hitAll && last.allFelt(Effort.HARD) -> result(0, lastTarget, TargetReason.HOLD_HARD)
@@ -121,6 +127,10 @@ object Progression {
         }
 
         val weight = last.workingWeight
+        if (now - last.performedAt > LONG_BREAK_MILLIS) {
+            // Two lighter-week drops: about 20%, rounded to whole steps.
+            return result(deload(deload(weight, step), step), slot.target, TargetReason.RETURN_AFTER_LONG_BREAK)
+        }
         if (now - last.performedAt > BREAK_MILLIS) {
             return result(weight, slot.target, TargetReason.RETURN_AFTER_BREAK)
         }

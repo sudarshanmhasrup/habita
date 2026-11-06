@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.theme.Space
+import dev.habita.app.core.ui.Chip
 import dev.habita.app.core.ui.Divider
 import dev.habita.app.core.ui.Gap
 import dev.habita.app.core.ui.HText
@@ -33,6 +34,7 @@ import dev.habita.app.core.ui.appear
 import dev.habita.app.feature.gym.data.TrendPoint
 import dev.habita.app.shared.gym.Body
 import dev.habita.app.shared.gym.BodyAdvice
+import dev.habita.app.shared.gym.BodyGoal
 import dev.habita.app.shared.gym.BodyLog
 import dev.habita.app.shared.gym.BodyTrend
 import kotlin.math.abs
@@ -50,6 +52,7 @@ internal fun BodyCard(
     onWeight: (Int) -> Unit,
     onWaist: (Int) -> Unit,
     onSetDay: (day: String, weightGrams: Int?, waistMm: Int?) -> Unit,
+    onGoal: (BodyGoal) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = HabitaTheme.colors
@@ -109,6 +112,14 @@ internal fun BodyCard(
         HText(title, type.bodyStrong)
         Gap(Space.tiny)
         HText(detail, type.caption, color = colors.muted)
+        Gap(Space.item)
+        HText("Goal", type.label)
+        Gap(Space.inside)
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.inside)) {
+            BodyGoal.entries.forEach { goal ->
+                Chip(goal.label(), selected = trend.goal == goal, onClick = { onGoal(goal) }, modifier = Modifier.weight(1f))
+            }
+        }
 
         Gap(Space.card)
         Divider()
@@ -144,6 +155,14 @@ internal fun BodyCard(
             }
         }
 
+        val notifications = rememberNotificationAccess()
+        if (notifications != null && !notifications.enabled) {
+            Gap(Space.inside)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HText("Sunday reminders are off.", type.caption, color = colors.muted, modifier = Modifier.weight(1f))
+                TextAction("Turn on", notifications.request)
+            }
+        }
         Gap(Space.card)
         Divider()
         Gap(Space.inside)
@@ -285,10 +304,16 @@ private fun adviceText(trend: BodyTrend): Pair<String, String> {
         BodyAdvice.NEED_MORE_DATA -> "Weigh in most mornings" to
             "Daily weight jumps around with water and food. Advice starts once there are two weeks with " +
             "at least ${Body.MIN_WEIGH_INS} weigh-ins each."
-        BodyAdvice.TOO_EARLY -> "Too early to change anything" to
-            "No drop this week yet. One week can be water. Keep eating the same and check again next week."
-        BodyAdvice.ON_TRACK -> "On track, keep eating the same" to
-            "Down $change kg this week. That's a pace that keeps your muscle."
+        BodyAdvice.TOO_EARLY -> "Too early to change anything" to when (trend.goal) {
+            BodyGoal.LOSE_FAT -> "No drop this week yet."
+            BodyGoal.MAINTAIN -> "That's a big move for one week."
+            BodyGoal.BUILD_MUSCLE -> "No gain this week yet."
+        } + " One week can be water. Keep eating the same and check again next week."
+        BodyAdvice.ON_TRACK -> "On track, keep eating the same" to when (trend.goal) {
+            BodyGoal.LOSE_FAT -> "Down $change kg this week. That's a pace that keeps your muscle."
+            BodyGoal.MAINTAIN -> "Your weight is holding steady."
+            BodyGoal.BUILD_MUSCLE -> "A slow, steady gain: mostly muscle, little fat."
+        }
         BodyAdvice.TOO_FAST -> "Losing fast: eat about 150 kcal a day more" to
             "Down $change kg in a week, over 1% of your weight. That fast, you start losing muscle too."
         BodyAdvice.STALLED -> "Stalled: eat about 150 kcal a day less" to
@@ -297,6 +322,14 @@ private fun adviceText(trend: BodyTrend): Pair<String, String> {
         BodyAdvice.RECOMP -> "Weight flat, waist down: keep going" to
             "Your waist is down ${formatOneDecimal((trend.waistChangeMm ?: 0) * 100)} cm in 4 weeks while the " +
             "scale stays put. That's fat going and muscle coming. Eat the same."
+        BodyAdvice.DRIFTING_UP -> "Creeping up: eat about 100 kcal a day less" to
+            "Over half a kilo up in two weeks. A small cut brings it back to steady."
+        BodyAdvice.DRIFTING_DOWN -> "Dropping: eat about 100 kcal a day more" to
+            "Over half a kilo down in two weeks. A little more food keeps it steady."
+        BodyAdvice.NOT_GAINING -> "Not gaining: eat about 150 kcal a day more" to
+            "Under 0.2 kg gained in two weeks. Muscle needs a small surplus. Change it, then give it two weeks."
+        BodyAdvice.GAINING_FAST -> "Gaining fast: eat about 150 kcal a day less" to
+            "Up $change kg in a week, over 0.5% of your weight. Most of that much is fat, not muscle."
     }
 }
 
@@ -317,4 +350,10 @@ private fun daysAgo(day: String): String = when (val days = (Body.epochDay(today
     0 -> "today"
     1 -> "yesterday"
     else -> "$days days ago"
+}
+
+private fun BodyGoal.label(): String = when (this) {
+    BodyGoal.LOSE_FAT -> "Lose fat"
+    BodyGoal.MAINTAIN -> "Maintain"
+    BodyGoal.BUILD_MUSCLE -> "Build"
 }

@@ -7,6 +7,7 @@ import dev.habita.app.feature.gym.db.Body_log
 import dev.habita.app.feature.gym.db.Check_in
 import dev.habita.app.feature.gym.db.Exercise_step
 import dev.habita.app.feature.gym.db.Exercise_swap
+import dev.habita.app.feature.gym.db.Gym_setting
 import dev.habita.app.feature.gym.db.GymDatabase
 import dev.habita.app.feature.gym.db.Set_log
 import dev.habita.app.feature.gym.db.Warm_up_log
@@ -20,6 +21,7 @@ import dev.habita.app.shared.gym.CheckIn
 import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.ExerciseStep
 import dev.habita.app.shared.gym.ExerciseSwap
+import dev.habita.app.shared.gym.GymSetting
 import dev.habita.app.shared.gym.SetLog
 import dev.habita.app.shared.gym.WarmUpLog
 import dev.habita.app.shared.gym.WarmUpStatus
@@ -42,6 +44,7 @@ class GymStore(private val database: GymDatabase) {
     internal val body = database.bodyLogQueries
     internal val swaps = database.exerciseSwapQueries
     internal val checkIns = database.checkInQueries
+    internal val settings = database.gymSettingQueries
     private val json = Json { ignoreUnknownKeys = true }
 
     fun <T> transaction(block: () -> T): T = database.transactionWithResult { block() }
@@ -126,6 +129,18 @@ class GymStore(private val database: GymDatabase) {
 
     internal fun saveSwap(swap: ExerciseSwap, dirty: Boolean) =
         swaps.save(swap.exerciseId, swap.replacementId, swap.updatedAt, swap.deleted.toLong(), dirty.toLong())
+
+    // Settings
+
+    val allSettings: Flow<Map<String, String>> =
+        settings.selectAll().asFlow().mapToList(Dispatchers.Default).map { rows -> rows.associate { it.key to it.value_ } }
+
+    fun settings(): List<GymSetting> = settings.selectAll().executeAsList().map { it.toModel() }
+
+    fun saveSetting(setting: GymSetting) = saveSetting(setting, dirty = true)
+
+    internal fun saveSetting(setting: GymSetting, dirty: Boolean) =
+        settings.save(setting.key, setting.value, setting.updatedAt, dirty.toLong())
 
     // Check-ins
 
@@ -273,5 +288,7 @@ internal fun Body_log.toModel() = BodyLog(
 internal fun Exercise_swap.toModel() = ExerciseSwap(exercise_id, replacement_id, updated_at, deleted == 1L)
 
 internal fun Check_in.toModel() = CheckIn(id, at, updated_at, deleted == 1L)
+
+internal fun Gym_setting.toModel() = GymSetting(key, value_, updated_at)
 
 private fun Exercise_step.toModel() = ExerciseStep(exercise_id, step.toInt(), updated_at)

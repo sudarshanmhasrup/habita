@@ -159,4 +159,27 @@ class ProgressionTest {
         assertEquals(45 * KG, Progression.deload(50 * KG, 5 * KG))
         assertEquals(0, Progression.deload(2 * KG, 5 * KG))
     }
+
+    @Test
+    fun `over eight weeks off comes back about 20 percent lighter`() {
+        val target = bench(performance("s1", now - 60 * DAY, 40 * KG, 12, 12, 12, 12))
+
+        assertEquals(TargetReason.RETURN_AFTER_LONG_BREAK, target.reason)
+        assertEquals(32 * KG, target.weightGrams)
+        assertEquals(12, target.target)
+    }
+
+    @Test
+    fun `a long break cuts a timed hold too, but not below the plan`() {
+        val longHold = Progression.target(
+            plank, plankSlot, step = 5, history = listOf(performance("s1", now - 60 * DAY, 0, 60, 60, 60, 60)), now = now,
+        )
+        val shortHold = Progression.target(
+            plank, plankSlot, step = 5, history = listOf(performance("s1", now - 60 * DAY, 0, 30, 30, 30, 30)), now = now,
+        )
+
+        assertEquals(TargetReason.RETURN_AFTER_LONG_BREAK, longHold.reason)
+        assertEquals(48, longHold.target)
+        assertEquals(30, shortHold.target)
+    }
 }

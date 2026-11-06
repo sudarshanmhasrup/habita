@@ -107,4 +107,6 @@ internal fun ExerciseTarget.reasonText(exercise: Exercise, step: Int): String = 
     TargetReason.DROP_BACK -> "Reps fell too low after the last jump, so it's back to the previous weight."
     TargetReason.DELOAD -> "No progress for 3 sessions. About 10% lighter, then build back up."
     TargetReason.RETURN_AFTER_BREAK -> "Over 3 weeks since last time. Same as before, no increase."
+    TargetReason.RETURN_AFTER_LONG_BREAK ->
+        if (exercise.isWeighted) "Over 8 weeks off. About 20% lighter, then build back up." else "Over 8 weeks off. A bit less than before, then build back up."
 }

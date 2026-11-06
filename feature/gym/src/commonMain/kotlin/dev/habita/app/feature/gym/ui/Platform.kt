@@ -24,3 +24,13 @@ internal expect fun rememberTextCopier(): (String) -> Unit
  */
 @Composable
 internal expect fun rememberFileOpener(onResult: (String?) -> Unit): () -> Unit
+
+/** Whether the app may show notifications, and a way to ask. */
+internal class NotificationAccess(val enabled: Boolean, val request: () -> Unit)
+
+/**
+ * Notification access for the Sunday reminder, rechecked when the app comes back. `null` where the
+ * gym has nothing to ask: iOS asks once at launch, and desktop has no reminder.
+ */
+@Composable
+internal expect fun rememberNotificationAccess(): NotificationAccess?

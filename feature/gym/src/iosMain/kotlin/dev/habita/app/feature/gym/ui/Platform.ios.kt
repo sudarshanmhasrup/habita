@@ -109,3 +109,7 @@ private class FileOpenerDelegate : NSObject(), UIDocumentPickerDelegateProtocol 
         onResult(null)
     }
 }
+
+/** iOS asks once at launch, when the reminders are queued. */
+@Composable
+internal actual fun rememberNotificationAccess(): NotificationAccess? = null

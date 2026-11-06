@@ -14,6 +14,22 @@ data class Program(
     fun exercise(id: String): Exercise? = exercises.firstOrNull { it.id == id }
 
     fun workout(id: String): Workout? = workouts.firstOrNull { it.id == id }
+
+    /**
+     * This plan plus every exercise that [older] plans had and this one dropped. History is stored
+     * by exercise id, so a dropped exercise must stay known or its history would disappear from
+     * summaries, progress and check-ins. Kept exercises are in no workout; the newest definition
+     * of each wins, and alternatives that no longer exist are dropped.
+     */
+    fun keepingRetired(older: List<Program>): Program {
+        val known = exercises.map { it.id }.toMutableSet()
+        val retired = older.flatMap { it.exercises }.filter { known.add(it.id) }
+        val all = (exercises + retired).map { it.id }.toSet()
+        return copy(exercises = exercises + retired.map { exercise -> exercise.copy(alternatives = exercise.alternatives.filter { it in all }) })
+    }
+
+    /** Whether [exerciseId] is done in any workout of this plan. */
+    fun inUse(exerciseId: String): Boolean = workouts.any { workout -> workout.exercises.any { it.exerciseId == exerciseId } }
 }
 
 @Serializable

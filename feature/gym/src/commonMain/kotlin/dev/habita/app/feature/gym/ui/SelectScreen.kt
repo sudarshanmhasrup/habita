@@ -44,6 +44,7 @@ import dev.habita.app.core.ui.TwoPane
 import dev.habita.app.core.sync.SyncState
 import dev.habita.app.feature.gym.data.CheckInStatus
 import dev.habita.app.feature.gym.workout.ActiveWorkout
+import dev.habita.app.shared.gym.BodyGoal
 import dev.habita.app.shared.gym.Program
 import dev.habita.app.shared.gym.Workout
 import dev.habita.app.shared.gym.WorkoutSession
@@ -63,11 +64,13 @@ internal fun SelectScreen(
     onRetry: () -> Unit,
     onBackup: () -> Unit,
     onRestore: () -> Unit,
+    onProgress: () -> Unit,
     backupMessage: String?,
     onWeight: (Int) -> Unit,
     onWaist: (Int) -> Unit,
     onNewGym: () -> Unit,
     onSetBody: (day: String, weightGrams: Int?, waistMm: Int?) -> Unit,
+    onGoal: (BodyGoal) -> Unit,
     checkIn: CheckInStatus?,
     onCopyCheckIn: () -> Unit,
     checkInMessage: String?,
@@ -112,7 +115,7 @@ internal fun SelectScreen(
                 CheckInCard(checkIn, onCopyCheckIn, checkInMessage)
             }
             Gap(Space.item)
-            BodyCard(data.body, data.bodyLogs, data.day, onWeight, onWaist, onSetBody)
+            BodyCard(data.body, data.bodyLogs, data.day, onWeight, onWaist, onSetBody, onGoal)
             if (wide) {
                 Gap(Space.section)
                 StorageNote(data, onBackup, onRestore, backupMessage, checkIn, onCopyCheckIn, checkInMessage)
@@ -124,6 +127,8 @@ internal fun SelectScreen(
             Overline("All workouts")
             Gap(Space.item)
             DayCards(program, onOpenWorkout)
+            Gap(Space.item)
+            SecondaryButton("See your progress", onProgress, Modifier.fillMaxWidth())
             if (data.swaps.isNotEmpty()) {
                 Gap(Space.item)
                 SwapsCard(program, data.swaps) { asking = Ask.NEW_GYM }

@@ -18,5 +18,11 @@ fun loadProgram(path: String, store: Store, now: Long): LoadedProgram {
     check(file.exists()) { "Program file not found: ${file.toAbsolutePath()}" }
     val content = file.readText()
     val program = ProgramParser.parse(content)
-    return LoadedProgram(store.programVersion(sha256(content), content, now), program)
+    val version = store.programVersion(sha256(content), content, now)
+    // Earlier plans, newest first, so an exercise dropped from the file keeps its history visible.
+    val older = store.programs()
+        .filter { it.version != version }
+        .sortedByDescending { it.version }
+        .mapNotNull { runCatching { ProgramParser.parse(it.content) }.getOrNull() }
+    return LoadedProgram(version, program.keepingRetired(older))
 }

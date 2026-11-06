@@ -40,3 +40,7 @@ internal actual fun rememberFileOpener(onResult: (String?) -> Unit): () -> Unit 
     val name = dialog.file
     onResult(if (directory == null || name == null) null else runCatching { File(directory, name).readText() }.getOrNull())
 }
+
+/** Desktop has no Sunday reminder to allow. */
+@Composable
+internal actual fun rememberNotificationAccess(): NotificationAccess? = null

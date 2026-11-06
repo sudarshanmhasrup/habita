@@ -146,4 +146,29 @@ class BodyTest {
         assertEquals(listOf("2026-11-15", "2026-11-22"), Body.waistReminderDays(logs, "2026-11-07", 2))
         assertEquals(listOf("2026-11-08", "2026-11-15"), Body.waistReminderDays(emptyList(), "2026-11-08", 2))
     }
+
+    private fun advice(goal: BodyGoal, vararg kg: Double) = Body.trend(weeks(*kg), today, goal).advice
+
+    @Test
+    fun `maintaining holds steady within half a kilo`() {
+        assertEquals(BodyAdvice.ON_TRACK, advice(BodyGoal.MAINTAIN, 78.3, 78.0, 78.0))
+        assertEquals(BodyAdvice.DRIFTING_UP, advice(BodyGoal.MAINTAIN, 78.6, 78.3, 78.0))
+        assertEquals(BodyAdvice.DRIFTING_DOWN, advice(BodyGoal.MAINTAIN, 77.4, 77.7, 78.0))
+        // Losing fast is fine to flag only when cutting; maintaining just sees a drift.
+        assertEquals(BodyAdvice.TOO_EARLY, advice(BodyGoal.MAINTAIN, 77.0, 78.0))
+    }
+
+    @Test
+    fun `building muscle wants a slow steady gain`() {
+        assertEquals(BodyAdvice.ON_TRACK, advice(BodyGoal.BUILD_MUSCLE, 78.4, 78.2, 78.0))
+        assertEquals(BodyAdvice.NOT_GAINING, advice(BodyGoal.BUILD_MUSCLE, 78.1, 78.0, 78.0))
+        assertEquals(BodyAdvice.GAINING_FAST, advice(BodyGoal.BUILD_MUSCLE, 78.6, 78.0))
+        assertEquals(BodyAdvice.TOO_EARLY, advice(BodyGoal.BUILD_MUSCLE, 78.0, 78.0))
+    }
+
+    @Test
+    fun `the goal travels with the trend`() {
+        assertEquals(BodyGoal.MAINTAIN, Body.trend(emptyList(), today, BodyGoal.MAINTAIN).goal)
+        assertEquals(BodyAdvice.NEED_MORE_DATA, advice(BodyGoal.BUILD_MUSCLE, 78.0))
+    }
 }

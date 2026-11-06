@@ -20,6 +20,7 @@ import dev.habita.app.feature.gym.data.GymRepository
 import dev.habita.app.feature.gym.ui.GymRoute
 import dev.habita.app.feature.gym.ui.GymViewModel
 import dev.habita.app.feature.gym.ui.PreStartScreen
+import dev.habita.app.feature.gym.ui.ProgressScreen
 import dev.habita.app.feature.gym.ui.SelectScreen
 import dev.habita.app.feature.gym.ui.SummaryScreen
 import dev.habita.app.feature.gym.ui.WorkoutScreen
@@ -131,6 +132,7 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
     }
     val preStartTargets by viewModel.preStartTargets.collectAsStateWithLifecycle()
     val report by viewModel.report.collectAsStateWithLifecycle()
+    val progress by viewModel.progress.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var backupMessage by remember { mutableStateOf<String?>(null) }
     val openFile = rememberFileOpener { text ->
@@ -180,6 +182,7 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
                     onDiscard = viewModel::discard,
                     onRetry = viewModel::retrySync,
                     onRestore = openFile,
+                    onProgress = viewModel::openProgress,
                     onBackup = {
                         scope.launch { saveFile("habita-backup-${backupDate(nowMillis())}.json", viewModel.backup()) }
                     },
@@ -188,6 +191,7 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
                     onWaist = viewModel::logWaist,
                     onNewGym = viewModel::newGym,
                     onSetBody = viewModel::setBody,
+                    onGoal = viewModel::setGoal,
                     checkIn = checkIn,
                     onCopyCheckIn = {
                         scope.launch {
@@ -213,6 +217,8 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
                 }
 
                 is GymRoute.Summary -> SummaryScreen(report = report, onDone = { viewModel.back() })
+
+                GymRoute.Progress -> ProgressScreen(progress, onBack = { viewModel.back() })
             }
         }
     }

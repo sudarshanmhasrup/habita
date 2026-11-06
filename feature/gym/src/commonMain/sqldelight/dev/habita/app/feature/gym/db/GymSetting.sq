@@ -1,0 +1,25 @@
+-- Gym choices that sync, by key, such as the diet goal.
+CREATE TABLE gym_setting (
+    key TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    dirty INTEGER NOT NULL
+);
+
+selectAll:
+SELECT * FROM gym_setting;
+
+selectDirty:
+SELECT * FROM gym_setting WHERE dirty = 1;
+
+selectByKey:
+SELECT * FROM gym_setting WHERE key = ?;
+
+save:
+INSERT OR REPLACE INTO gym_setting VALUES (?, ?, ?, ?);
+
+markClean:
+UPDATE gym_setting SET dirty = 0 WHERE key = ? AND updated_at = ?;
+
+markAllDirty:
+UPDATE gym_setting SET dirty = 1;

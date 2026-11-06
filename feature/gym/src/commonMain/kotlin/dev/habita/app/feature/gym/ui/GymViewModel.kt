@@ -10,12 +10,14 @@ import dev.habita.app.core.sync.SyncState
 import dev.habita.app.feature.gym.workout.ActiveWorkout
 import dev.habita.app.feature.gym.workout.Phase
 import dev.habita.app.shared.gym.Body
+import dev.habita.app.shared.gym.BodyGoal
 import dev.habita.app.shared.gym.BodyLog
 import dev.habita.app.shared.gym.BodyTrend
 import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.ExerciseTarget
 import dev.habita.app.shared.gym.Program
 import dev.habita.app.shared.gym.Rotation
+import dev.habita.app.shared.gym.Progress as ProgressReport
 import dev.habita.app.shared.gym.Swaps
 import dev.habita.app.shared.gym.WarmUpStatus
 import dev.habita.app.shared.gym.Workout
@@ -31,6 +33,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -41,12 +45,15 @@ internal sealed interface GymRoute {
     val depth: Int
         get() = when (this) {
             Select -> 0
+            Progress -> 1
             is PreStart -> 1
             Workout -> 2
             is Summary -> 3
         }
 
     data object Select : GymRoute
+
+    data object Progress : GymRoute
 
     data class PreStart(val workoutId: String) : GymRoute
 
@@ -95,7 +102,10 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
         repository.body,
         repository.swaps,
         currentDay,
-    ) { data, body, swaps, day -> data.copy(body = Body.trend(body, day), swaps = swaps, day = day, bodyLogs = body) }
+        repository.goal,
+    ) { data, body, swaps, day, goal ->
+        data.copy(body = Body.trend(body, day, goal), swaps = swaps, day = day, bodyLogs = body)
+    }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Targets for the pre-start screen, refreshed when synced history or a swap arrives. */
@@ -120,6 +130,24 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
 
     /** The check-in text for an AI chat; getting it counts as a check-in. */
     suspend fun checkInText(): String? = repository.checkInText(today(), ::backupDate)
+
+    /** The progress screen's data, worked out only while it is open. */
+    val progress: StateFlow<ProgressData?> = _route
+        .flatMapLatest { route ->
+            if (route != GymRoute.Progress) {
+                flowOf(null)
+            } else {
+                combine(repository.program, repository.sessions, repository.sets, repository.body, currentDay) { program, sessions, sets, body, day ->
+                    val plan = program?.program ?: return@combine null
+                    ProgressData(ProgressReport.exercises(plan, sessions, sets), ProgressReport.bodyWeeks(body, day))
+                }.flowOn(Dispatchers.Default)
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    fun openProgress() {
+        _route.value = GymRoute.Progress
+    }
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
@@ -199,6 +227,8 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
 
     /** Saves this morning's weight. */
     fun logWeight(grams: Int) = act { repository.logWeight(today(), grams) }
+
+    fun setGoal(goal: BodyGoal) = act { repository.setGoal(goal) }
 
     /** Fixes or fills in [day]; both `null` deletes it. */
     fun setBody(day: String, weightGrams: Int?, waistMm: Int?) = act { repository.setBody(day, weightGrams, waistMm) }
