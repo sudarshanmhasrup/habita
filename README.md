@@ -63,6 +63,18 @@ How each set felt adjusts this:
 The step size defaults per exercise in the plan and can be changed in the app, for example after
 switching gyms. Weights are in kg; dumbbell exercises record the weight of one dumbbell.
 
+### Bodyweight
+
+The gym screen takes a morning weigh-in and, about once a week, a waist measurement. It averages
+each week (a week needs at least 3 weigh-ins) and says what to change, relative to what you eat
+now, so the app never needs a calorie target:
+
+- Fewer than two weeks of weigh-ins: no advice yet.
+- Losing, at up to 1% of your weight a week: keep eating the same.
+- Losing more than 1% a week: eat about 150 kcal a day more, to keep muscle.
+- Less than 0.2 kg lost in two weeks: eat about 150 kcal a day less, or walk more. If the waist
+  went down at least 0.5 cm over four weeks meanwhile, that's recomposition, so keep going.
+
 ## The workout plan
 
 The plan lives in [program/PROGRAM.md](program/PROGRAM.md): every exercise, warm-up and workout,

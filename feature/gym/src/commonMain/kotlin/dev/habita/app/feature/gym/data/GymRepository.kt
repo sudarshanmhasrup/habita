@@ -9,6 +9,7 @@ import dev.habita.app.feature.gym.workout.WorkoutEngine
 import dev.habita.app.shared.api.Export
 import dev.habita.app.shared.api.ExportedProgram
 import dev.habita.app.shared.api.ProgramResponse
+import dev.habita.app.shared.gym.BodyLog
 import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.ExerciseStep
 import dev.habita.app.shared.gym.ExerciseTarget
@@ -60,6 +61,23 @@ class GymRepository(core: Core) {
     val sessions: Flow<List<WorkoutSession>> = store.allSessions
     val steps: Flow<Map<String, Int>> = store.allSteps
     val active: Flow<ActiveWorkout?> = store.active
+    val body: Flow<List<BodyLog>> = store.allBody
+
+    /** Saves today's weight, keeping a waist already logged today. */
+    suspend fun logWeight(day: String, grams: Int) = write {
+        store.transaction {
+            val today = store.bodyLog(day)
+            store.saveBody(BodyLog(day, grams, today?.waistMm.takeIf { today?.deleted == false }, nowMillis()))
+        }
+    }
+
+    /** Saves today's waist, keeping a weight already logged today. */
+    suspend fun logWaist(day: String, mm: Int) = write {
+        store.transaction {
+            val today = store.bodyLog(day)
+            store.saveBody(BodyLog(day, today?.weightGrams.takeIf { today?.deleted == false }, mm, nowMillis()))
+        }
+    }
 
     /** Today's targets for every exercise in [workoutId], or `null` without a program. */
     suspend fun targets(workoutId: String): List<ExerciseTarget>? = withContext(Dispatchers.Default) {
@@ -198,6 +216,7 @@ class GymRepository(core: Core) {
                 ),
             ),
             changes = store.everything(),
+            records = sync.records.associate { it.collection to it.everything() }.filterValues { it.isNotEmpty() },
         )
         backupJson.encodeToString(export)
     }

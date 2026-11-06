@@ -12,6 +12,7 @@ import kotlinx.serialization.json.jsonObject
  * it to other devices. A new feature with no server logic only needs its name added here.
  */
 fun recordTables(database: HabitaDatabase): List<RecordTable> = listOf(
+    SyncCollections.GYM_BODY,
     SyncCollections.EXPENSES,
     SyncCollections.EXPENSE_CATEGORIES,
     SyncCollections.EXPENSE_SETTINGS,

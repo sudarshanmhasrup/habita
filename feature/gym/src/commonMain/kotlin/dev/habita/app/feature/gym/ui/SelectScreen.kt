@@ -62,6 +62,8 @@ internal fun SelectScreen(
     onRetry: () -> Unit,
     onBackup: () -> Unit,
     backupMessage: String?,
+    onWeight: (Int) -> Unit,
+    onWaist: (Int) -> Unit,
 ) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
@@ -96,6 +98,8 @@ internal fun SelectScreen(
                     UpNextCard(program, workout, lastDone(data.sessions, workout.id, now)) { onOpenWorkout(workout.id) }
                 }
             }
+            Gap(Space.item)
+            BodyCard(data.body, onWeight, onWaist)
             if (wide) {
                 Gap(Space.section)
                 StorageNote(data, onBackup, backupMessage)

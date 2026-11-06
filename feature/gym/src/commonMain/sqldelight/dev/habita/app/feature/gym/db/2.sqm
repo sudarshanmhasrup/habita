@@ -1,0 +1,9 @@
+-- Version 3: the bodyweight and waist log.
+CREATE TABLE body_log (
+    day TEXT NOT NULL PRIMARY KEY,
+    weight_grams INTEGER,
+    waist_mm INTEGER,
+    updated_at INTEGER NOT NULL,
+    deleted INTEGER NOT NULL,
+    dirty INTEGER NOT NULL
+);
