@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -133,7 +134,7 @@ fun HabitaScreen(
                     ),
                 )
             }
-            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .windowInsetsPadding(WindowInsets.safeDrawing.union(LocalTitleBarInsets.current))
             .imePadding(),
         contentAlignment = Alignment.TopCenter,
     ) {
@@ -146,6 +147,12 @@ fun HabitaScreen(
         }
     }
 }
+
+/**
+ * Room for a window title bar the app draws under, such as the macOS traffic lights on desktop.
+ * The background still fills it; only the content is pushed clear. Zero on phones.
+ */
+val LocalTitleBarInsets = staticCompositionLocalOf { WindowInsets(0) }
 
 /** Screens at least this wide, such as tablets and desktop windows, lay out in two panes. */
 val WideLayoutMinWidth = 760.dp
