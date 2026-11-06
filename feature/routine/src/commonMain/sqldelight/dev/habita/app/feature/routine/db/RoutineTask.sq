@@ -1,0 +1,35 @@
+-- One task in a group. An adjustable task can move around the day; the rest are fixed. Removed
+-- tasks are kept, deleted, so the removal syncs. Built-in tasks start at updated_at 0 and clean,
+-- like the groups.
+CREATE TABLE routine_task (
+    id TEXT NOT NULL PRIMARY KEY,
+    group_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    adjustable INTEGER NOT NULL,
+    position INTEGER NOT NULL,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL DEFAULT 0,
+    dirty INTEGER NOT NULL DEFAULT 0
+);
+
+active:
+SELECT * FROM routine_task WHERE deleted = 0 ORDER BY position, id;
+
+byId:
+SELECT * FROM routine_task WHERE id = ?;
+
+save:
+INSERT OR REPLACE INTO routine_task (id, group_id, title, adjustable, position, deleted, updated_at, dirty)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+nextPosition:
+SELECT COALESCE(MAX(position), -1) + 1 FROM routine_task WHERE group_id = ?;
+
+selectDirty:
+SELECT * FROM routine_task WHERE dirty = 1;
+
+markClean:
+UPDATE routine_task SET dirty = 0 WHERE id = ? AND updated_at = ?;
+
+markAllDirty:
+UPDATE routine_task SET dirty = 1;

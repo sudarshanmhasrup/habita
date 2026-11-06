@@ -1,0 +1,38 @@
+-- A block of the day, such as Morning, and the weekdays it shows on as bits: Monday is 1, Sunday
+-- is 64. Removed groups are kept, deleted, so the removal reaches every device. updated_at and
+-- dirty drive syncing. The built-in groups start at updated_at 0 and clean, so any real edit, on
+-- any device, wins over them.
+CREATE TABLE routine_group (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    days INTEGER NOT NULL,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL DEFAULT 0,
+    dirty INTEGER NOT NULL DEFAULT 0
+);
+
+active:
+SELECT * FROM routine_group WHERE deleted = 0 ORDER BY position, id;
+
+count:
+SELECT COUNT(*) FROM routine_group;
+
+byId:
+SELECT * FROM routine_group WHERE id = ?;
+
+save:
+INSERT OR REPLACE INTO routine_group (id, name, position, days, deleted, updated_at, dirty)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+nextPosition:
+SELECT COALESCE(MAX(position), -1) + 1 FROM routine_group;
+
+selectDirty:
+SELECT * FROM routine_group WHERE dirty = 1;
+
+markClean:
+UPDATE routine_group SET dirty = 0 WHERE id = ? AND updated_at = ?;
+
+markAllDirty:
+UPDATE routine_group SET dirty = 1;

@@ -40,6 +40,7 @@ core-version = "1.0.0"
 feature-auth-group = "dev.habita.app.feature.auth"
 feature-gym-group = "dev.habita.app.feature.gym"
 feature-expense-group = "dev.habita.app.feature.expense"
+feature-routine-group = "dev.habita.app.feature.routine"
 feature-version = "1.0.0"
 
 # shared module's configuration information

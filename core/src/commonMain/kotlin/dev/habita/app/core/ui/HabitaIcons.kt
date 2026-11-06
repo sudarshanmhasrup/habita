@@ -12,6 +12,8 @@ import androidx.compose.ui.unit.dp
 object HabitaIcons {
     val ChevronLeft = icon("ChevronLeft", "M15 6l-6 6 6 6")
     val ChevronRight = icon("ChevronRight", "M9 6l6 6-6 6")
+    val ChevronUp = icon("ChevronUp", "M6 15l6-6 6 6")
+    val ChevronDown = icon("ChevronDown", "M6 9l6 6 6-6")
     val Plus = icon("Plus", "M12 5v14M5 12h14")
     val Minus = icon("Minus", "M5 12h14")
     val Dumbbell = icon("Dumbbell", "M3 10v4M6.5 7v10M17.5 7v10M21 10v4M6.5 12h11")

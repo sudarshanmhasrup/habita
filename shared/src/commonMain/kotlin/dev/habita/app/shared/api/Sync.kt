@@ -37,6 +37,9 @@ object SyncCollections {
     const val EXPENSES = "expense.expenses"
     const val EXPENSE_CATEGORIES = "expense.categories"
     const val EXPENSE_SETTINGS = "expense.settings"
+    const val ROUTINE_GROUPS = "routine.groups"
+    const val ROUTINE_TASKS = "routine.tasks"
+    const val ROUTINE_CHECKS = "routine.checks"
     const val APP_PREFERENCES = "app.preferences"
 }
 

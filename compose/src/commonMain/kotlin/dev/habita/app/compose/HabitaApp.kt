@@ -7,6 +7,7 @@ import dev.habita.app.core.update.AppInstaller
 import dev.habita.app.core.update.AppUpdates
 import dev.habita.app.feature.expense.ExpenseFeature
 import dev.habita.app.feature.gym.GymFeature
+import dev.habita.app.feature.routine.RoutineFeature
 
 /**
  * The app's object graph. Each platform entry point creates one and keeps it for the life of the
@@ -16,6 +17,7 @@ class HabitaApp(config: AppConfig, databases: DatabaseFactory, installer: AppIns
     val core = Core(config, databases)
     val gym = GymFeature(core)
     val expense = ExpenseFeature(core)
+    val routine = RoutineFeature(core)
 
     /** Updates from the Habita server, where the platform can install them (Android). */
     val updates: AppUpdates? = installer?.let { AppUpdates(core, it) }

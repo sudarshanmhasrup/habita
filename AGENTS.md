@@ -11,9 +11,10 @@ Run what CI runs before saying a change is done. Build output goes to `.build/`,
 
 ```sh
 ./gradlew :shared:jvmTest :server:test :core:desktopTest :feature:gym:desktopTest \
-    :feature:expense:desktopTest :android:assembleDebug
+    :feature:expense:desktopTest :feature:routine:desktopTest :android:assembleDebug
 ./gradlew :server:verifySqlDelightMigration :core:verifySqlDelightMigration \
-    :feature:gym:verifySqlDelightMigration :feature:expense:verifySqlDelightMigration
+    :feature:gym:verifySqlDelightMigration :feature:expense:verifySqlDelightMigration \
+    :feature:routine:verifySqlDelightMigration
 ```
 
 iOS (Mac only): `./gradlew :compose:linkDebugFrameworkIosSimulatorArm64`, then build

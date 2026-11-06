@@ -45,10 +45,12 @@ import dev.habita.app.core.ui.appear
 import dev.habita.app.feature.expense.ExpenseToday
 import dev.habita.app.feature.expense.data.formatRupees
 import dev.habita.app.feature.gym.GymToday
+import dev.habita.app.feature.routine.RoutineToday
 
 /**
- * The only screen: the date, a greeting and today at a glance. The gym card starts today's
- * workout in one tap; the expense card shows what's left this month and adds a payment.
+ * The only screen: the date, a greeting and today at a glance. The routine card ticks the next
+ * task of the day, the gym card starts today's workout in one tap, and the expense card shows
+ * what's left this month and adds a payment.
  */
 @Composable
 internal fun HomeScreen(
@@ -58,12 +60,15 @@ internal fun HomeScreen(
     accent: Accent,
     gym: GymToday?,
     expense: ExpenseToday?,
+    routine: RoutineToday?,
     update: UpdateState,
     onInstallUpdate: () -> Unit,
     onDarkTheme: (Boolean) -> Unit,
     onAccent: (Accent) -> Unit,
     onStartWorkout: (workoutId: String) -> Unit,
     onOpenGym: () -> Unit,
+    onOpenRoutine: () -> Unit,
+    onRoutineDone: (taskId: String) -> Unit,
     onOpenExpense: () -> Unit,
     onAddExpense: () -> Unit,
 ) {
@@ -102,12 +107,16 @@ internal fun HomeScreen(
                     UpdateCard(update, onInstallUpdate, Modifier.appear(0))
                     Gap(Space.item)
                 }
+                if (routine != null) {
+                    RoutineCard(routine, onOpenRoutine, onRoutineDone, Modifier.appear(1))
+                    Gap(Space.item)
+                }
                 if (gym != null) {
-                    GymCard(gym, onStartWorkout, onOpenGym, Modifier.appear(1))
+                    GymCard(gym, onStartWorkout, onOpenGym, Modifier.appear(2))
                     Gap(Space.item)
                 }
                 if (expense != null) {
-                    ExpenseCard(expense, onOpenExpense, onAddExpense, Modifier.appear(2))
+                    ExpenseCard(expense, onOpenExpense, onAddExpense, Modifier.appear(3))
                 }
                 Gap(Space.card)
             },
@@ -156,6 +165,35 @@ private fun UpdateCard(update: UpdateState, onInstall: () -> Unit, modifier: Mod
             is UpdateState.Downloading -> ProgressBar(update.progress, height = 6.dp)
             is UpdateState.Installing -> Unit
             else -> PrimaryButton(if (update is UpdateState.Failed) "Try again" else "Install", onInstall, Modifier.fillMaxWidth())
+        }
+    }
+}
+
+/** Today's routine: how much is done, the next task, and a button that ticks it. */
+@Composable
+private fun RoutineCard(routine: RoutineToday, onOpen: () -> Unit, onDone: (String) -> Unit, modifier: Modifier) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
+    HabitaCard(modifier.fillMaxWidth(), onClick = onOpen) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Overline(routine.nextGroup?.let { "Routine · $it" } ?: "Routine", Modifier.weight(1f), color = colors.accent)
+            HText("${routine.done} of ${routine.total}", type.caption, color = colors.muted)
+        }
+        Gap(Space.inside)
+        HText(routine.nextTask ?: "All done for today", type.headline)
+        Gap(2.dp)
+        HText(if (routine.nextTask != null) "Up next" else "It starts again at midnight.", type.body, color = colors.muted)
+        Gap(Space.item)
+        ProgressBar(if (routine.total > 0) routine.done.toFloat() / routine.total else 0f, height = 6.dp)
+        Gap(Space.card)
+        val next = routine.nextTaskId
+        if (next != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.inside)) {
+                SecondaryButton("See all", onOpen, Modifier.weight(1f))
+                PrimaryButton("Done", { onDone(next) }, Modifier.weight(1f))
+            }
+        } else {
+            SecondaryButton("See the list", onOpen, Modifier.fillMaxWidth())
         }
     }
 }
