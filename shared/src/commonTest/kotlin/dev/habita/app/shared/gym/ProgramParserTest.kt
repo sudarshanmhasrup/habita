@@ -142,4 +142,53 @@ class ProgramParserTest {
             ProgramParser.parse(valid.replace("- Rotation: 1", "- Rotation: fallback"))
         }
     }
+
+    private val withAlternatives = valid.replace(
+        "## Warm-ups",
+        """
+        ## Alternatives
+
+        | Exercise | Alternatives |
+        |----------|--------------|
+        | bench    | row, plank   |
+
+        ## Warm-ups
+        """.trimIndent(),
+    )
+
+    @Test
+    fun `reads alternatives in order`() {
+        val program = ProgramParser.parse(withAlternatives)
+
+        assertEquals(listOf("row", "plank"), program.exercise("bench")!!.alternatives)
+        assertEquals(emptyList(), program.exercise("row")!!.alternatives)
+    }
+
+    @Test
+    fun `a program without alternatives still parses`() {
+        assertTrue(ProgramParser.parse(valid).exercises.all { it.alternatives.isEmpty() })
+    }
+
+    @Test
+    fun `rejects an unknown alternative with the line number`() {
+        val error = assertFailsWith<ProgramFormatException> {
+            ProgramParser.parse(withAlternatives.replace("| bench    | row, plank   |", "| bench    | row, squat   |"))
+        }
+        assertTrue("Unknown alternative \"squat\"" in error.message!!)
+        assertEquals(17, error.line)
+    }
+
+    @Test
+    fun `rejects an exercise as its own alternative`() {
+        assertFailsWith<ProgramFormatException> {
+            ProgramParser.parse(withAlternatives.replace("| bench    | row, plank   |", "| bench    | bench        |"))
+        }
+    }
+
+    @Test
+    fun `rejects the same exercise listed twice`() {
+        assertFailsWith<ProgramFormatException> {
+            ProgramParser.parse(withAlternatives.replace("| bench    | row, plank   |", "| bench    | row          |\n| bench    | plank        |"))
+        }
+    }
 }

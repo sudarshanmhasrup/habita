@@ -13,6 +13,7 @@ import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.ExerciseTarget
 import dev.habita.app.shared.gym.Program
 import dev.habita.app.shared.gym.Rotation
+import dev.habita.app.shared.gym.Swaps
 import dev.habita.app.shared.gym.WarmUpStatus
 import dev.habita.app.shared.gym.Workout
 import dev.habita.app.shared.gym.WorkoutSession
@@ -60,7 +61,13 @@ internal data class GymData(
     /** Whether the app logs in and syncs; without it everything stays on the phone. */
     val syncEnabled: Boolean,
     val body: BodyTrend = Body.trend(emptyList(), today()),
+    /** Exercises swapped at this gym, by the planned exercise they replace. */
+    val swaps: Map<String, String> = emptyMap(),
 ) {
+    /** [id] as it will be done here: the plan's workout with this gym's swaps. */
+    fun workout(id: String): Workout? =
+        program?.let { plan -> plan.workout(id)?.let { Swaps.apply(it, plan, swaps) } }
+
     /** The next workout in the rotation. */
     val suggested: Workout? = program?.let { Rotation.next(it, sessions) }
 
@@ -79,16 +86,17 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
             GymData(program?.program, sessions, steps, active, sync, repository.syncEnabled)
         },
         repository.body,
-    ) { data, body -> data.copy(body = Body.trend(body, today())) }
+        repository.swaps,
+    ) { data, body, swaps -> data.copy(body = Body.trend(body, today()), swaps = swaps) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    /** Targets for the pre-start screen, refreshed when synced history arrives. */
+    /** Targets for the pre-start screen, refreshed when synced history or a swap arrives. */
     val preStartTargets: StateFlow<List<ExerciseTarget>?> = _route
         .flatMapLatest { route ->
             if (route !is GymRoute.PreStart) {
                 flowOf(null)
             } else {
-                combine(repository.program, repository.sessions, repository.steps) { _, _, _ -> }
+                combine(repository.program, repository.sessions, repository.steps, repository.swaps) { _, _, _, _ -> }
                     .mapLatest { repository.targets(route.workoutId) }
             }
         }
@@ -178,6 +186,11 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
 
     /** Saves today's waist measurement. */
     fun logWaist(mm: Int) = act { repository.logWaist(today(), mm) }
+
+    /** Does [exerciseId] as [replacementId] at this gym, or as planned again for `null`. */
+    fun swap(exerciseId: String, replacementId: String?) = act { repository.swap(exerciseId, replacementId) }
+
+    fun newGym() = act { repository.newGym() }
 
     fun exerciseMachineTaken() = act { repository.exerciseMachineTaken() }
 

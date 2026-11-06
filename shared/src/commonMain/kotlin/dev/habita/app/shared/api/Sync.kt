@@ -35,6 +35,7 @@ object SyncCollections {
     const val GYM_WARM_UPS = "gym.warmUps"
     const val GYM_STEPS = "gym.steps"
     const val GYM_BODY = "gym.body"
+    const val GYM_SWAPS = "gym.swaps"
     const val EXPENSES = "expense.expenses"
     const val EXPENSE_CATEGORIES = "expense.categories"
     const val EXPENSE_SETTINGS = "expense.settings"

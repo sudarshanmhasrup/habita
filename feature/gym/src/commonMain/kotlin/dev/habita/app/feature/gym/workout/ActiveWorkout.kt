@@ -60,6 +60,8 @@ data class ActiveWorkout(
     /** Slots whose warm-up set is done or skipped. */
     val warmUpSetsDone: Set<Int> = emptySet(),
     val rest: Rest? = null,
+    /** The planned exercise id of each slot swapped for an alternative at this gym. */
+    val originals: Map<Int, String> = emptyMap(),
 ) {
     val isFinished: Boolean get() = phase == Phase.MAIN && exerciseQueue.isEmpty()
 
@@ -70,6 +72,17 @@ data class ActiveWorkout(
     val nextSlot: Int? get() = exerciseQueue.getOrNull(1)
 
     fun slot(index: Int): WorkoutExercise = workout.exercises[index]
+
+    /** The workout as the plan has it, before swaps. */
+    val planned: Workout
+        get() = workout.copy(
+            exercises = workout.exercises.mapIndexed { index, slot ->
+                originals[index]?.let { slot.copy(exerciseId = it) } ?: slot
+            },
+        )
+
+    /** Whether [slot] can still be swapped: none of its working sets are logged yet. */
+    fun canSwap(slot: Int): Boolean = setsLogged[slot] == 0
 
     /** The set number about to be done in [slot], starting at 1. */
     fun setNumber(slot: Int): Int = setsLogged[slot] + 1

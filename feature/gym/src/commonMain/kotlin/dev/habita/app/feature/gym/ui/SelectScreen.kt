@@ -64,6 +64,7 @@ internal fun SelectScreen(
     backupMessage: String?,
     onWeight: (Int) -> Unit,
     onWaist: (Int) -> Unit,
+    onNewGym: () -> Unit,
 ) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
@@ -111,6 +112,10 @@ internal fun SelectScreen(
             Overline("All workouts")
             Gap(Space.item)
             DayCards(program, onOpenWorkout)
+            if (data.swaps.isNotEmpty()) {
+                Gap(Space.item)
+                SwapsCard(program, data.swaps, onNewGym)
+            }
             if (!wide) {
                 Gap(Space.section)
                 StorageNote(data, onBackup, backupMessage)
@@ -296,6 +301,34 @@ private fun DayCards(program: Program, onOpenWorkout: (String) -> Unit) {
                 }
             }
         }
+    }
+}
+
+/** The exercises swapped at this gym, and a way to start fresh at a new one. */
+@Composable
+private fun SwapsCard(program: Program, swaps: Map<String, String>, onNewGym: () -> Unit) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
+    var confirm by remember(swaps) { mutableStateOf(false) }
+    HabitaCard(Modifier.fillMaxWidth().appear(5)) {
+        HText("Swapped at this gym", type.title)
+        Gap(Space.inside)
+        Column(verticalArrangement = Arrangement.spacedBy(Space.tiny)) {
+            swaps.forEach { (planned, replacement) ->
+                HText(
+                    "${program.exercise(planned)?.name ?: planned} → ${program.exercise(replacement)?.name ?: replacement}",
+                    type.caption,
+                    color = colors.muted,
+                )
+            }
+        }
+        Gap(Space.card)
+        SecondaryButton(
+            text = if (confirm) "Tap to confirm" else "New gym: back to the plan",
+            onClick = { if (confirm) onNewGym() else confirm = true },
+            modifier = Modifier.fillMaxWidth(),
+            color = if (confirm) colors.error else colors.text,
+        )
     }
 }
 

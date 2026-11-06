@@ -14,36 +14,89 @@ refuses to start if it is malformed, with the line number of the problem.
 - Target is reps, or seconds when the measure is `seconds`. Rest is in seconds.
 - Rotation sets the suggestion order. A `fallback` workout is never suggested and does not move the
   rotation.
+- Alternatives list exercise ids, separated by commas. An exercise can be listed as an alternative
+  without being in any workout.
 
 ## Exercises
 
-| Id                               | Name                             | Equipment  | Measure | Per side | Step |
-|----------------------------------|----------------------------------|------------|---------|----------|------|
-| dumbbell-bench-press             | Dumbbell Bench Press             | dumbbell   | reps    | no       | 2    |
-| seated-cable-row                 | Seated Cable Row                 | cable      | reps    | no       | 5    |
-| lat-pulldown                     | Lat Pulldown                     | cable      | reps    | no       | 5    |
-| dumbbell-lateral-raise           | Dumbbell Lateral Raise           | dumbbell   | reps    | no       | 2    |
-| reverse-pec-deck                 | Reverse Pec Deck                 | machine    | reps    | no       | 5    |
-| biceps-curl                      | Biceps Curl                      | dumbbell   | reps    | no       | 2    |
-| cable-triceps-pushdown           | Cable Triceps Pushdown           | cable      | reps    | no       | 2.5  |
-| leg-press                        | Leg Press                        | machine    | reps    | no       | 5    |
-| hip-thrust                       | Hip Thrust                       | machine    | reps    | no       | 5    |
-| hamstring-curl                   | Hamstring Curl                   | machine    | reps    | no       | 5    |
-| leg-extension                    | Leg Extension                    | machine    | reps    | no       | 5    |
-| cable-crunch                     | Cable Crunch                     | cable      | reps    | no       | 5    |
-| dumbbell-standing-calf-raise     | Dumbbell Standing Calf Raise     | dumbbell   | reps    | no       | 2    |
-| incline-dumbbell-press           | Incline Dumbbell Press           | dumbbell   | reps    | no       | 2    |
-| seated-dumbbell-shoulder-press   | Seated Dumbbell Shoulder Press   | dumbbell   | reps    | no       | 2    |
-| one-arm-dumbbell-row             | One-Arm Dumbbell Row             | dumbbell   | reps    | yes      | 2    |
-| pec-deck-fly                     | Pec Deck Fly                     | machine    | reps    | no       | 5    |
-| cable-lateral-raise              | Cable Lateral Raise              | cable      | reps    | no       | 2.5  |
-| incline-dumbbell-curl            | Incline Dumbbell Curl            | dumbbell   | reps    | no       | 2    |
-| overhead-cable-triceps-extension | Overhead Cable Triceps Extension | cable      | reps    | no       | 2.5  |
-| goblet-squat                     | Goblet Squat                     | dumbbell   | reps    | no       | 2    |
-| dumbbell-step-up                 | Dumbbell Step-Up (bench)         | dumbbell   | reps    | yes      | 2    |
-| cable-pull-through               | Cable Pull-Through               | cable      | reps    | no       | 5    |
-| dumbbell-seated-calf-raise       | Dumbbell Seated Calf Raise       | dumbbell   | reps    | no       | 2    |
-| plank                            | Plank                            | bodyweight | seconds | no       | 5    |
+| Id                                  | Name                                | Equipment  | Measure | Per side | Step |
+|-------------------------------------|-------------------------------------|------------|---------|----------|------|
+| dumbbell-bench-press                | Dumbbell Bench Press                | dumbbell   | reps    | no       | 2    |
+| seated-cable-row                    | Seated Cable Row                    | cable      | reps    | no       | 5    |
+| lat-pulldown                        | Lat Pulldown                        | cable      | reps    | no       | 5    |
+| dumbbell-lateral-raise              | Dumbbell Lateral Raise              | dumbbell   | reps    | no       | 2    |
+| reverse-pec-deck                    | Reverse Pec Deck                    | machine    | reps    | no       | 5    |
+| biceps-curl                         | Biceps Curl                         | dumbbell   | reps    | no       | 2    |
+| cable-triceps-pushdown              | Cable Triceps Pushdown              | cable      | reps    | no       | 2.5  |
+| leg-press                           | Leg Press                           | machine    | reps    | no       | 5    |
+| hip-thrust                          | Hip Thrust                          | machine    | reps    | no       | 5    |
+| hamstring-curl                      | Hamstring Curl                      | machine    | reps    | no       | 5    |
+| leg-extension                       | Leg Extension                       | machine    | reps    | no       | 5    |
+| cable-crunch                        | Cable Crunch                        | cable      | reps    | no       | 5    |
+| dumbbell-standing-calf-raise        | Dumbbell Standing Calf Raise        | dumbbell   | reps    | no       | 2    |
+| incline-dumbbell-press              | Incline Dumbbell Press              | dumbbell   | reps    | no       | 2    |
+| seated-dumbbell-shoulder-press      | Seated Dumbbell Shoulder Press      | dumbbell   | reps    | no       | 2    |
+| one-arm-dumbbell-row                | One-Arm Dumbbell Row                | dumbbell   | reps    | yes      | 2    |
+| pec-deck-fly                        | Pec Deck Fly                        | machine    | reps    | no       | 5    |
+| cable-lateral-raise                 | Cable Lateral Raise                 | cable      | reps    | no       | 2.5  |
+| incline-dumbbell-curl               | Incline Dumbbell Curl               | dumbbell   | reps    | no       | 2    |
+| overhead-cable-triceps-extension    | Overhead Cable Triceps Extension    | cable      | reps    | no       | 2.5  |
+| goblet-squat                        | Goblet Squat                        | dumbbell   | reps    | no       | 2    |
+| dumbbell-step-up                    | Dumbbell Step-Up (bench)            | dumbbell   | reps    | yes      | 2    |
+| cable-pull-through                  | Cable Pull-Through                  | cable      | reps    | no       | 5    |
+| dumbbell-seated-calf-raise          | Dumbbell Seated Calf Raise          | dumbbell   | reps    | no       | 2    |
+| plank                               | Plank                               | bodyweight | seconds | no       | 5    |
+| machine-chest-press                 | Machine Chest Press                 | machine    | reps    | no       | 5    |
+| incline-machine-press               | Incline Machine Press               | machine    | reps    | no       | 5    |
+| dumbbell-fly                        | Dumbbell Fly                        | dumbbell   | reps    | no       | 2    |
+| cable-fly                           | Cable Fly                           | cable      | reps    | no       | 2.5  |
+| machine-row                         | Machine Row                         | machine    | reps    | no       | 5    |
+| chest-supported-dumbbell-row        | Chest-Supported Dumbbell Row        | dumbbell   | reps    | no       | 2    |
+| dumbbell-pullover                   | Dumbbell Pullover                   | dumbbell   | reps    | no       | 2    |
+| machine-shoulder-press              | Machine Shoulder Press              | machine    | reps    | no       | 5    |
+| dumbbell-rear-delt-fly              | Dumbbell Rear Delt Fly              | dumbbell   | reps    | no       | 2    |
+| face-pull                           | Face Pull                           | cable      | reps    | no       | 2.5  |
+| cable-curl                          | Cable Curl                          | cable      | reps    | no       | 2.5  |
+| overhead-dumbbell-triceps-extension | Overhead Dumbbell Triceps Extension | dumbbell   | reps    | no       | 2    |
+| hack-squat                          | Hack Squat                          | machine    | reps    | no       | 5    |
+| dumbbell-split-squat                | Dumbbell Split Squat                | dumbbell   | reps    | yes      | 2    |
+| dumbbell-romanian-deadlift          | Dumbbell Romanian Deadlift          | dumbbell   | reps    | no       | 2    |
+| dumbbell-hip-thrust                 | Dumbbell Hip Thrust                 | dumbbell   | reps    | no       | 2    |
+| machine-calf-raise                  | Machine Calf Raise                  | machine    | reps    | no       | 5    |
+| hanging-knee-raise                  | Hanging Knee Raise                  | bodyweight | reps    | no       | 1    |
+
+## Alternatives
+
+What to do instead when a gym doesn't have the equipment, best first. In the app, "Not at this gym"
+swaps an exercise for one of these until it's undone or a new gym clears every swap. Each
+alternative is an exercise of its own, with its own history and weights.
+
+| Exercise                         | Alternatives                                                          |
+|----------------------------------|-----------------------------------------------------------------------|
+| dumbbell-bench-press             | machine-chest-press, dumbbell-fly                                     |
+| seated-cable-row                 | machine-row, chest-supported-dumbbell-row                             |
+| lat-pulldown                     | dumbbell-pullover, one-arm-dumbbell-row                               |
+| dumbbell-lateral-raise           | cable-lateral-raise                                                   |
+| reverse-pec-deck                 | dumbbell-rear-delt-fly, face-pull                                     |
+| biceps-curl                      | cable-curl, incline-dumbbell-curl                                     |
+| cable-triceps-pushdown           | overhead-dumbbell-triceps-extension, overhead-cable-triceps-extension |
+| leg-press                        | hack-squat, goblet-squat                                              |
+| hip-thrust                       | dumbbell-hip-thrust, cable-pull-through                               |
+| hamstring-curl                   | dumbbell-romanian-deadlift                                            |
+| leg-extension                    | dumbbell-split-squat                                                  |
+| cable-crunch                     | hanging-knee-raise                                                    |
+| dumbbell-standing-calf-raise     | machine-calf-raise, dumbbell-seated-calf-raise                        |
+| incline-dumbbell-press           | incline-machine-press, machine-chest-press                            |
+| seated-dumbbell-shoulder-press   | machine-shoulder-press                                                |
+| one-arm-dumbbell-row             | chest-supported-dumbbell-row, machine-row                             |
+| pec-deck-fly                     | cable-fly, dumbbell-fly                                               |
+| cable-lateral-raise              | dumbbell-lateral-raise                                                |
+| incline-dumbbell-curl            | biceps-curl, cable-curl                                               |
+| overhead-cable-triceps-extension | overhead-dumbbell-triceps-extension, cable-triceps-pushdown           |
+| goblet-squat                     | leg-press, hack-squat                                                 |
+| dumbbell-step-up                 | dumbbell-split-squat                                                  |
+| cable-pull-through               | dumbbell-romanian-deadlift, dumbbell-hip-thrust                       |
+| dumbbell-seated-calf-raise       | machine-calf-raise, dumbbell-standing-calf-raise                      |
 
 ## Warm-ups
 

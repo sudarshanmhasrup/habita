@@ -6,6 +6,7 @@ import dev.habita.app.shared.api.SyncCollections
 import dev.habita.app.shared.api.SyncJson
 import dev.habita.app.shared.api.SyncRecord
 import dev.habita.app.shared.gym.BodyLog
+import dev.habita.app.shared.gym.ExerciseSwap
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.jsonObject
 
@@ -26,6 +27,19 @@ internal fun gymRecordTables(store: GymStore): List<GymRecordTable<*>> = listOf(
         save = { log, dirty -> store.saveBody(log, dirty) },
         cleanRow = { id, updatedAt -> store.body.markClean(id, updatedAt) },
         dirtyAll = { store.body.markAllDirty() },
+        transaction = { block -> store.transaction(block) },
+    ),
+    GymRecordTable(
+        collection = SyncCollections.GYM_SWAPS,
+        serializer = ExerciseSwap.serializer(),
+        envelope = { Triple(it.exerciseId, it.updatedAt, it.deleted) },
+        fromEnvelope = { swap, record -> swap.copy(exerciseId = record.id, updatedAt = record.updatedAt, deleted = record.deleted) },
+        all = { store.swaps() },
+        dirtyRows = { store.swaps.selectDirty().executeAsList().map { it.toModel() } },
+        byId = { id -> store.swaps.selectById(id).executeAsOneOrNull()?.let { it.toModel() to (it.dirty == 1L) } },
+        save = { swap, dirty -> store.saveSwap(swap, dirty) },
+        cleanRow = { id, updatedAt -> store.swaps.markClean(id, updatedAt) },
+        dirtyAll = { store.swaps.markAllDirty() },
         transaction = { block -> store.transaction(block) },
     ),
 )
