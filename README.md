@@ -84,6 +84,7 @@ data as one JSON file, ready to review yourself or with an AI before you change 
 | `core`           | App-wide pieces: theme, UI components, settings, server client, sync   |
 | `feature/auth`   | The login screen                                                       |
 | `feature/gym`    | The gym flow and its local database                                    |
+| `feature/routine` | The daily routine checklist, reset every midnight, and its database   |
 | `shared`         | Code for every platform and the server: models, progression, summaries |
 | `server`         | Ktor server: login, sync, targets, summaries and export                |
 | `program`        | The workout plan                                                       |

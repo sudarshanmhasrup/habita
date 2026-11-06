@@ -1,0 +1,58 @@
+package dev.habita.app.feature.routine.data
+
+import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
+import dev.habita.app.feature.routine.db.RoutineDatabase
+import dev.habita.app.shared.api.SyncCollections
+import kotlin.test.Test
+import kotlin.test.assertEquals
+
+class RoutineSyncTest {
+    private fun database() = RoutineDatabase(JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).also { RoutineDatabase.Schema.create(it) })
+
+    private fun RoutineDatabase.table(collection: String) = routineSyncTables(this).single { it.collection == collection }
+
+    @Test
+    fun `a task from another device is saved as synced and reads back the same`() {
+        val sender = database()
+        sender.routineTaskQueries.save("t1", "office", "Clean shoes", 0, 2, 0, 1_000, 1)
+        val record = sender.table(SyncCollections.ROUTINE_TASKS).dirty().single()
+        val receiver = database()
+        val table = receiver.table(SyncCollections.ROUTINE_TASKS)
+
+        table.applyRemote(listOf(record))
+
+        assertEquals(record, table.local("t1")!!.record)
+        assertEquals(false, table.local("t1")!!.dirty)
+        assertEquals(emptyList(), table.dirty())
+    }
+
+    @Test
+    fun `a deleted group arrives deleted and drops out of the list`() {
+        val sender = database()
+        sender.routineGroupQueries.save("office", "Office", 1, Days.WEEKDAYS.toLong(), 1, 2_000, 1)
+        val record = sender.table(SyncCollections.ROUTINE_GROUPS).dirty().single()
+        val receiver = database()
+        receiver.routineGroupQueries.save("office", "Office", 1, Days.WEEKDAYS.toLong(), 0, 0, 0)
+
+        receiver.table(SyncCollections.ROUTINE_GROUPS).applyRemote(listOf(record))
+
+        assertEquals(true, record.deleted)
+        assertEquals(emptyList(), receiver.routineGroupQueries.active().executeAsList())
+    }
+
+    @Test
+    fun `a tick from another device counts as done today and an untick clears it`() {
+        val sender = database()
+        sender.routineCheckQueries.save("2026-11-06/t1", "2026-11-06", "t1", 1, 1_000, 1)
+        val tick = sender.table(SyncCollections.ROUTINE_CHECKS).dirty().single()
+        val receiver = database()
+        val table = receiver.table(SyncCollections.ROUTINE_CHECKS)
+
+        table.applyRemote(listOf(tick))
+        assertEquals(listOf("t1"), receiver.routineCheckQueries.doneOn("2026-11-06").executeAsList())
+
+        sender.routineCheckQueries.save("2026-11-06/t1", "2026-11-06", "t1", 0, 2_000, 1)
+        table.applyRemote(sender.table(SyncCollections.ROUTINE_CHECKS).dirty())
+        assertEquals(emptyList(), receiver.routineCheckQueries.doneOn("2026-11-06").executeAsList())
+    }
+}

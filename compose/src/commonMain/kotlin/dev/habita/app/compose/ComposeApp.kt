@@ -4,18 +4,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.update.UpdateState
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.StateFlow
 import dev.habita.app.core.ui.HabitaScreen
 import dev.habita.app.core.ui.ScreenTransition
 import dev.habita.app.feature.auth.LoginScreen
 import dev.habita.app.feature.expense.ExpenseScreen
 import dev.habita.app.feature.gym.GymScreen
+import dev.habita.app.feature.routine.RoutineScreen
 
 /**
  * The app: the login screen without a token (when login is on), otherwise home and the features
@@ -31,8 +34,10 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
     val update by (app.updates?.state ?: noUpdates).collectAsStateWithLifecycle()
     val gymToday by app.gym.today.collectAsStateWithLifecycle(null)
     val expenseToday by app.expense.today.collectAsStateWithLifecycle(null)
+    val routineToday by app.routine.today.collectAsStateWithLifecycle(null)
     val expenseRequest by app.expense.openRequest.collectAsStateWithLifecycle()
     var screen by rememberSaveable { mutableStateOf(Screen.Home) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(darkTheme) { onDarkThemeChange(darkTheme) }
     val loggedOut = token == null && app.core.config.loginEnabled
@@ -56,6 +61,7 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
                         accent = accent,
                         gym = gymToday,
                         expense = expenseToday,
+                        routine = routineToday,
                         update = update,
                         onInstallUpdate = { app.updates?.install() },
                         onDarkTheme = settings::setDarkTheme,
@@ -65,6 +71,8 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
                             screen = Screen.Gym
                         },
                         onOpenGym = { screen = Screen.Gym },
+                        onOpenRoutine = { screen = Screen.Routine },
+                        onRoutineDone = { taskId -> scope.launch { app.routine.markDone(taskId) } },
                         onOpenExpense = { screen = Screen.Expense },
                         onAddExpense = {
                             app.expense.requestAdd()
@@ -74,12 +82,13 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
                 }
                 Screen.Gym -> GymScreen(app.gym, onExit = { screen = Screen.Home })
                 Screen.Expense -> ExpenseScreen(app.expense, onExit = { screen = Screen.Home })
+                Screen.Routine -> RoutineScreen(app.routine, onExit = { screen = Screen.Home })
             }
         }
     }
 }
 
-private enum class Screen { Home, Gym, Expense }
+private enum class Screen { Home, Gym, Expense, Routine }
 
 /** Platforms without an installer (iOS, desktop) never have an update to show. */
 private val noUpdates: StateFlow<UpdateState> = MutableStateFlow(UpdateState.None)

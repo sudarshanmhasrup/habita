@@ -1,0 +1,144 @@
+package dev.habita.app.feature.routine.data
+
+import app.cash.sqldelight.coroutines.asFlow
+import app.cash.sqldelight.coroutines.mapToList
+import dev.habita.app.core.Core
+import dev.habita.app.core.data.newId
+import dev.habita.app.core.data.nowMillis
+import dev.habita.app.feature.routine.db.RoutineDatabase
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
+
+/**
+ * The routine's groups and tasks, and which tasks were done on each day, kept on the device and
+ * synced when the server is reachable. Every change records its time, marks the record dirty and
+ * asks for a sync.
+ */
+internal class RoutineRepository(core: Core) {
+    private val sync = core.sync
+    private val database = RoutineDatabase(core.databases.open("routine.db", RoutineDatabase.Schema))
+    private val groupQueries = database.routineGroupQueries
+    private val taskQueries = database.routineTaskQueries
+    private val checkQueries = database.routineCheckQueries
+
+    init {
+        // A new install starts with the built-in routine. It counts as never edited (time 0, not
+        // dirty), so the routine as edited on another device wins once it syncs.
+        database.transaction {
+            if (groupQueries.count().executeAsOne() == 0L) {
+                Defaults.groups.forEach { groupQueries.save(it.id, it.name, it.position, it.days.toLong(), 0, 0, 0) }
+                Defaults.tasks.forEach { taskQueries.save(it.id, it.groupId, it.title, if (it.adjustable) 1 else 0, it.position, 0, 0, 0) }
+            }
+        }
+        routineSyncTables(database).forEach(sync::register)
+    }
+
+    val groups: Flow<List<RoutineGroup>> = groupQueries.active { id, name, position, days, _, _, _ ->
+        RoutineGroup(id, name, position, days.toInt())
+    }.asFlow().mapToList(Dispatchers.Default)
+
+    val tasks: Flow<List<RoutineTask>> = taskQueries.active { id, groupId, title, adjustable, position, _, _, _ ->
+        RoutineTask(id, groupId, title, adjustable == 1L, position)
+    }.asFlow().mapToList(Dispatchers.Default)
+
+    /** The ids of the tasks done on [day]. */
+    fun doneOn(day: String): Flow<Set<String>> = checkQueries.doneOn(day).asFlow().mapToList(Dispatchers.Default).map { it.toSet() }
+
+    suspend fun setDone(day: String, taskId: String, done: Boolean) = change {
+        checkQueries.save("$day/$taskId", day, taskId, if (done) 1 else 0, nowMillis(), 1)
+    }
+
+    /** Saves a new task ([RoutineTask.id] blank) at the end of its group, or an edited one. */
+    suspend fun saveTask(task: RoutineTask) = change {
+        database.transaction {
+            val old = task.id.takeIf { it.isNotBlank() }?.let { taskQueries.byId(it).executeAsOneOrNull() }
+            // A new task, or one moved to another group, goes to the end of its group.
+            val position = if (old == null || old.group_id != task.groupId) {
+                taskQueries.nextPosition(task.groupId).executeAsOne() ?: 0
+            } else {
+                old.position
+            }
+            writeTask(task.copy(id = old?.id ?: newId(), title = task.title.trim(), position = position))
+        }
+    }
+
+    suspend fun deleteTask(taskId: String) = change {
+        taskQueries.byId(taskId).executeAsOneOrNull()?.let {
+            taskQueries.save(it.id, it.group_id, it.title, it.adjustable, it.position, 1, nowMillis(), 1)
+        }
+    }
+
+    /** Moves a task one place up ([by] -1) or down ([by] 1) within its group. */
+    suspend fun moveTask(task: RoutineTask, siblings: List<RoutineTask>, by: Int) = change {
+        database.transaction {
+            reorder(siblings.map { it.id to it.position }, task.id, by) { id, position ->
+                siblings.first { it.id == id }.let { writeTask(it.copy(position = position)) }
+            }
+        }
+    }
+
+    /** Saves a new group ([RoutineGroup.id] blank) at the end, or an edited one. */
+    suspend fun saveGroup(group: RoutineGroup) = change {
+        database.transaction {
+            val old = group.id.takeIf { it.isNotBlank() }?.let { groupQueries.byId(it).executeAsOneOrNull() }
+            val position = old?.position ?: groupQueries.nextPosition().executeAsOne() ?: 0
+            writeGroup(group.copy(id = old?.id ?: newId(), name = group.name.trim(), position = position))
+        }
+    }
+
+    /** Deletes a group and every task in it. */
+    suspend fun deleteGroup(group: RoutineGroup, tasks: List<RoutineTask>) = change {
+        database.transaction {
+            val now = nowMillis()
+            groupQueries.save(group.id, group.name, group.position, group.days.toLong(), 1, now, 1)
+            tasks.filter { it.groupId == group.id }.forEach {
+                taskQueries.save(it.id, it.groupId, it.title, if (it.adjustable) 1 else 0, it.position, 1, now, 1)
+            }
+        }
+    }
+
+    suspend fun moveGroup(group: RoutineGroup, groups: List<RoutineGroup>, by: Int) = change {
+        database.transaction {
+            reorder(groups.map { it.id to it.position }, group.id, by) { id, position ->
+                groups.first { it.id == id }.let { writeGroup(it.copy(position = position)) }
+            }
+        }
+    }
+
+    private fun writeTask(task: RoutineTask) {
+        taskQueries.save(task.id, task.groupId, task.title, if (task.adjustable) 1 else 0, task.position, 0, nowMillis(), 1)
+    }
+
+    private fun writeGroup(group: RoutineGroup) {
+        groupQueries.save(group.id, group.name, group.position, group.days.toLong(), 0, nowMillis(), 1)
+    }
+
+    private suspend fun <T> io(block: () -> T): T = withContext(Dispatchers.Default) { block() }
+
+    /** A local edit: saved now, synced soon. */
+    private suspend fun change(block: () -> Unit) {
+        io(block)
+        sync.request()
+    }
+}
+
+/**
+ * Moves [id] by [by] places in [items] (id and position, in display order) and numbers them 0, 1,
+ * 2, ... again. Only the ones whose position changed are written, so a move touches as few
+ * records as it can.
+ */
+internal fun reorder(items: List<Pair<String, Long>>, id: String, by: Int, write: (id: String, position: Long) -> Unit) {
+    val positions = items.toMap()
+    reordered(items.map { it.first }, id, by).forEachIndexed { index, each ->
+        if (positions[each] != index.toLong()) write(each, index.toLong())
+    }
+}
+
+internal fun reordered(ids: List<String>, id: String, by: Int): List<String> {
+    val from = ids.indexOf(id)
+    if (from < 0) return ids
+    val to = (from + by).coerceIn(0, ids.lastIndex)
+    return ids.toMutableList().apply { add(to, removeAt(from)) }
+}

@@ -1,0 +1,31 @@
+-- Whether a task was done on a day ("2026-11-06", in the device's time zone). The id is
+-- "day/task", so ticks on two devices land on the same record. Unticking keeps the row with
+-- done 0, so the change syncs.
+CREATE TABLE routine_check (
+    id TEXT NOT NULL PRIMARY KEY,
+    day TEXT NOT NULL,
+    task_id TEXT NOT NULL,
+    done INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    dirty INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX routine_check_day ON routine_check(day);
+
+doneOn:
+SELECT task_id FROM routine_check WHERE day = ? AND done = 1;
+
+byId:
+SELECT * FROM routine_check WHERE id = ?;
+
+save:
+INSERT OR REPLACE INTO routine_check (id, day, task_id, done, updated_at, dirty) VALUES (?, ?, ?, ?, ?, ?);
+
+selectDirty:
+SELECT * FROM routine_check WHERE dirty = 1;
+
+markClean:
+UPDATE routine_check SET dirty = 0 WHERE id = ? AND updated_at = ?;
+
+markAllDirty:
+UPDATE routine_check SET dirty = 1;

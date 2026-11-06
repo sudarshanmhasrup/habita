@@ -75,6 +75,7 @@ kotlin {
             implementation(projects.feature.auth)
             implementation(projects.feature.gym)
             api(projects.feature.expense)
+            implementation(projects.feature.routine)
         }
 
         iosMain {

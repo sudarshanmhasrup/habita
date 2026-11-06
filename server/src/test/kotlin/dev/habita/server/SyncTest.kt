@@ -150,6 +150,29 @@ class SyncTest {
     }
 
     @Test
+    fun `routine groups, tasks and ticks sync as records the server keeps as they came`() = serverTest { client ->
+        val token = client.token()
+        val group = SyncRecord("office", NOW, data = buildJsonObject { put("name", "Office") })
+        val task = SyncRecord("office-01", NOW, data = buildJsonObject { put("title", "Clean shoes") })
+        val tick = SyncRecord("2026-11-06/office-01", NOW, data = buildJsonObject { put("done", true) })
+
+        val result = client.push(
+            token,
+            mapOf(
+                SyncCollections.ROUTINE_GROUPS to listOf(group),
+                SyncCollections.ROUTINE_TASKS to listOf(task),
+                SyncCollections.ROUTINE_CHECKS to listOf(tick),
+            ),
+        ).body<SyncPushResult>()
+
+        assertTrue(result.rejected.isEmpty())
+        val pulled = client.pull(token).collections
+        assertEquals(listOf(group), pulled[SyncCollections.ROUTINE_GROUPS])
+        assertEquals(listOf(task), pulled[SyncCollections.ROUTINE_TASKS])
+        assertEquals(listOf(tick), pulled[SyncCollections.ROUTINE_CHECKS])
+    }
+
+    @Test
     fun `preferences such as the theme sync like any record`() = serverTest { client ->
         val token = client.token()
         val accent = SyncRecord("accent", NOW, data = buildJsonObject { put("value", "plum") })
