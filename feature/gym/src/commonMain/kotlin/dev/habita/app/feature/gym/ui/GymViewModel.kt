@@ -7,6 +7,8 @@ import dev.habita.app.feature.gym.data.SessionReport
 import dev.habita.app.core.sync.SyncState
 import dev.habita.app.feature.gym.workout.ActiveWorkout
 import dev.habita.app.feature.gym.workout.Phase
+import dev.habita.app.shared.gym.Body
+import dev.habita.app.shared.gym.BodyTrend
 import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.ExerciseTarget
 import dev.habita.app.shared.gym.Program
@@ -57,6 +59,7 @@ internal data class GymData(
     val sync: SyncState,
     /** Whether the app logs in and syncs; without it everything stays on the phone. */
     val syncEnabled: Boolean,
+    val body: BodyTrend = Body.trend(emptyList(), today()),
 ) {
     /** The next workout in the rotation. */
     val suggested: Workout? = program?.let { Rotation.next(it, sessions) }
@@ -71,14 +74,13 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
     val route: StateFlow<GymRoute> = _route.asStateFlow()
 
     val data: StateFlow<GymData?> = combine(
-        repository.program,
-        repository.sessions,
-        repository.steps,
-        repository.active,
-        repository.sync.state,
-    ) { program, sessions, steps, active, sync ->
-        GymData(program?.program, sessions, steps, active, sync, repository.syncEnabled)
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+        combine(repository.program, repository.sessions, repository.steps, repository.active, repository.sync.state) {
+            program, sessions, steps, active, sync ->
+            GymData(program?.program, sessions, steps, active, sync, repository.syncEnabled)
+        },
+        repository.body,
+    ) { data, body -> data.copy(body = Body.trend(body, today())) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Targets for the pre-start screen, refreshed when synced history arrives. */
     val preStartTargets: StateFlow<List<ExerciseTarget>?> = _route
@@ -170,6 +172,12 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
     fun logSet(weightGrams: Int, achieved: Int?, effort: Effort?) = act {
         repository.logSet(weightGrams, achieved, effort)?.let { _route.value = GymRoute.Summary(it) }
     }
+
+    /** Saves this morning's weight. */
+    fun logWeight(grams: Int) = act { repository.logWeight(today(), grams) }
+
+    /** Saves today's waist measurement. */
+    fun logWaist(mm: Int) = act { repository.logWaist(today(), mm) }
 
     fun exerciseMachineTaken() = act { repository.exerciseMachineTaken() }
 

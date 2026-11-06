@@ -3,6 +3,7 @@ package dev.habita.app.feature.gym.data
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
+import dev.habita.app.feature.gym.db.Body_log
 import dev.habita.app.feature.gym.db.Exercise_step
 import dev.habita.app.feature.gym.db.GymDatabase
 import dev.habita.app.feature.gym.db.Set_log
@@ -12,6 +13,7 @@ import dev.habita.app.feature.gym.workout.ActiveWorkout
 import dev.habita.app.shared.api.ProgramResponse
 import dev.habita.app.shared.api.SyncChanges
 import dev.habita.app.shared.api.SyncCollections
+import dev.habita.app.shared.gym.BodyLog
 import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.ExerciseStep
 import dev.habita.app.shared.gym.SetLog
@@ -33,6 +35,7 @@ class GymStore(private val database: GymDatabase) {
     private val warmUps = database.warmUpLogQueries
     private val steps = database.exerciseStepQueries
     private val values = database.gymValueQueries
+    internal val body = database.bodyLogQueries
     private val json = Json { ignoreUnknownKeys = true }
 
     fun <T> transaction(block: () -> T): T = database.transactionWithResult { block() }
@@ -90,6 +93,19 @@ class GymStore(private val database: GymDatabase) {
     fun saveWarmUp(warmUp: WarmUpLog) = save(warmUp, dirty = true)
 
     fun saveStep(step: ExerciseStep) = save(step, dirty = true)
+
+    // Body
+
+    val allBody: Flow<List<BodyLog>> =
+        body.selectAll().asFlow().mapToList(Dispatchers.Default).map { rows -> rows.map { it.toModel() } }
+
+    fun bodyLog(day: String): BodyLog? = body.selectByDay(day).executeAsOneOrNull()?.toModel()
+
+    fun saveBody(log: BodyLog) = saveBody(log, dirty = true)
+
+    internal fun saveBody(log: BodyLog, dirty: Boolean) = body.save(
+        log.day, log.weightGrams?.toLong(), log.waistMm?.toLong(), log.updatedAt, log.deleted.toLong(), dirty.toLong(),
+    )
 
     /** Every record, including deleted ones and ones already synced, for a backup. */
     fun everything(): SyncChanges = transaction {
@@ -170,7 +186,7 @@ class GymStore(private val database: GymDatabase) {
     }
 }
 
-private fun Boolean.toLong() = if (this) 1L else 0L
+internal fun Boolean.toLong() = if (this) 1L else 0L
 
 private fun Workout_session.toModel() = WorkoutSession(
     id = id,
@@ -204,6 +220,14 @@ private fun Warm_up_log.toModel() = WarmUpLog(
     position = position.toInt(),
     status = WarmUpStatus.entries.firstOrNull { it.name == status } ?: WarmUpStatus.entries.first(),
     completedAt = completed_at,
+    updatedAt = updated_at,
+    deleted = deleted == 1L,
+)
+
+internal fun Body_log.toModel() = BodyLog(
+    day = day,
+    weightGrams = weight_grams?.toInt(),
+    waistMm = waist_mm?.toInt(),
     updatedAt = updated_at,
     deleted = deleted == 1L,
 )

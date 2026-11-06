@@ -145,6 +145,8 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
                         scope.launch { saveFile("habita-backup-${backupDate(nowMillis())}.json", viewModel.backup()) }
                     },
                     backupMessage = backupMessage,
+                    onWeight = viewModel::logWeight,
+                    onWaist = viewModel::logWaist,
                 )
 
                 is GymRoute.PreStart -> PreStartScreen(

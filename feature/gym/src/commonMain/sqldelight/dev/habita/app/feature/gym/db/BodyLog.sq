@@ -1,0 +1,27 @@
+-- One row per day: weight most mornings, waist about once a week. day is the date, 2026-11-07.
+CREATE TABLE body_log (
+    day TEXT NOT NULL PRIMARY KEY,
+    weight_grams INTEGER,
+    waist_mm INTEGER,
+    updated_at INTEGER NOT NULL,
+    deleted INTEGER NOT NULL,
+    dirty INTEGER NOT NULL
+);
+
+selectAll:
+SELECT * FROM body_log;
+
+selectDirty:
+SELECT * FROM body_log WHERE dirty = 1;
+
+selectByDay:
+SELECT * FROM body_log WHERE day = ?;
+
+save:
+INSERT OR REPLACE INTO body_log VALUES (?, ?, ?, ?, ?, ?);
+
+markClean:
+UPDATE body_log SET dirty = 0 WHERE day = ? AND updated_at = ?;
+
+markAllDirty:
+UPDATE body_log SET dirty = 1;
