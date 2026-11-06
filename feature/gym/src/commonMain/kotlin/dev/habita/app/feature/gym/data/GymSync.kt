@@ -19,14 +19,11 @@ class GymSync(private val store: GymStore, private val core: Core) {
     /** The plain-record collections, such as the body log. */
     internal val records = gymRecordTables(store)
 
+    /** Every gym collection, typed and plain. */
+    internal val tables: List<LocalSyncTable> = gymTypedTables(store) + records
+
     init {
-        listOf(
-            SyncCollections.GYM_SESSIONS,
-            SyncCollections.GYM_SETS,
-            SyncCollections.GYM_WARM_UPS,
-            SyncCollections.GYM_STEPS,
-        ).forEach { core.sync.register(GymSyncTable(it, store)) }
-        records.forEach(core.sync::register)
+        tables.forEach(core.sync::register)
         core.sync.beforeEachSync {
             val program: ProgramResponse = core.api.get("program")
             if (store.program() != program) store.saveProgram(program)
@@ -37,6 +34,14 @@ class GymSync(private val store: GymStore, private val core: Core) {
 
     fun request() = core.sync.request()
 }
+
+/** The collections the server reads too: sessions, sets, warm-ups and steps. */
+internal fun gymTypedTables(store: GymStore): List<LocalSyncTable> = listOf(
+    SyncCollections.GYM_SESSIONS,
+    SyncCollections.GYM_SETS,
+    SyncCollections.GYM_WARM_UPS,
+    SyncCollections.GYM_STEPS,
+).map { GymSyncTable(it, store) }
 
 private class GymSyncTable(override val collection: String, private val store: GymStore) : LocalSyncTable {
     override fun dirty(): List<SyncRecord> = store.dirty(collection).toCollections()[collection].orEmpty()

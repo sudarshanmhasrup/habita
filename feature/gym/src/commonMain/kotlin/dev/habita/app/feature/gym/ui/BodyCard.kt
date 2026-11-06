@@ -1,10 +1,12 @@
 package dev.habita.app.feature.gym.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
@@ -25,11 +27,13 @@ import dev.habita.app.core.ui.HabitaCard
 import dev.habita.app.core.ui.LabeledField
 import dev.habita.app.core.ui.Overline
 import dev.habita.app.core.ui.PrimaryButton
+import dev.habita.app.core.ui.SecondaryButton
 import dev.habita.app.core.ui.TextAction
 import dev.habita.app.core.ui.appear
 import dev.habita.app.feature.gym.data.TrendPoint
 import dev.habita.app.shared.gym.Body
 import dev.habita.app.shared.gym.BodyAdvice
+import dev.habita.app.shared.gym.BodyLog
 import dev.habita.app.shared.gym.BodyTrend
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -39,12 +43,21 @@ import kotlin.math.roundToInt
  * what is eaten now, so the app never needs a calorie target.
  */
 @Composable
-internal fun BodyCard(trend: BodyTrend, onWeight: (Int) -> Unit, onWaist: (Int) -> Unit, modifier: Modifier = Modifier) {
+internal fun BodyCard(
+    trend: BodyTrend,
+    logs: List<BodyLog>,
+    today: String,
+    onWeight: (Int) -> Unit,
+    onWaist: (Int) -> Unit,
+    onSetDay: (day: String, weightGrams: Int?, waistMm: Int?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     val todayWeight = trend.today?.weightGrams
     var editingWeight by remember { mutableStateOf(false) }
     var editingWaist by remember { mutableStateOf(false) }
+    var showPast by remember { mutableStateOf(false) }
 
     HabitaCard(modifier.fillMaxWidth().appear(2)) {
         Overline("Bodyweight")
@@ -53,7 +66,7 @@ internal fun BodyCard(trend: BodyTrend, onWeight: (Int) -> Unit, onWaist: (Int) 
             NumberEntry(
                 label = "This morning, kg",
                 initial = todayWeight?.let(::formatKg).orEmpty(),
-                parse = { parseKg(it)?.takeIf { grams -> grams in 20_000..400_000 } },
+                parse = ::parseWeight,
                 onSave = { onWeight(it); editingWeight = false },
             )
             Gap(Space.tiny)
@@ -106,7 +119,7 @@ internal fun BodyCard(trend: BodyTrend, onWeight: (Int) -> Unit, onWaist: (Int) 
             NumberEntry(
                 label = "Waist, cm",
                 initial = waistToday?.let { formatOneDecimal(it * 100) }.orEmpty(),
-                parse = { parseKg(it)?.let { tenths -> tenths / 100 }?.takeIf { mm -> mm in 400..2000 } },
+                parse = ::parseWaist,
                 onSave = { onWaist(it); editingWaist = false },
             )
             Gap(Space.tiny)
@@ -130,8 +143,123 @@ internal fun BodyCard(trend: BodyTrend, onWeight: (Int) -> Unit, onWaist: (Int) 
                 TextAction(if (waistToday != null) "Edit" else "Log waist", { editingWaist = true })
             }
         }
+
+        Gap(Space.card)
+        Divider()
+        Gap(Space.inside)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HText("Past two weeks", type.label, modifier = Modifier.weight(1f))
+            TextAction(if (showPast) "Hide" else "Show", { showPast = !showPast }, color = colors.muted)
+        }
+        if (showPast) {
+            Gap(Space.inside)
+            HText("Tap a day to fix it, or to add one you missed.", type.caption, color = colors.muted)
+            Gap(Space.inside)
+            PastDays(logs, today, onSetDay)
+        }
     }
 }
+
+/** The last 14 days, each one editable: a missed gym weigh-in can be added, a typo fixed. */
+@Composable
+private fun PastDays(logs: List<BodyLog>, today: String, onSetDay: (String, Int?, Int?) -> Unit) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
+    val byDay = logs.filter { !it.deleted }.associateBy { it.day }
+    var editing by remember { mutableStateOf<String?>(null) }
+    Column(verticalArrangement = Arrangement.spacedBy(Space.inside)) {
+        Body.lastDays(today, PAST_DAYS).forEach { day ->
+            val log = byDay[day]
+            if (editing == day) {
+                DayEditor(day, log, today, onSave = { weight, waist ->
+                    onSetDay(day, weight, waist)
+                    editing = null
+                }, onCancel = { editing = null })
+            } else {
+                Row(
+                    Modifier.fillMaxWidth().clickable { editing = day }.padding(vertical = Space.tiny),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    HText(dayLabel(day, today), type.body, modifier = Modifier.weight(1f))
+                    HText(
+                        listOfNotNull(
+                            log?.weightGrams?.let { "${formatOneDecimal(it)} kg" },
+                            log?.waistMm?.let { "${formatOneDecimal(it * 100)} cm" },
+                        ).joinToString(" · ").ifEmpty { "–" },
+                        type.body,
+                        color = if (log == null) colors.muted else colors.text,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Both values of one day. Clearing both and saving deletes the day. */
+@Composable
+private fun DayEditor(day: String, log: BodyLog?, today: String, onSave: (Int?, Int?) -> Unit, onCancel: () -> Unit) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
+    var weightText by remember(day) { mutableStateOf(log?.weightGrams?.let(::formatOneDecimal).orEmpty()) }
+    var waistText by remember(day) { mutableStateOf(log?.waistMm?.let { formatOneDecimal(it * 100) }.orEmpty()) }
+    val weight = parseWeight(weightText)
+    val waist = parseWaist(waistText)
+    // A blank field means no value; anything typed must be a real number to save.
+    val valid = (weightText.isBlank() || weight != null) && (waistText.isBlank() || waist != null)
+    Column(Modifier.fillMaxWidth()) {
+        HText(dayLabel(day, today), type.bodyStrong)
+        Gap(Space.inside)
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.item)) {
+            LabeledField(
+                label = "Weight, kg",
+                value = weightText,
+                onValueChange = { weightText = numberInput(it) },
+                modifier = Modifier.weight(1f),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+            )
+            LabeledField(
+                label = "Waist, cm",
+                value = waistText,
+                onValueChange = { waistText = numberInput(it) },
+                modifier = Modifier.weight(1f),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+            )
+        }
+        Gap(Space.item)
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.inside)) {
+            SecondaryButton("Cancel", onCancel, Modifier.weight(1f))
+            PrimaryButton(
+                if (weightText.isBlank() && waistText.isBlank() && log != null) "Delete day" else "Save",
+                { onSave(weight, waist) },
+                Modifier.weight(1f),
+                enabled = valid && (log != null || weight != null || waist != null),
+            )
+        }
+        if (!valid) {
+            Gap(Space.tiny)
+            HText("Weight 20–400 kg, waist 40–200 cm.", type.caption, color = colors.error)
+        }
+    }
+}
+
+private const val PAST_DAYS = 14
+
+private val weekdays = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+/** "Today", "Yesterday" or "Thu 5 Nov". */
+private fun dayLabel(day: String, today: String): String = when (Body.epochDay(today) - Body.epochDay(day)) {
+    0L -> "Today"
+    1L -> "Yesterday"
+    // Noon UTC is the same calendar day in every time zone the app is likely used in.
+    else -> "${weekdays[Body.dayOfWeek(day)]} ${shortDate(Body.epochDay(day) * 86_400_000 + 43_200_000)}"
+}
+
+private fun numberInput(text: String): String = text.filter { it.isDigit() || it == '.' || it == ',' }.take(6)
+
+private fun parseWeight(text: String): Int? = parseKg(text)?.takeIf { it in 20_000..400_000 }
+
+/** Centimetres as typed ("85.5") to millimetres. */
+private fun parseWaist(text: String): Int? = parseKg(text)?.let { it / 100 }?.takeIf { it in 400..2000 }
 
 /** A number field with a Save button. [parse] returns `null` for anything that can't be saved. */
 @Composable
@@ -142,7 +270,7 @@ private fun NumberEntry(label: String, initial: String, parse: (String) -> Int?,
         LabeledField(
             label = label,
             value = text,
-            onValueChange = { text = it.filter { c -> c.isDigit() || c == '.' || c == ',' }.take(6) },
+            onValueChange = { text = numberInput(it) },
             modifier = Modifier.weight(1f),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { value?.let(onSave) }),

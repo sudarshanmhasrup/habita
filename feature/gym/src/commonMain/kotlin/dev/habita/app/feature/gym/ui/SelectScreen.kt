@@ -62,10 +62,12 @@ internal fun SelectScreen(
     onDiscard: () -> Unit,
     onRetry: () -> Unit,
     onBackup: () -> Unit,
+    onRestore: () -> Unit,
     backupMessage: String?,
     onWeight: (Int) -> Unit,
     onWaist: (Int) -> Unit,
     onNewGym: () -> Unit,
+    onSetBody: (day: String, weightGrams: Int?, waistMm: Int?) -> Unit,
     checkIn: CheckInStatus?,
     onCopyCheckIn: () -> Unit,
     checkInMessage: String?,
@@ -87,6 +89,8 @@ internal fun SelectScreen(
     val now = nowMillis()
     val weekStart = startOfWeek(now)
     val thisWeek = data.sessions.filter { !it.deleted && it.endedAt != null && it.startedAt >= weekStart }
+    var asking by remember { mutableStateOf<Ask?>(null) }
+    Box(Modifier.fillMaxSize()) {
     TwoPane(
         first = {
             TopBar("Home", onBack)
@@ -97,7 +101,7 @@ internal fun SelectScreen(
             Gap(Space.card)
             WeekStrip(thisWeek, weekStart, now)
             Gap(Space.section)
-            data.active?.let { InProgressCard(it, onResume, onDiscard) }
+            data.active?.let { InProgressCard(it, onResume) { asking = Ask.DISCARD } }
             data.suggested?.let { workout ->
                 if (data.active == null) {
                     UpNextCard(program, workout, lastDone(data.sessions, workout.id, now)) { onOpenWorkout(workout.id) }
@@ -108,10 +112,10 @@ internal fun SelectScreen(
                 CheckInCard(checkIn, onCopyCheckIn, checkInMessage)
             }
             Gap(Space.item)
-            BodyCard(data.body, onWeight, onWaist)
+            BodyCard(data.body, data.bodyLogs, data.day, onWeight, onWaist, onSetBody)
             if (wide) {
                 Gap(Space.section)
-                StorageNote(data, onBackup, backupMessage, checkIn, onCopyCheckIn, checkInMessage)
+                StorageNote(data, onBackup, onRestore, backupMessage, checkIn, onCopyCheckIn, checkInMessage)
             }
         },
         second = {
@@ -122,16 +126,48 @@ internal fun SelectScreen(
             DayCards(program, onOpenWorkout)
             if (data.swaps.isNotEmpty()) {
                 Gap(Space.item)
-                SwapsCard(program, data.swaps, onNewGym)
+                SwapsCard(program, data.swaps) { asking = Ask.NEW_GYM }
             }
             if (!wide) {
                 Gap(Space.section)
-                StorageNote(data, onBackup, backupMessage, checkIn, onCopyCheckIn, checkInMessage)
+                StorageNote(data, onBackup, onRestore, backupMessage, checkIn, onCopyCheckIn, checkInMessage)
             }
             Gap(Space.card)
         },
     )
+    val active = data.active
+    ConfirmPanel(
+        visible = asking == Ask.DISCARD && active != null,
+        title = "Discard ${active?.workout?.name ?: "the workout"}?",
+        detail = active?.setsLogged?.sum()?.takeIf { it > 0 }
+            ?.let { "The $it ${if (it == 1) "set" else "sets"} logged in it are deleted and won't count. This can't be undone." }
+            ?: "Nothing is logged in it yet. It won't count as a workout.",
+        confirm = "Discard workout",
+        onConfirm = {
+            asking = null
+            onDiscard()
+        },
+        cancel = "Keep it",
+        onCancel = { asking = null },
+        destructive = true,
+    )
+    ConfirmPanel(
+        visible = asking == Ask.NEW_GYM,
+        title = "New gym?",
+        detail = "Every swapped exercise goes back to the plan. Swap again for anything this gym doesn't have.",
+        confirm = "Back to the plan",
+        onConfirm = {
+            asking = null
+            onNewGym()
+        },
+        cancel = "Keep my swaps",
+        onCancel = { asking = null },
+    )
+    }
 }
+
+/** Which confirmation panel is open. */
+private enum class Ask { DISCARD, NEW_GYM }
 
 private fun weekLine(count: Int): String = when (count) {
     0 -> "No workouts yet this week"
@@ -231,7 +267,6 @@ private fun NoProgram(sync: SyncState, onRetry: () -> Unit) {
 private fun InProgressCard(active: ActiveWorkout, onResume: () -> Unit, onDiscard: () -> Unit) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
-    var confirmDiscard by remember(active.sessionId) { mutableStateOf(false) }
     HabitaCard(Modifier.fillMaxWidth().appear(3), borderColor = colors.accent) {
         Overline("In progress", color = colors.accent)
         Gap(Space.inside)
@@ -245,12 +280,7 @@ private fun InProgressCard(active: ActiveWorkout, onResume: () -> Unit, onDiscar
         Gap(Space.card)
         Row(horizontalArrangement = Arrangement.spacedBy(Space.inside)) {
             PrimaryButton("Resume", onResume, Modifier.weight(1f))
-            SecondaryButton(
-                text = if (confirmDiscard) "Tap to confirm" else "Discard",
-                onClick = { if (confirmDiscard) onDiscard() else confirmDiscard = true },
-                modifier = Modifier.weight(1f),
-                color = if (confirmDiscard) colors.error else colors.text,
-            )
+            SecondaryButton("Discard", onDiscard, Modifier.weight(1f))
         }
     }
 }
@@ -317,7 +347,6 @@ private fun DayCards(program: Program, onOpenWorkout: (String) -> Unit) {
 private fun SwapsCard(program: Program, swaps: Map<String, String>, onNewGym: () -> Unit) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
-    var confirm by remember(swaps) { mutableStateOf(false) }
     HabitaCard(Modifier.fillMaxWidth().appear(5)) {
         HText("Swapped at this gym", type.title)
         Gap(Space.inside)
@@ -331,12 +360,7 @@ private fun SwapsCard(program: Program, swaps: Map<String, String>, onNewGym: ()
             }
         }
         Gap(Space.card)
-        SecondaryButton(
-            text = if (confirm) "Tap to confirm" else "New gym: back to the plan",
-            onClick = { if (confirm) onNewGym() else confirm = true },
-            modifier = Modifier.fillMaxWidth(),
-            color = if (confirm) colors.error else colors.text,
-        )
+        SecondaryButton("New gym: back to the plan", onNewGym, Modifier.fillMaxWidth())
     }
 }
 
@@ -348,6 +372,7 @@ private fun SwapsCard(program: Program, swaps: Map<String, String>, onNewGym: ()
 private fun ColumnScope.StorageNote(
     data: GymData,
     onBackup: () -> Unit,
+    onRestore: () -> Unit,
     backupMessage: String?,
     checkIn: CheckInStatus?,
     onCopyCheckIn: () -> Unit,
@@ -379,6 +404,8 @@ private fun ColumnScope.StorageNote(
         }
         Gap(Space.item)
         SecondaryButton("Save a backup file", onBackup, Modifier.fillMaxWidth())
+        Gap(Space.inside)
+        SecondaryButton("Restore from a backup file", onRestore, Modifier.fillMaxWidth())
         if (backupMessage != null) {
             Gap(Space.inside)
             HText(backupMessage, type.caption, color = colors.muted)

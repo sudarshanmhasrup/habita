@@ -117,6 +117,20 @@ object Body {
         return logs.none { !it.deleted && it.waistMm != null && epochDay(it.day) in todayEpoch - 6..todayEpoch }
     }
 
+    /**
+     * The next [count] Sundays, from [today] on, that need a waist reminder: a Sunday whose week
+     * already has a measurement is skipped. For platforms that queue reminders ahead of time.
+     */
+    fun waistReminderDays(logs: List<BodyLog>, today: String, count: Int): List<String> {
+        val todayEpoch = epochDay(today)
+        val firstSunday = todayEpoch + (6 - dayOfWeek(today))
+        return generateSequence(firstSunday) { it + 7 }
+            .map { dayString(it) }
+            .filter { waistDue(logs, it) }
+            .take(count)
+            .toList()
+    }
+
     /** 0 for Monday up to 6 for Sunday. 1970-01-01 was a Thursday. */
     fun dayOfWeek(day: String): Int = ((epochDay(day) + 3) % 7 + 7).toInt() % 7
 
@@ -133,5 +147,26 @@ object Body {
         val dayOfYear = (153 * (if (m > 2) m - 3 else m + 9) + 2) / 5 + d - 1
         val dayOfEra = yearOfEra * 365 + yearOfEra / 4 - yearOfEra / 100 + dayOfYear
         return era * 146097L + dayOfEra - 719468
+    }
+
+    /** The date [epochDay] days after 1970-01-01, written as `2026-11-07`. */
+    fun dayString(epochDay: Long): String {
+        // Civil from days, from Howard Hinnant's date algorithms.
+        val z = epochDay + 719468
+        val era = (if (z >= 0) z else z - 146096) / 146097
+        val dayOfEra = z - era * 146097
+        val yearOfEra = (dayOfEra - dayOfEra / 1460 + dayOfEra / 36524 - dayOfEra / 146096) / 365
+        val dayOfYear = dayOfEra - (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100)
+        val mp = (5 * dayOfYear + 2) / 153
+        val d = dayOfYear - (153 * mp + 2) / 5 + 1
+        val m = if (mp < 10) mp + 3 else mp - 9
+        val y = yearOfEra + era * 400 + if (m <= 2) 1 else 0
+        return "$y-${m.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}"
+    }
+
+    /** The last [count] days up to [today], newest first. */
+    fun lastDays(today: String, count: Int): List<String> {
+        val todayEpoch = epochDay(today)
+        return (0 until count).map { dayString(todayEpoch - it) }
     }
 }

@@ -4,11 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.habita.app.feature.gym.data.CheckInStatus
 import dev.habita.app.feature.gym.data.GymRepository
+import dev.habita.app.feature.gym.data.RestoreResult
 import dev.habita.app.feature.gym.data.SessionReport
 import dev.habita.app.core.sync.SyncState
 import dev.habita.app.feature.gym.workout.ActiveWorkout
 import dev.habita.app.feature.gym.workout.Phase
 import dev.habita.app.shared.gym.Body
+import dev.habita.app.shared.gym.BodyLog
 import dev.habita.app.shared.gym.BodyTrend
 import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.ExerciseTarget
@@ -64,6 +66,10 @@ internal data class GymData(
     val body: BodyTrend = Body.trend(emptyList(), today()),
     /** Exercises swapped at this gym, by the planned exercise they replace. */
     val swaps: Map<String, String> = emptyMap(),
+    /** Today's date, so screens redraw when the day changes. */
+    val day: String = today(),
+    /** Every body log, for editing past days. */
+    val bodyLogs: List<BodyLog> = emptyList(),
 ) {
     /** [id] as it will be done here: the plan's workout with this gym's swaps. */
     fun workout(id: String): Workout? =
@@ -88,7 +94,8 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
         },
         repository.body,
         repository.swaps,
-    ) { data, body, swaps -> data.copy(body = Body.trend(body, today()), swaps = swaps) }
+        currentDay,
+    ) { data, body, swaps, day -> data.copy(body = Body.trend(body, day), swaps = swaps, day = day, bodyLogs = body) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Targets for the pre-start screen, refreshed when synced history or a swap arrives. */
@@ -146,6 +153,9 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
     /** The backup file's contents. */
     suspend fun backup(): String = repository.backup()
 
+    /** Merges a backup file in; `null` when it isn't one. */
+    suspend fun restore(text: String): RestoreResult? = repository.restore(text)
+
     fun openWorkout(workoutId: String) {
         _route.value = GymRoute.PreStart(workoutId)
     }
@@ -189,6 +199,9 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
 
     /** Saves this morning's weight. */
     fun logWeight(grams: Int) = act { repository.logWeight(today(), grams) }
+
+    /** Fixes or fills in [day]; both `null` deletes it. */
+    fun setBody(day: String, weightGrams: Int?, waistMm: Int?) = act { repository.setBody(day, weightGrams, waistMm) }
 
     /** Saves today's waist measurement. */
     fun logWaist(mm: Int) = act { repository.logWaist(today(), mm) }

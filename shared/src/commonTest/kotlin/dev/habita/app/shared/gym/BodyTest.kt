@@ -126,4 +126,24 @@ class BodyTest {
         assertTrue(Body.waistDue(listOf(waistOn("2026-11-05").copy(deleted = true)), sunday))
         assertFalse(Body.waistDue(emptyList(), "2026-11-07"))
     }
+
+    @Test
+    fun `writes days back the same way it reads them`() {
+        listOf("1970-01-01", "2024-02-29", "2024-03-01", "2026-11-07", "2026-12-31", "2027-01-01").forEach {
+            assertEquals(it, Body.dayString(Body.epochDay(it)))
+        }
+    }
+
+    @Test
+    fun `lists the last days newest first across a month end`() {
+        assertEquals(listOf("2026-12-01", "2026-11-30", "2026-11-29"), Body.lastDays("2026-12-01", 3))
+    }
+
+    @Test
+    fun `queues the coming Sundays, skipping one already measured`() {
+        val logs = listOf(BodyLog("2026-11-05", waistMm = 850, updatedAt = 0))
+
+        assertEquals(listOf("2026-11-15", "2026-11-22"), Body.waistReminderDays(logs, "2026-11-07", 2))
+        assertEquals(listOf("2026-11-08", "2026-11-15"), Body.waistReminderDays(emptyList(), "2026-11-08", 2))
+    }
 }
