@@ -1,0 +1,7 @@
+-- Version 6: gym choices that sync, such as the diet goal.
+CREATE TABLE gym_setting (
+    key TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    dirty INTEGER NOT NULL
+);

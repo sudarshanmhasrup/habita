@@ -9,7 +9,9 @@ import dev.habita.app.feature.gym.workout.WorkoutEngine
 import dev.habita.app.shared.api.Export
 import dev.habita.app.shared.api.ExportedProgram
 import dev.habita.app.shared.api.ProgramResponse
+import dev.habita.app.shared.gym.BodyGoal
 import dev.habita.app.shared.gym.BodyLog
+import dev.habita.app.shared.gym.GymSetting
 import dev.habita.app.shared.gym.CheckIn
 import dev.habita.app.shared.gym.CheckInData
 import dev.habita.app.shared.gym.CheckInReason
@@ -21,6 +23,7 @@ import dev.habita.app.shared.gym.ExerciseStep
 import dev.habita.app.shared.gym.ExerciseTarget
 import dev.habita.app.shared.gym.History
 import dev.habita.app.shared.gym.Program
+import dev.habita.app.shared.gym.SetLog
 import dev.habita.app.shared.gym.ProgramParser
 import dev.habita.app.shared.gym.Progression
 import dev.habita.app.shared.gym.Summary
@@ -72,8 +75,20 @@ class GymRepository(core: Core) {
     val active: Flow<ActiveWorkout?> = store.active
     val body: Flow<List<BodyLog>> = store.allBody
 
+    /** Every set, for the progress screen. */
+    val sets: Flow<List<SetLog>> = store.allSets
+
     /** Exercises swapped at this gym, by the planned exercise they replace. */
     val swaps: Flow<Map<String, String>> = store.allSwaps.map(Swaps::active)
+
+    /** What the diet is for; losing fat until it is changed. */
+    val goal: Flow<BodyGoal> = store.allSettings.map { settings ->
+        BodyGoal.entries.firstOrNull { it.name == settings[GymSetting.GOAL_KEY] } ?: BodyGoal.LOSE_FAT
+    }
+
+    suspend fun setGoal(goal: BodyGoal) = write {
+        store.saveSetting(GymSetting(GymSetting.GOAL_KEY, goal.name, nowMillis()))
+    }
 
     /** Whether the plan needs a check-in, and which exercises are stuck, as workouts are logged. */
     val checkIn: Flow<CheckInStatus> =
@@ -100,6 +115,8 @@ class GymRepository(core: Core) {
                 now = now,
                 today = today,
                 formatDate = formatDate,
+                goal = BodyGoal.entries.firstOrNull { goal -> store.settings().any { it.key == GymSetting.GOAL_KEY && it.value == goal.name } }
+                    ?: BodyGoal.LOSE_FAT,
             ),
         )
         store.saveCheckIn(CheckIn(newId(), now, now))

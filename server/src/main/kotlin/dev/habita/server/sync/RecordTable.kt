@@ -15,6 +15,7 @@ fun recordTables(database: HabitaDatabase): List<RecordTable> = listOf(
     SyncCollections.GYM_BODY,
     SyncCollections.GYM_SWAPS,
     SyncCollections.GYM_CHECK_INS,
+    SyncCollections.GYM_SETTINGS,
     SyncCollections.EXPENSES,
     SyncCollections.EXPENSE_CATEGORIES,
     SyncCollections.EXPENSE_SETTINGS,

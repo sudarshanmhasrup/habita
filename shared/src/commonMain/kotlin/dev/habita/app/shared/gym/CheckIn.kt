@@ -40,6 +40,8 @@ data class CheckInData(
     val today: String,
     /** A date for people, such as "7 Nov 2026". */
     val formatDate: (Long) -> String,
+    /** The diet goal picked in the app. */
+    val goal: BodyGoal = BodyGoal.LOSE_FAT,
 )
 
 /**
@@ -120,7 +122,8 @@ object CheckIns {
             append("replace, sets, rep targets or rest times. No change is a fine answer.\n")
             append("3. If you change the plan, reply with the complete updated tables in exactly the format ")
             append("of \"Current plan\" below. Keep every existing id, since my history is stored by id. A new ")
-            append("exercise needs a new lowercase-kebab-case id. Step is in kg for weighted exercises.\n\n")
+            append("exercise needs a new lowercase-kebab-case id. Never delete a row from Exercises: to stop doing an ")
+            append("exercise, take it out of the workouts and leave its row. Step is in kg for weighted exercises.\n\n")
 
             append("## Summary\n\n")
             val finishedInPeriod = periodSessions.count { it.endedAt != null }
@@ -129,6 +132,7 @@ object CheckIns {
             val unfinished = periodSessions.count { it.endedAt == null }
             if (unfinished > 0) append(", plus $unfinished started and not finished")
             append("\n")
+            append("- Diet goal set in the app: ${data.goal.name.lowercase().replace('_', ' ')}\n")
             append("- Sets done: ${periodSets.count { !it.isSkipped }}, skipped: ${periodSets.count { it.isSkipped }}\n")
             val rated = periodSets.mapNotNull { it.effort }
             if (rated.isNotEmpty()) {

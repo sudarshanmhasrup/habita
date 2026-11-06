@@ -7,6 +7,9 @@ refuses to start if it is malformed, with the line number of the problem.
 
 - Exercise ids are permanent. History is stored by id, so rename an exercise freely, but never
   change or reuse its id. To replace an exercise, add a new one with a new id.
+- Never delete an exercise row: to stop doing it, take it out of the workouts and leave its row.
+  As a safety net the server keeps serving exercises an older plan had, so history never
+  disappears, but the row is the clean way.
 - Step is the default progression step. Use kg for weighted exercises (`2.5` is allowed) and reps or
   seconds for bodyweight ones. It can be changed per exercise from the app.
 - Equipment is one of `dumbbell`, `machine`, `cable` or `bodyweight`. Measure is `reps` or

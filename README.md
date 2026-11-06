@@ -46,7 +46,8 @@ Habita uses double progression, the standard method for a fixed rep target like 
 - Drop below 8 reps right after a weight jump, and you go back to the previous weight.
 - Make no progress for 3 sessions in a row, and the weight drops by about 10% so you can build back
   up.
-- Come back after more than 3 weeks off, and the weight stays where it was.
+- Come back after more than 3 weeks off, and the weight stays where it was. After more than 8
+  weeks off, it comes back about 20% lighter (timed holds a bit shorter) to build back up safely.
 - Bodyweight exercises such as the plank grow their target instead, by 5 seconds at a time.
 
 How each set felt adjusts this:
@@ -83,6 +84,15 @@ now, so the app never needs a calorie target:
 - Less than 0.2 kg lost in two weeks: eat about 150 kcal a day less, or walk more. If the waist
   went down at least 0.5 cm over four weeks meanwhile, that's recomposition, so keep going.
 
+That's for the "Lose fat" goal. The card's goal can also be "Maintain" (more than 0.5 kg up or
+down in two weeks: eat about 100 kcal less or more) or "Build" (under 0.2 kg gained in two weeks:
+eat about 150 kcal more; over 0.5% of your weight gained in a week: eat about 150 kcal less). The
+goal syncs, and check-ins include it. If notifications are off, the card says so and offers to
+turn them on.
+
+"See your progress" on the gym screen shows the whole history: every exercise from its first
+session to its latest, with its best, and bodyweight and waist since the first weigh-in.
+
 Weighing at the gym before each workout works too, as long as it's always the same way. "Past two
 weeks" lists the last 14 days: tap one to fix a typo, add a missed weigh-in or delete the day. On
 Sundays, the phone shows a reminder at 9:00 to measure the waist (Android and iOS), and the home
@@ -104,7 +114,8 @@ under the backup button does the same at any time.
 
 The plan lives in [program/PROGRAM.md](program/PROGRAM.md): every exercise, warm-up and workout,
 with sets, target reps and rest times. The server reads it on startup and refuses to start if
-anything in it is malformed, pointing at the line.
+anything in it is malformed, pointing at the line. An exercise that an older version of the plan
+had keeps being served even if a new version drops its row, so its history never disappears.
 
 Every exercise has a permanent id, and all history is stored against that id. You can rename an
 exercise or change sets, reps and rest at any time without losing history. Each change to the file

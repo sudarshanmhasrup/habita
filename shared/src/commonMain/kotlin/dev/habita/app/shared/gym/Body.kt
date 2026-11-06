@@ -1,6 +1,7 @@
 package dev.habita.app.shared.gym
 
 import kotlinx.serialization.Serializable
+import kotlin.math.abs
 
 /**
  * One day's body measurements. [day] is the local date as `2026-11-07` and is the record id, so a
@@ -16,7 +17,20 @@ data class BodyLog(
     val deleted: Boolean = false,
 )
 
-/** What to change in the diet, from the weekly averages. The app is cutting or recomping. */
+/** A gym choice that syncs, by [key], such as [GOAL_KEY]. */
+@Serializable
+data class GymSetting(val key: String, val value: String, val updatedAt: Long) {
+    companion object {
+        /** The diet goal, a [BodyGoal] name. */
+        const val GOAL_KEY = "body.goal"
+    }
+}
+
+/** What the diet is for right now. The advice follows it. */
+@Serializable
+enum class BodyGoal { LOSE_FAT, MAINTAIN, BUILD_MUSCLE }
+
+/** What to change in the diet, from the weekly averages and the [BodyGoal]. */
 enum class BodyAdvice {
     /** Fewer than two weeks of weigh-ins: no advice yet. */
     NEED_MORE_DATA,
@@ -35,6 +49,18 @@ enum class BodyAdvice {
 
     /** Flat for two weeks, but the waist is going down: muscle is replacing fat, keep going. */
     RECOMP,
+
+    /** Maintaining, but up over half a kilo in two weeks: eat a little less. */
+    DRIFTING_UP,
+
+    /** Maintaining, but down over half a kilo in two weeks: eat a little more. */
+    DRIFTING_DOWN,
+
+    /** Building muscle, but under 0.2 kg gained in two weeks: eat a little more. */
+    NOT_GAINING,
+
+    /** Building muscle, but gaining over 0.5% a week, which is mostly fat: eat a little less. */
+    GAINING_FAST,
 }
 
 /** The average of one week's weigh-ins. Week 0 is the last 7 days, week 1 the 7 before, and so on. */
@@ -51,6 +77,7 @@ data class BodyTrend(
     /** How much the waist went down over the last four weeks, in mm, or `null` without two readings. */
     val waistChangeMm: Int?,
     val advice: BodyAdvice,
+    val goal: BodyGoal = BodyGoal.LOSE_FAT,
 )
 
 object Body {
@@ -65,7 +92,13 @@ object Body {
 
     const val TREND_WEEKS = 8
 
-    fun trend(logs: List<BodyLog>, today: String): BodyTrend {
+    /** Maintaining: more than this either way in two weeks is drifting. */
+    const val DRIFT_GRAMS = 500
+
+    /** Building: less than this gained in two weeks is not gaining. */
+    const val MIN_GAIN_GRAMS = 200
+
+    fun trend(logs: List<BodyLog>, today: String, goal: BodyGoal = BodyGoal.LOSE_FAT): BodyTrend {
         val live = logs.filter { !it.deleted }
         val todayEpoch = epochDay(today)
         fun weeksAgo(log: BodyLog) = ((todayEpoch - epochDay(log.day)) / 7).toInt()
@@ -92,6 +125,8 @@ object Body {
 
         val advice = when {
             w0 == null || w1 == null -> BodyAdvice.NEED_MORE_DATA
+            goal == BodyGoal.MAINTAIN -> maintainAdvice(w0, w1, w2)
+            goal == BodyGoal.BUILD_MUSCLE -> buildAdvice(w0, w1, w2)
             change!! < 0 && -change * 100 > w1 -> BodyAdvice.TOO_FAST
             w2 == null -> if (change < 0) BodyAdvice.ON_TRACK else BodyAdvice.TOO_EARLY
             w0 > w2 - FLAT_GRAMS ->
@@ -107,7 +142,22 @@ object Body {
             weeklyChangeGrams = change,
             waistChangeMm = waistChange,
             advice = advice,
+            goal = goal,
         )
+    }
+
+    private fun maintainAdvice(w0: Int, w1: Int, w2: Int?): BodyAdvice = when {
+        w2 == null -> if (abs(w0 - w1) <= DRIFT_GRAMS) BodyAdvice.ON_TRACK else BodyAdvice.TOO_EARLY
+        w0 - w2 > DRIFT_GRAMS -> BodyAdvice.DRIFTING_UP
+        w2 - w0 > DRIFT_GRAMS -> BodyAdvice.DRIFTING_DOWN
+        else -> BodyAdvice.ON_TRACK
+    }
+
+    private fun buildAdvice(w0: Int, w1: Int, w2: Int?): BodyAdvice = when {
+        (w0 - w1) * 200 > w1 -> BodyAdvice.GAINING_FAST
+        w2 == null -> if (w0 > w1) BodyAdvice.ON_TRACK else BodyAdvice.TOO_EARLY
+        w0 - w2 < MIN_GAIN_GRAMS -> BodyAdvice.NOT_GAINING
+        else -> BodyAdvice.ON_TRACK
     }
 
     /** Whether [today] is Sunday and the waist hasn't been measured in the last six days. */
