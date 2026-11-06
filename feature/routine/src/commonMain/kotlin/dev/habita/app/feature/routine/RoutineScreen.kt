@@ -15,15 +15,13 @@ import dev.habita.app.feature.routine.ui.EditTaskScreen
 import dev.habita.app.feature.routine.ui.RoutineRoute
 import dev.habita.app.feature.routine.ui.RoutineViewModel
 
-/** The daily routine: today's checklist, and editing its groups and tasks. */
+/** The daily routine: today's checklist, and adding, editing and deleting its groups and tasks. */
 @Composable
 fun RoutineScreen(feature: RoutineFeature, onExit: () -> Unit) {
     val viewModel = viewModel { RoutineViewModel(feature.repository, feature.checklist) }
     val route by viewModel.route.collectAsStateWithLifecycle()
     val checklist by viewModel.checklist.collectAsStateWithLifecycle()
-    val editing by viewModel.editing.collectAsStateWithLifecycle()
     val groups by viewModel.groups.collectAsStateWithLifecycle()
-    val tasks by viewModel.tasks.collectAsStateWithLifecycle()
     val taskDraft by viewModel.taskDraft.collectAsStateWithLifecycle()
     val groupDraft by viewModel.groupDraft.collectAsStateWithLifecycle()
 
@@ -39,18 +37,14 @@ fun RoutineScreen(feature: RoutineFeature, onExit: () -> Unit) {
                 RoutineRoute.Today -> checklist?.let {
                     ChecklistScreen(
                         checklist = it,
-                        editing = editing,
-                        groups = groups,
-                        tasks = tasks,
                         onBack = onExit,
-                        onEditing = viewModel::setEditing,
                         onToggle = viewModel::toggle,
                         onEditTask = viewModel::editTask,
+                        onDeleteTask = viewModel::deleteTask,
                         onAddTask = viewModel::addTask,
-                        onMoveTask = viewModel::moveTask,
                         onEditGroup = viewModel::editGroup,
+                        onDeleteGroup = viewModel::deleteGroup,
                         onAddGroup = viewModel::addGroup,
-                        onMoveGroup = viewModel::moveGroup,
                     )
                 }
 
@@ -62,6 +56,7 @@ fun RoutineScreen(feature: RoutineFeature, onExit: () -> Unit) {
                         onChange = viewModel::update,
                         onSave = { viewModel.save(draft) },
                         onDelete = { draft.id?.let(viewModel::deleteTask) },
+                        onMove = { by -> draft.id?.let { viewModel.moveTask(it, by) } },
                     )
                 }
 
@@ -72,6 +67,7 @@ fun RoutineScreen(feature: RoutineFeature, onExit: () -> Unit) {
                         onChange = viewModel::update,
                         onSave = { viewModel.save(draft) },
                         onDelete = { draft.id?.let(viewModel::deleteGroup) },
+                        onMove = { by -> draft.id?.let { viewModel.moveGroup(it, by) } },
                     )
                 }
             }

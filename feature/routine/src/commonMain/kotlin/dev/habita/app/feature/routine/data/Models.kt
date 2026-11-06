@@ -41,8 +41,8 @@ object Days {
  */
 data class Day(val key: String, val weekday: Int, val title: String, val endsAt: Long)
 
-/** Today's checklist: the groups that show today, and the ones that are off. */
-data class Checklist(val day: Day, val groups: List<ChecklistGroup>, val off: List<RoutineGroup>) {
+/** Today's checklist: the groups that show today, and the ones that are off, with their tasks. */
+data class Checklist(val day: Day, val groups: List<ChecklistGroup>, val off: List<ChecklistGroup>) {
     val total: Int get() = groups.sumOf { it.tasks.size }
     val done: Int get() = groups.sumOf { it.done }
 
@@ -56,20 +56,20 @@ data class Checklist(val day: Day, val groups: List<ChecklistGroup>, val off: Li
         fun of(day: Day, groups: List<RoutineGroup>, tasks: List<RoutineTask>, done: Set<String>): Checklist {
             val byGroup = tasks.groupBy { it.groupId }
             val (on, off) = groups.sortedWith(compareBy({ it.position }, { it.id })).partition { it.isOn(day.weekday) }
-            return Checklist(
-                day = day,
-                groups = on.map { group ->
-                    val list = byGroup[group.id].orEmpty().sortedWith(compareBy({ it.position }, { it.id }))
-                    ChecklistGroup(group, list.map { ChecklistTask(it, it.id in done) })
-                },
-                off = off,
-            )
+            fun section(group: RoutineGroup): ChecklistGroup {
+                val list = byGroup[group.id].orEmpty().sortedWith(compareBy({ it.position }, { it.id }))
+                return ChecklistGroup(group, list.map { ChecklistTask(it, it.id in done) })
+            }
+            return Checklist(day = day, groups = on.map(::section), off = off.map(::section))
         }
     }
 }
 
+/** A group's tasks in order; [fixed] and [adjustable] split them the way the routine is read. */
 data class ChecklistGroup(val group: RoutineGroup, val tasks: List<ChecklistTask>) {
     val done: Int get() = tasks.count { it.done }
+    val fixed: List<ChecklistTask> get() = tasks.filter { !it.task.adjustable }
+    val adjustable: List<ChecklistTask> get() = tasks.filter { it.task.adjustable }
 }
 
 data class ChecklistTask(val task: RoutineTask, val done: Boolean)
