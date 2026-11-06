@@ -26,7 +26,8 @@ enum class Measure { REPS, SECONDS }
  * An exercise. Its [id] is permanent: history is keyed by it, so the name can change safely.
  *
  * [defaultStep] is how much the target grows when progressing: grams of weight for weighted
- * exercises, reps or seconds for bodyweight ones.
+ * exercises, reps or seconds for bodyweight ones. [alternatives] are the exercise ids to do instead
+ * when a gym doesn't have the equipment, best first.
  */
 @Serializable
 data class Exercise(
@@ -36,6 +37,7 @@ data class Exercise(
     val measure: Measure,
     val perSide: Boolean,
     val defaultStep: Int,
+    val alternatives: List<String> = emptyList(),
 ) {
     val isWeighted: Boolean get() = equipment != Equipment.BODYWEIGHT
 }

@@ -1,0 +1,8 @@
+-- Version 4: exercises swapped for an alternative at this gym.
+CREATE TABLE exercise_swap (
+    exercise_id TEXT NOT NULL PRIMARY KEY,
+    replacement_id TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    deleted INTEGER NOT NULL,
+    dirty INTEGER NOT NULL
+);

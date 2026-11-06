@@ -1,0 +1,26 @@
+-- Exercises done as one of their alternatives at this gym. exercise_id is the one replaced.
+CREATE TABLE exercise_swap (
+    exercise_id TEXT NOT NULL PRIMARY KEY,
+    replacement_id TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    deleted INTEGER NOT NULL,
+    dirty INTEGER NOT NULL
+);
+
+selectAll:
+SELECT * FROM exercise_swap;
+
+selectDirty:
+SELECT * FROM exercise_swap WHERE dirty = 1;
+
+selectById:
+SELECT * FROM exercise_swap WHERE exercise_id = ?;
+
+save:
+INSERT OR REPLACE INTO exercise_swap VALUES (?, ?, ?, ?, ?);
+
+markClean:
+UPDATE exercise_swap SET dirty = 0 WHERE exercise_id = ? AND updated_at = ?;
+
+markAllDirty:
+UPDATE exercise_swap SET dirty = 1;

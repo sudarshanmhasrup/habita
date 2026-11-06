@@ -5,6 +5,7 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import dev.habita.app.feature.gym.db.Body_log
 import dev.habita.app.feature.gym.db.Exercise_step
+import dev.habita.app.feature.gym.db.Exercise_swap
 import dev.habita.app.feature.gym.db.GymDatabase
 import dev.habita.app.feature.gym.db.Set_log
 import dev.habita.app.feature.gym.db.Warm_up_log
@@ -16,6 +17,7 @@ import dev.habita.app.shared.api.SyncCollections
 import dev.habita.app.shared.gym.BodyLog
 import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.ExerciseStep
+import dev.habita.app.shared.gym.ExerciseSwap
 import dev.habita.app.shared.gym.SetLog
 import dev.habita.app.shared.gym.WarmUpLog
 import dev.habita.app.shared.gym.WarmUpStatus
@@ -36,6 +38,7 @@ class GymStore(private val database: GymDatabase) {
     private val steps = database.exerciseStepQueries
     private val values = database.gymValueQueries
     internal val body = database.bodyLogQueries
+    internal val swaps = database.exerciseSwapQueries
     private val json = Json { ignoreUnknownKeys = true }
 
     fun <T> transaction(block: () -> T): T = database.transactionWithResult { block() }
@@ -106,6 +109,18 @@ class GymStore(private val database: GymDatabase) {
     internal fun saveBody(log: BodyLog, dirty: Boolean) = body.save(
         log.day, log.weightGrams?.toLong(), log.waistMm?.toLong(), log.updatedAt, log.deleted.toLong(), dirty.toLong(),
     )
+
+    // Swaps
+
+    val allSwaps: Flow<List<ExerciseSwap>> =
+        swaps.selectAll().asFlow().mapToList(Dispatchers.Default).map { rows -> rows.map { it.toModel() } }
+
+    fun swaps(): List<ExerciseSwap> = swaps.selectAll().executeAsList().map { it.toModel() }
+
+    fun saveSwap(swap: ExerciseSwap) = saveSwap(swap, dirty = true)
+
+    internal fun saveSwap(swap: ExerciseSwap, dirty: Boolean) =
+        swaps.save(swap.exerciseId, swap.replacementId, swap.updatedAt, swap.deleted.toLong(), dirty.toLong())
 
     /** Every record, including deleted ones and ones already synced, for a backup. */
     fun everything(): SyncChanges = transaction {
@@ -231,5 +246,7 @@ internal fun Body_log.toModel() = BodyLog(
     updatedAt = updated_at,
     deleted = deleted == 1L,
 )
+
+internal fun Exercise_swap.toModel() = ExerciseSwap(exercise_id, replacement_id, updated_at, deleted == 1L)
 
 private fun Exercise_step.toModel() = ExerciseStep(exercise_id, step.toInt(), updated_at)

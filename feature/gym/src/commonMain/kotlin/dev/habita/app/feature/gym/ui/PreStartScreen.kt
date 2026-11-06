@@ -28,6 +28,7 @@ import dev.habita.app.core.ui.TopBar
 import dev.habita.app.core.ui.TwoPane
 import dev.habita.app.shared.gym.ExerciseTarget
 import dev.habita.app.shared.gym.Program
+import dev.habita.app.shared.gym.Workout
 
 /** The whole workout before it starts: warm-up, exercises and today's targets. */
 @Composable
@@ -37,6 +38,7 @@ internal fun PreStartScreen(
     targets: List<ExerciseTarget>?,
     onBack: () -> Unit,
     onStart: () -> Unit,
+    onSwap: (exerciseId: String, replacementId: String?) -> Unit,
 ) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
@@ -85,7 +87,7 @@ internal fun PreStartScreen(
                 HText("today's weight", type.caption, color = colors.muted)
             }
             Gap(Space.item)
-            ExerciseList(program, workoutId, targets)
+            ExerciseList(program, workout, data.workout(workoutId) ?: workout, targets, onSwap.takeIf { data.active == null })
             Gap(Space.card)
         })
         Box(
@@ -109,11 +111,20 @@ internal fun PreStartScreen(
     }
 }
 
+/**
+ * The exercises as they'll be done at this gym, each with today's weight. [onSwap] offers "Not at
+ * this gym" on each row; `null` hides it, for example while another workout is in progress.
+ */
 @Composable
-private fun ExerciseList(program: Program, workoutId: String, targets: List<ExerciseTarget>?) {
+private fun ExerciseList(
+    program: Program,
+    planned: Workout,
+    workout: Workout,
+    targets: List<ExerciseTarget>?,
+    onSwap: ((String, String?) -> Unit)?,
+) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
-    val workout = program.workout(workoutId) ?: return
     HabitaCard(Modifier.fillMaxWidth().appear(2)) {
         workout.exercises.forEachIndexed { index, slot ->
             val exercise = program.exercise(slot.exerciseId) ?: return@forEachIndexed
@@ -144,6 +155,11 @@ private fun ExerciseList(program: Program, workoutId: String, targets: List<Exer
                         type.bodyStrong,
                         color = if (target.reason.isIncrease) colors.accent else colors.text,
                     )
+                }
+            }
+            if (onSwap != null) {
+                Column(Modifier.padding(start = 24.dp)) {
+                    SwapAction(program, planned, workout, index, onSwap)
                 }
             }
         }

@@ -404,8 +404,8 @@ private fun WarmUpSetContent(active: ActiveWorkout, data: GymData, viewModel: Gy
     // Half the working weight once it's known. The first time there is none, so start at one
     // step, the lightest sensible load, ready to adjust.
     val suggested = working?.let { Progression.warmUpWeight(it, step) } ?: step.takeIf { exercise.isWeighted }
-    var weightText by remember(active.sessionId, slotIndex) { mutableStateOf(suggested?.let(::formatKg) ?: "") }
-    var repsText by remember(active.sessionId, slotIndex) { mutableStateOf(Progression.WARM_UP_REPS.toString()) }
+    var weightText by remember(active.sessionId, slotIndex, exercise.id) { mutableStateOf(suggested?.let(::formatKg) ?: "") }
+    var repsText by remember(active.sessionId, slotIndex, exercise.id) { mutableStateOf(Progression.WARM_UP_REPS.toString()) }
     val weightGrams = parseKg(weightText)
     val reps = parseCount(repsText)
 
@@ -439,6 +439,7 @@ private fun WarmUpSetContent(active: ActiveWorkout, data: GymData, viewModel: Gy
         },
     ) {
         ExerciseHeader(active, slotIndex, "Exercise ${active.exercisesDone + 1} of ${active.workout.exercises.size} · warm-up set")
+        SwapAction(active, data.program, slotIndex, viewModel::swap)
         Gap(Space.card)
         Column(Modifier.fillMaxWidth()) {
             HText(
@@ -467,11 +468,11 @@ private fun WorkingSetContent(active: ActiveWorkout, data: GymData, viewModel: G
 
     // Prefilled with today's target, adjusted by how the last set felt, so a normal set is one tap.
     // With no target yet (the first time), the warm-up set is about half, so double it.
-    var weightText by remember(active.sessionId, slotIndex, setNumber) {
+    var weightText by remember(active.sessionId, slotIndex, exercise.id, setNumber) {
         val prefill = next.weightGrams ?: active.warmUpSetFor(slotIndex)?.weightGrams?.let { it * 2 }
         mutableStateOf(prefill?.let(::formatKg) ?: "")
     }
-    var amountText by remember(active.sessionId, slotIndex, setNumber) { mutableStateOf(next.target.toString()) }
+    var amountText by remember(active.sessionId, slotIndex, exercise.id, setNumber) { mutableStateOf(next.target.toString()) }
     var editingStep by remember(slotIndex) { mutableStateOf(false) }
 
     val weightGrams = if (exercise.isWeighted) parseKg(weightText) else 0
@@ -531,6 +532,7 @@ private fun WorkingSetContent(active: ActiveWorkout, data: GymData, viewModel: G
         },
     ) {
         ExerciseHeader(active, slotIndex, "Exercise ${active.exercisesDone + 1} of ${active.workout.exercises.size}")
+        SwapAction(active, data.program, slotIndex, viewModel::swap)
         Gap(Space.card)
         SetTrack(active, slotIndex)
         Gap(Space.card)

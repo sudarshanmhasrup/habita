@@ -7,17 +7,18 @@ class ProgramFormatException(val line: Int, message: String) :
 
 /**
  * Parses `PROGRAM.md`. The format is strict on purpose: anything it does not understand inside the
- * Exercises, Warm-ups and Workouts sections is an error, so a typo never turns into wrong data.
- * Other sections and prose are ignored.
+ * Exercises, Alternatives, Warm-ups and Workouts sections is an error, so a typo never turns into
+ * wrong data. Other sections and prose are ignored.
  */
 object ProgramParser {
     private val exerciseHeader = listOf("id", "name", "equipment", "measure", "per side", "step")
     private val warmUpHeader = listOf("name", "amount")
     private val workoutHeader = listOf("exercise", "sets", "target", "rest")
+    private val alternativesHeader = listOf("exercise", "alternatives")
     private val idPattern = Regex("^[a-z0-9]+(-[a-z0-9]+)*$")
     private val separatorPattern = Regex("^\\|[\\s:|-]+\\|$")
 
-    private enum class Section { OTHER, EXERCISES, WARM_UPS, WORKOUTS }
+    private enum class Section { OTHER, EXERCISES, ALTERNATIVES, WARM_UPS, WORKOUTS }
 
     private class Block(val name: String, val line: Int, val section: Section) {
         val keys = mutableMapOf<String, Pair<String, Int>>()
@@ -31,6 +32,7 @@ object ProgramParser {
         val exercises = mutableListOf<Exercise>()
         val warmUps = mutableListOf<WarmUp>()
         val workouts = mutableListOf<Workout>()
+        val alternatives = mutableListOf<Row>()
         var section = Section.OTHER
         var block: Block? = null
 
@@ -53,6 +55,7 @@ object ProgramParser {
                     finishBlock()
                     section = when (line.removePrefix("## ").trim().lowercase()) {
                         "exercises" -> Section.EXERCISES
+                        "alternatives" -> Section.ALTERNATIVES
                         "warm-ups" -> Section.WARM_UPS
                         "workouts" -> Section.WORKOUTS
                         else -> Section.OTHER
@@ -74,6 +77,8 @@ object ProgramParser {
                         Section.EXERCISES -> {
                             readTable(tableLines, exerciseHeader).mapTo(exercises, ::exercise)
                         }
+
+                        Section.ALTERNATIVES -> alternatives += readTable(tableLines, alternativesHeader)
 
                         Section.WARM_UPS, Section.WORKOUTS -> {
                             val current = block
@@ -107,7 +112,26 @@ object ProgramParser {
         }
         finishBlock()
 
-        return Program(exercises, warmUps, workouts).also(::validate)
+        return Program(withAlternatives(exercises, alternatives), warmUps, workouts).also(::validate)
+    }
+
+    /** Adds each Alternatives row to its exercise, checking every id is a known exercise. */
+    private fun withAlternatives(exercises: List<Exercise>, rows: List<Row>): List<Exercise> {
+        val ids = exercises.map { it.id }.toSet()
+        val byExercise = mutableMapOf<String, List<String>>()
+        rows.forEach { row ->
+            val (exerciseId, list) = row.cells
+            if (exerciseId !in ids) throw ProgramFormatException(row.line, "Unknown exercise \"$exerciseId\"")
+            if (exerciseId in byExercise) throw ProgramFormatException(row.line, "\"$exerciseId\" is listed twice")
+            val alternatives = list.split(',').map { it.trim() }
+            alternatives.forEach {
+                if (it !in ids) throw ProgramFormatException(row.line, "Unknown alternative \"$it\"")
+                if (it == exerciseId) throw ProgramFormatException(row.line, "\"$exerciseId\" can't be its own alternative")
+            }
+            duplicate(alternatives)?.let { throw ProgramFormatException(row.line, "Alternative \"$it\" is listed twice") }
+            byExercise[exerciseId] = alternatives
+        }
+        return exercises.map { it.copy(alternatives = byExercise[it.id].orEmpty()) }
     }
 
     private fun readTable(lines: List<Pair<String, Int>>, expectedHeader: List<String>): List<Row> {

@@ -147,6 +147,7 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
                     backupMessage = backupMessage,
                     onWeight = viewModel::logWeight,
                     onWaist = viewModel::logWaist,
+                    onNewGym = viewModel::newGym,
                 )
 
                 is GymRoute.PreStart -> PreStartScreen(
@@ -155,6 +156,7 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
                     targets = preStartTargets,
                     onBack = { viewModel.back() },
                     onStart = { viewModel.start(screen.workoutId) },
+                    onSwap = viewModel::swap,
                 )
 
                 GymRoute.Workout -> current.active?.let { active ->

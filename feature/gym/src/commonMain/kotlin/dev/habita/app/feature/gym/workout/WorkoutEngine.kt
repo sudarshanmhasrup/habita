@@ -15,6 +15,10 @@ import dev.habita.app.shared.gym.Workout
  * next one, plus the record to save. Saving is left to the caller.
  */
 object WorkoutEngine {
+    /**
+     * Starts [workout], which already has this gym's swaps applied. [planned] is the same workout
+     * as the plan has it, so the app knows which slots were swapped.
+     */
     fun start(
         sessionId: String,
         workout: Workout,
@@ -22,6 +26,7 @@ object WorkoutEngine {
         exercises: List<Exercise>,
         targets: List<ExerciseTarget>,
         now: Long,
+        planned: Workout = workout,
     ): ActiveWorkout {
         require(exercises.size == workout.exercises.size && targets.size == workout.exercises.size) {
             "Exercises and targets must match the workout's slots"
@@ -39,6 +44,9 @@ object WorkoutEngine {
             exerciseQueue = workout.exercises.indices.toList(),
             setsLogged = List(workout.exercises.size) { 0 },
             rest = if (noWarmUp) breakRest(warmUp, now) else null,
+            originals = workout.exercises.indices
+                .filter { workout.exercises[it].exerciseId != planned.exercises[it].exerciseId }
+                .associateWith { planned.exercises[it].exerciseId },
         )
     }
 
@@ -170,6 +178,29 @@ object WorkoutEngine {
                 targets[slot]?.takeIf { active.setsLogged[slot] == 0 } ?: target
             },
         )
+
+    /**
+     * Does [slot] as [exercise] instead, with its own [target], for example when this gym doesn't
+     * have the machine. Only before any working set of the slot is logged. Swapping back to the
+     * planned exercise clears the swap.
+     */
+    fun swapExercise(active: ActiveWorkout, slot: Int, exercise: Exercise, target: ExerciseTarget): ActiveWorkout {
+        check(active.canSwap(slot)) { "Sets already logged" }
+        val planned = active.originals[slot] ?: active.slot(slot).exerciseId
+        return active.copy(
+            workout = active.workout.copy(
+                exercises = active.workout.exercises.mapIndexed { index, it ->
+                    if (index == slot) it.copy(exerciseId = exercise.id) else it
+                },
+            ),
+            exercises = active.exercises.mapIndexed { index, it -> if (index == slot) exercise else it },
+            targets = active.targets.mapIndexed { index, it -> if (index == slot) target else it },
+            originals = if (exercise.id == planned) active.originals - slot else active.originals + (slot to planned),
+            warmUpSetsDone = active.warmUpSetsDone - slot,
+            lastWeights = active.lastWeights - slot,
+            advice = active.advice - slot,
+        )
+    }
 
     private fun breakRest(warmUp: WarmUp, now: Long) = Rest(now, now + warmUp.restSeconds * 1000L)
 

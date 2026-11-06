@@ -11,6 +11,8 @@ import dev.habita.app.shared.api.ExportedProgram
 import dev.habita.app.shared.api.ProgramResponse
 import dev.habita.app.shared.gym.BodyLog
 import dev.habita.app.shared.gym.Effort
+import dev.habita.app.shared.gym.ExerciseSwap
+import dev.habita.app.shared.gym.Swaps
 import dev.habita.app.shared.gym.ExerciseStep
 import dev.habita.app.shared.gym.ExerciseTarget
 import dev.habita.app.shared.gym.History
@@ -23,6 +25,7 @@ import dev.habita.app.shared.gym.Workout
 import dev.habita.app.shared.gym.WorkoutSession
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -63,6 +66,9 @@ class GymRepository(core: Core) {
     val active: Flow<ActiveWorkout?> = store.active
     val body: Flow<List<BodyLog>> = store.allBody
 
+    /** Exercises swapped at this gym, by the planned exercise they replace. */
+    val swaps: Flow<Map<String, String>> = store.allSwaps.map(Swaps::active)
+
     /** Saves today's weight, keeping a waist already logged today. */
     suspend fun logWeight(day: String, grams: Int) = write {
         store.transaction {
@@ -83,14 +89,15 @@ class GymRepository(core: Core) {
     suspend fun targets(workoutId: String): List<ExerciseTarget>? = withContext(Dispatchers.Default) {
         val program = store.program()?.program ?: return@withContext null
         val workout = program.workout(workoutId) ?: return@withContext null
-        targetsFor(program, workout, nowMillis())
+        targetsFor(program, Swaps.apply(workout, program, Swaps.active(store.swaps())), nowMillis())
     }
 
     suspend fun start(workoutId: String): ActiveWorkout = write {
         check(store.active() == null) { "A workout is already in progress" }
         val loaded = checkNotNull(store.program()) { "No program yet" }
         val program = loaded.program
-        val workout = checkNotNull(program.workout(workoutId)) { "Unknown workout $workoutId" }
+        val planned = checkNotNull(program.workout(workoutId)) { "Unknown workout $workoutId" }
+        val workout = Swaps.apply(planned, program, Swaps.active(store.swaps()))
         val warmUp = program.warmUps.first { it.id == workout.warmUpId }
         val now = nowMillis()
         val active = WorkoutEngine.start(
@@ -100,6 +107,7 @@ class GymRepository(core: Core) {
             exercises = workout.exercises.map { program.exercise(it.exerciseId)!! },
             targets = targetsFor(program, workout, now),
             now = now,
+            planned = planned,
         )
         store.transaction {
             store.saveSession(
@@ -178,6 +186,49 @@ class GymRepository(core: Core) {
             val targets = targetsFor(program, active.workout, now, slots)
             store.saveActive(WorkoutEngine.updateTargets(active, slots.zip(targets).toMap()))
         }
+    }
+
+    /**
+     * At this gym, does [exerciseId] (as the plan has it) as [replacementId] from now on, or as
+     * planned again when [replacementId] is `null`. The workout in progress follows, for slots with
+     * no working sets yet.
+     */
+    suspend fun swap(exerciseId: String, replacementId: String?) = write {
+        val now = nowMillis()
+        store.transaction {
+            val existing = store.swaps().firstOrNull { it.exerciseId == exerciseId }
+            when {
+                replacementId != null -> store.saveSwap(ExerciseSwap(exerciseId, replacementId, now))
+                existing != null && !existing.deleted -> store.saveSwap(existing.copy(deleted = true, updatedAt = now))
+            }
+            followSwaps(now)
+        }
+    }
+
+    /** A new gym: every swap is undone, so each exercise is back to the plan's. */
+    suspend fun newGym() = write {
+        val now = nowMillis()
+        store.transaction {
+            store.swaps().filter { !it.deleted }.forEach { store.saveSwap(it.copy(deleted = true, updatedAt = now)) }
+            followSwaps(now)
+        }
+    }
+
+    /** Brings the workout in progress in line with the swaps, for slots with no working sets yet. */
+    private fun followSwaps(now: Long) {
+        var active = store.active() ?: return
+        val program = store.program()?.program ?: return
+        val wanted = Swaps.apply(active.planned, program, Swaps.active(store.swaps()))
+        val slots = active.workout.exercises.indices.filter {
+            active.canSwap(it) && wanted.exercises[it].exerciseId != active.slot(it).exerciseId
+        }
+        if (slots.isEmpty()) return
+        val targets = targetsFor(program, wanted, now, slots)
+        slots.zip(targets).forEach { (slot, target) ->
+            val exercise = program.exercise(wanted.exercises[slot].exerciseId) ?: return@forEach
+            active = WorkoutEngine.swapExercise(active, slot, exercise, target)
+        }
+        store.saveActive(active)
     }
 
     /** Finishes the workout early. Sets not done are simply not logged. Returns the session id. */

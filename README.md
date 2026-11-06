@@ -63,6 +63,14 @@ How each set felt adjusts this:
 The step size defaults per exercise in the plan and can be changed in the app, for example after
 switching gyms. Weights are in kg; dumbbell exercises record the weight of one dumbbell.
 
+### Changing gyms
+
+Local gyms don't all have the same machines. Each exercise in the plan lists alternatives, such as
+a cable fly or dumbbell fly for the pec deck. Tap "Not at this gym" on the pre-start screen, or
+before the first set of an exercise, and pick one. The swap is kept for every workout after, until
+it's undone. "New gym: back to the plan" on the gym screen undoes every swap at once. An
+alternative is an exercise of its own, so it has its own weights and history.
+
 ### Bodyweight
 
 The gym screen takes a morning weigh-in and, about once a week, a waist measurement. It averages
