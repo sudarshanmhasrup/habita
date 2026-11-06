@@ -1,9 +1,10 @@
 # AGENTS.md
 
 Habita is a single-user personal app: a Ktor server (`server/`) with SQLite, a Kotlin
-Multiplatform core (`shared/`, `core/`), Compose screens (`compose/`, `feature/*`) and Android
-and iOS entry points (`android/`, `ios/`). It holds the owner's real workout and money data, and
-the server is on the public internet. Full rules: [CODING-GUIDELINES.md](CODING-GUIDELINES.md).
+Multiplatform core (`shared/`, `core/`), Compose screens (`compose/`, `feature/*`) and Android,
+iOS and desktop entry points (`android/`, `ios/`, `desktop/`). It holds the owner's real workout
+and money data, and the server is on the public internet. Full rules:
+[CODING-GUIDELINES.md](CODING-GUIDELINES.md).
 
 ## Check your work
 

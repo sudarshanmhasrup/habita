@@ -5,18 +5,20 @@ own copy. It works offline first and syncs across devices through a small self-h
 
 The first feature is a gym tracker built around progressive overload: it remembers what you lifted
 last time and tells you what to lift today, so there is nothing to remember or work out at the gym.
+Next to it are an expense tracker with a monthly budget and a daily routine checklist that resets
+every midnight.
 
 ## Status
 
-| Part           | Status                                                                  |
-|----------------|-------------------------------------------------------------------------|
-| Server         | Done: login, sync, progression, summaries, export                       |
-| Deployment     | Done: Docker image, CI, HTTPS, server hardening, backups                |
-| Android app    | Done: home, the full gym flow, effort-based suggestions, summary charts |
-| Desktop app    | Planned, sharing the Compose Multiplatform UI with Android              |
-| iOS app        | Runs the same Compose UI as Android; not yet tested on a real iPhone    |
-| Web            | Planned for later                                                       |
-| Other features | Planned for later: expense tracker, to-do list, roadmap, month planner  |
+| Part           | Status                                                                    |
+|----------------|---------------------------------------------------------------------------|
+| Server         | Done: login, sync, progression, summaries, export                         |
+| Deployment     | Done: Docker image, CI, HTTPS, server hardening, backups                  |
+| Android app    | Done: home, the gym flow, expense tracker and daily routine               |
+| Desktop app    | Done: the same Compose UI as Android in one window, for macOS and others  |
+| iOS app        | Runs the same Compose UI as Android; not yet tested on a real iPhone      |
+| Web            | Planned for later                                                         |
+| Other features | Planned for later: to-do list, roadmap, month planner                     |
 
 ## How the gym feature works
 
@@ -76,19 +78,21 @@ data as one JSON file, ready to review yourself or with an AI before you change 
 
 ## Project structure
 
-| Path             | Purpose                                                                |
-|------------------|------------------------------------------------------------------------|
-| `android`        | Android entry point                                                    |
-| `ios`            | iOS entry point: an Xcode project that shows the `compose` UI          |
-| `compose`        | Compose Multiplatform entry point: home screen and navigation          |
-| `core`           | App-wide pieces: theme, UI components, settings, server client, sync   |
-| `feature/auth`   | The login screen                                                       |
-| `feature/gym`    | The gym flow and its local database                                    |
-| `feature/routine` | The daily routine checklist, reset every midnight, and its database   |
-| `shared`         | Code for every platform and the server: models, progression, summaries |
-| `server`         | Ktor server: login, sync, targets, summaries and export                |
-| `program`        | The workout plan                                                       |
-| `deploy`         | Docker Compose stack, server setup and backup scripts                  |
+| Path              | Purpose                                                                |
+|-------------------|------------------------------------------------------------------------|
+| `android`         | Android entry point                                                    |
+| `ios`             | iOS entry point: an Xcode project that shows the `compose` UI          |
+| `desktop`         | Desktop entry point: one window that shows the `compose` UI            |
+| `compose`         | Compose Multiplatform entry point: home screen and navigation          |
+| `core`            | App-wide pieces: theme, UI components, settings, server client, sync   |
+| `feature/auth`    | The login screen                                                       |
+| `feature/gym`     | The gym flow and its local database                                    |
+| `feature/expense` | The expense tracker: payments, categories, budget and its database     |
+| `feature/routine` | The daily routine checklist, reset every midnight, and its database    |
+| `shared`          | Code for every platform and the server: models, progression, summaries |
+| `server`          | Ktor server: login, sync, targets, summaries and export                |
+| `program`         | The workout plan                                                       |
+| `deploy`          | Docker Compose stack, server setup and backup scripts                  |
 
 The progression rules, rotation and summary live in `shared`, so the app gives the same answers
 offline that the server gives online.
@@ -115,8 +119,11 @@ cd habita
 ### Run the tests
 
 ```sh
-./gradlew :shared:jvmTest :server:test :feature:gym:desktopTest
+./gradlew :shared:jvmTest :server:test :core:desktopTest :feature:gym:desktopTest \
+    :feature:expense:desktopTest :feature:routine:desktopTest
 ```
+
+CI also checks every database migration; the full list of checks is in [AGENTS.md](AGENTS.md).
 
 ### Run the server locally
 
@@ -167,10 +174,22 @@ need HTTPS.
 
 Every set and payment is saved on the phone as it is done, so the app works with no connection.
 Android's automatic backup includes it, and the gym screen's "Save a backup file" button writes the
-gym's records to a JSON file you choose. With the login on, workouts, payments, categories and the
-income sync in the background whenever the server is reachable, including what was saved before
-the login was turned on, and the server's workout plan replaces the built-in one. How syncing
-works is in the [server README](server/README.md#sync).
+gym's records to a JSON file you choose. With the login on, workouts, payments, categories, the
+income and the daily routine sync in the background whenever the server is reachable, including
+what was saved before the login was turned on, and the server's workout plan replaces the built-in
+one. How syncing works is in the [server README](server/README.md#sync).
+
+### Run the desktop app
+
+The desktop app reads the same `local.properties` settings as Android and keeps its data in
+`~/.habita`. Start it with:
+
+```sh
+./gradlew :desktop:run
+```
+
+To build an installer for the current system, run `./gradlew :desktop:packageDmg` on macOS,
+`:desktop:packageMsi` on Windows or `:desktop:packageDeb` on Linux.
 
 ### Build the iOS app
 
