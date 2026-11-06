@@ -2,7 +2,9 @@ package dev.habita.app.shared.gym
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class BodyTest {
     // Today is 28 Jan: week 0 is 22–28 Jan, week 1 is 15–21, week 2 is 8–14, week 3 is 1–7.
@@ -103,5 +105,25 @@ class BodyTest {
         assertNull(trend.today)
         assertEquals("2026-01-26", trend.latestWeight?.day)
         assertEquals("2026-01-21", trend.latestWaist?.day)
+    }
+
+    @Test
+    fun `knows the day of the week`() {
+        assertEquals(3, Body.dayOfWeek("1970-01-01"))
+        assertEquals(5, Body.dayOfWeek("2026-11-07"))
+        assertEquals(6, Body.dayOfWeek("2026-11-08"))
+    }
+
+    @Test
+    fun `the waist is due on Sundays unless measured in the last six days`() {
+        val sunday = "2026-11-08"
+        fun waistOn(day: String) = BodyLog(day, waistMm = 850, updatedAt = 0)
+
+        assertTrue(Body.waistDue(emptyList(), sunday))
+        assertTrue(Body.waistDue(listOf(waistOn("2026-11-01")), sunday))
+        assertFalse(Body.waistDue(listOf(waistOn("2026-11-02")), sunday))
+        assertFalse(Body.waistDue(listOf(waistOn("2026-11-08")), sunday))
+        assertTrue(Body.waistDue(listOf(waistOn("2026-11-05").copy(deleted = true)), sunday))
+        assertFalse(Body.waistDue(emptyList(), "2026-11-07"))
     }
 }

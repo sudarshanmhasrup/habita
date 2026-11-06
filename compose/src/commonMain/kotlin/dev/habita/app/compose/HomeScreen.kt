@@ -213,6 +213,10 @@ private fun GymCard(gym: GymToday, onStart: (String) -> Unit, onOpen: () -> Unit
         HText(gym.detail, type.body, color = colors.muted)
         Gap(Space.card)
         WeekDots(gym.trainedDays, gym.todayIndex)
+        if (gym.waistDue) {
+            Gap(Space.card)
+            HText("Sunday: measure your waist and log it in the gym.", type.caption, color = colors.accent)
+        }
         Gap(Space.card)
         PrimaryButton(if (gym.inProgress) "Resume workout" else "Start workout", { onStart(gym.workoutId) }, Modifier.fillMaxWidth())
     }
