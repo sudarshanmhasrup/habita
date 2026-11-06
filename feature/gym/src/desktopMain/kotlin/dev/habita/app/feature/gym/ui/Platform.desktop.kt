@@ -1,8 +1,11 @@
 package dev.habita.app.feature.gym.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import java.awt.FileDialog
 import java.awt.Frame
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import java.io.File
 
 /** Desktop has no vibration. */
@@ -24,3 +27,8 @@ internal actual fun rememberFileSaver(onResult: (Boolean?) -> Unit): (fileName: 
             onResult(runCatching { File(directory, name).writeText(contents) }.isSuccess)
         }
     }
+
+@Composable
+internal actual fun rememberTextCopier(): (String) -> Unit = remember {
+    { text -> Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null) }
+}

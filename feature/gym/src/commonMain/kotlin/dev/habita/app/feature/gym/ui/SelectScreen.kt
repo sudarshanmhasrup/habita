@@ -42,6 +42,7 @@ import dev.habita.app.core.ui.SecondaryButton
 import dev.habita.app.core.ui.TopBar
 import dev.habita.app.core.ui.TwoPane
 import dev.habita.app.core.sync.SyncState
+import dev.habita.app.feature.gym.data.CheckInStatus
 import dev.habita.app.feature.gym.workout.ActiveWorkout
 import dev.habita.app.shared.gym.Program
 import dev.habita.app.shared.gym.Workout
@@ -65,6 +66,9 @@ internal fun SelectScreen(
     onWeight: (Int) -> Unit,
     onWaist: (Int) -> Unit,
     onNewGym: () -> Unit,
+    checkIn: CheckInStatus?,
+    onCopyCheckIn: () -> Unit,
+    checkInMessage: String?,
 ) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
@@ -99,11 +103,15 @@ internal fun SelectScreen(
                     UpNextCard(program, workout, lastDone(data.sessions, workout.id, now)) { onOpenWorkout(workout.id) }
                 }
             }
+            if (checkIn?.due != null) {
+                Gap(Space.item)
+                CheckInCard(checkIn, onCopyCheckIn, checkInMessage)
+            }
             Gap(Space.item)
             BodyCard(data.body, onWeight, onWaist)
             if (wide) {
                 Gap(Space.section)
-                StorageNote(data, onBackup, backupMessage)
+                StorageNote(data, onBackup, backupMessage, checkIn, onCopyCheckIn, checkInMessage)
             }
         },
         second = {
@@ -118,7 +126,7 @@ internal fun SelectScreen(
             }
             if (!wide) {
                 Gap(Space.section)
-                StorageNote(data, onBackup, backupMessage)
+                StorageNote(data, onBackup, backupMessage, checkIn, onCopyCheckIn, checkInMessage)
             }
             Gap(Space.card)
         },
@@ -337,7 +345,14 @@ private fun SwapsCard(program: Program, swaps: Map<String, String>, onNewGym: ()
  * backup file of everything on the phone.
  */
 @Composable
-private fun ColumnScope.StorageNote(data: GymData, onBackup: () -> Unit, backupMessage: String?) {
+private fun ColumnScope.StorageNote(
+    data: GymData,
+    onBackup: () -> Unit,
+    backupMessage: String?,
+    checkIn: CheckInStatus?,
+    onCopyCheckIn: () -> Unit,
+    checkInMessage: String?,
+) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     val (title, detail) = when {
@@ -367,6 +382,18 @@ private fun ColumnScope.StorageNote(data: GymData, onBackup: () -> Unit, backupM
         if (backupMessage != null) {
             Gap(Space.inside)
             HText(backupMessage, type.caption, color = colors.muted)
+        }
+        // With a check-in due, its card has the button instead.
+        if (checkIn != null && checkIn.due == null) {
+            Gap(Space.item)
+            SecondaryButton("Copy check-in for AI", onCopyCheckIn, Modifier.fillMaxWidth())
+            Gap(Space.inside)
+            HText(
+                checkInMessage ?: checkIn.lastAt?.let { "Last check-in ${shortDate(it)}. Asks again in about three months, or when an exercise is stuck." }
+                    ?: "Your training data and plan, ready to paste into Claude or ChatGPT.",
+                type.caption,
+                color = colors.muted,
+            )
         }
     }
 }

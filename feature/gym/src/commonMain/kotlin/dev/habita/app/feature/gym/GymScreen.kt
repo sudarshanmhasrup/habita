@@ -28,6 +28,7 @@ import dev.habita.app.feature.gym.ui.daysBetween
 import dev.habita.app.feature.gym.ui.estimateMinutes
 import dev.habita.app.feature.gym.ui.startOfWeek
 import dev.habita.app.feature.gym.ui.rememberFileSaver
+import dev.habita.app.feature.gym.ui.rememberTextCopier
 import dev.habita.app.shared.gym.Rotation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -109,6 +110,9 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
     val report by viewModel.report.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var backupMessage by remember { mutableStateOf<String?>(null) }
+    val checkIn by viewModel.checkIn.collectAsStateWithLifecycle()
+    var checkInMessage by remember { mutableStateOf<String?>(null) }
+    val copyText = rememberTextCopier()
     val saveFile = rememberFileSaver { saved ->
         backupMessage = when (saved) {
             true -> "Backup saved. Keep it somewhere safe, like Google Drive."
@@ -148,6 +152,15 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
                     onWeight = viewModel::logWeight,
                     onWaist = viewModel::logWaist,
                     onNewGym = viewModel::newGym,
+                    checkIn = checkIn,
+                    onCopyCheckIn = {
+                        scope.launch {
+                            val text = viewModel.checkInText() ?: return@launch
+                            copyText(text)
+                            checkInMessage = "Copied. Paste it into Claude or ChatGPT, in the chat where your goal is saved."
+                        }
+                    },
+                    checkInMessage = checkInMessage,
                 )
 
                 is GymRoute.PreStart -> PreStartScreen(

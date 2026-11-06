@@ -1,5 +1,7 @@
 package dev.habita.app.feature.gym.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
@@ -54,6 +56,17 @@ internal actual fun rememberFileSaver(onResult: (Boolean?) -> Unit): (fileName: 
         { fileName, contents ->
             pending[0] = contents
             launcher.launch(fileName)
+        }
+    }
+}
+
+@Composable
+internal actual fun rememberTextCopier(): (String) -> Unit {
+    val context = LocalContext.current
+    return remember(context) {
+        { text ->
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("Habita check-in", text))
         }
     }
 }

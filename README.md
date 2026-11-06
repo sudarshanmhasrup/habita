@@ -83,6 +83,17 @@ now, so the app never needs a calorie target:
 - Less than 0.2 kg lost in two weeks: eat about 150 kcal a day less, or walk more. If the waist
   went down at least 0.5 cm over four weeks meanwhile, that's recomposition, so keep going.
 
+### Check-ins
+
+There is no coach and no AI inside the app. Instead, about every three months, or sooner when an
+exercise has had no new best for six weeks over at least four sessions, the gym screen asks for a
+check-in. "Copy for AI" copies one text with the period's workouts, every exercise's first, latest
+and best sets, how the sets felt, the weekly bodyweight, the gym's swaps and the full plan in
+`PROGRAM.md` format. Paste it into Claude or ChatGPT, ideally in a chat or project where your goal
+and diet targets are saved, so they never go into this repository. If it suggests changes, it
+replies with tables to paste into [program/PROGRAM.md](program/PROGRAM.md). "Copy check-in for AI"
+under the backup button does the same at any time.
+
 ## The workout plan
 
 The plan lives in [program/PROGRAM.md](program/PROGRAM.md): every exercise, warm-up and workout,

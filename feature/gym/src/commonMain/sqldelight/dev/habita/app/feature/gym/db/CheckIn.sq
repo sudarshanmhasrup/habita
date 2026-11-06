@@ -1,0 +1,26 @@
+-- Each time the check-in text was copied for an AI. The latest decides when the next is due.
+CREATE TABLE check_in (
+    id TEXT NOT NULL PRIMARY KEY,
+    at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    deleted INTEGER NOT NULL,
+    dirty INTEGER NOT NULL
+);
+
+selectAll:
+SELECT * FROM check_in;
+
+selectDirty:
+SELECT * FROM check_in WHERE dirty = 1;
+
+selectById:
+SELECT * FROM check_in WHERE id = ?;
+
+save:
+INSERT OR REPLACE INTO check_in VALUES (?, ?, ?, ?, ?);
+
+markClean:
+UPDATE check_in SET dirty = 0 WHERE id = ? AND updated_at = ?;
+
+markAllDirty:
+UPDATE check_in SET dirty = 1;
