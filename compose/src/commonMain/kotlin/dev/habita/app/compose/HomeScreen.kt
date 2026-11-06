@@ -56,6 +56,7 @@ import dev.habita.app.feature.routine.RoutineToday
 internal fun HomeScreen(
     userName: String,
     hour: Int,
+    dateLabel: String,
     darkTheme: Boolean,
     accent: Accent,
     gym: GymToday?,
@@ -82,7 +83,7 @@ internal fun HomeScreen(
             Modifier.fillMaxWidth().padding(start = Space.screen, end = Space.screen, top = Space.item),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Overline(todayLabel(), Modifier.weight(1f))
+            Overline(dateLabel, Modifier.weight(1f))
             IconCircleButton(
                 icon = HabitaIcons.Palette,
                 contentDescription = "Theme",

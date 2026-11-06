@@ -1,16 +1,8 @@
 package dev.habita.app.feature.gym.ui
 
-import dev.habita.app.core.ui.Motion
 import dev.habita.app.core.ui.ContentSwap
-import dev.habita.app.core.ui.Scrim
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -149,25 +141,15 @@ private fun ActiveWorkout.stepKey(): Any = listOf(phase, rest != null, currentWa
 /** Asks before finishing, over a dimmed screen. Tapping outside keeps the workout going. */
 @Composable
 private fun BoxScope.FinishPanel(visible: Boolean, workoutName: String, onFinish: () -> Unit, onKeepGoing: () -> Unit) {
-    val colors = HabitaTheme.colors
-    val type = HabitaTheme.typography
-    Scrim(visible, onDismiss = onKeepGoing)
-    AnimatedVisibility(
-        visible,
-        modifier = Modifier.align(Alignment.BottomCenter),
-        enter = slideInVertically(tween(Motion.MEDIUM, easing = Motion.Ease)) { it } + fadeIn(),
-        exit = slideOutVertically(tween(Motion.SHORT)) { it } + fadeOut(),
-    ) {
-        HabitaCard(Modifier.fillMaxWidth().padding(Space.item)) {
-            HText("Finish $workoutName?", type.title)
-            Gap(Space.tiny)
-            HText("Sets you haven't done are left out of today's numbers.", type.body, color = colors.muted)
-            Gap(Space.card)
-            PrimaryButton("Finish workout", onFinish, Modifier.fillMaxWidth())
-            Gap(Space.inside)
-            SecondaryButton("Keep going", onKeepGoing, Modifier.fillMaxWidth())
-        }
-    }
+    ConfirmPanel(
+        visible = visible,
+        title = "Finish $workoutName?",
+        detail = "Sets you haven't done are left out of today's numbers.",
+        confirm = "Finish workout",
+        onConfirm = onFinish,
+        cancel = "Keep going",
+        onCancel = onKeepGoing,
+    )
 }
 
 /** Time since the workout started, ticking every second. */

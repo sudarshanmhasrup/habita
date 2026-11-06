@@ -17,6 +17,7 @@ import platform.Foundation.writeToURL
 import platform.UIKit.UIDocumentPickerDelegateProtocol
 import platform.UIKit.UIDocumentPickerViewController
 import platform.UIKit.UIPasteboard
+import platform.UniformTypeIdentifiers.UTTypeJSON
 import platform.darwin.NSObject
 
 /** The full-strength system buzz; iOS has no custom patterns without Core Haptics. */
@@ -76,4 +77,35 @@ private class FileSaverDelegate : NSObject(), UIDocumentPickerDelegateProtocol {
 @Composable
 internal actual fun rememberTextCopier(): (String) -> Unit = remember {
     { text -> UIPasteboard.generalPasteboard.string = text }
+}
+
+/** Opens the Files picker for a JSON file and reads a copy of it. */
+@OptIn(ExperimentalForeignApi::class)
+@Composable
+internal actual fun rememberFileOpener(onResult: (String?) -> Unit): () -> Unit {
+    val viewController = LocalUIViewController.current
+    // The picker holds its delegate weakly, so it is kept here for as long as the screen is.
+    val delegate = remember { FileOpenerDelegate() }
+    delegate.onResult = onResult
+    return remember(viewController) {
+        {
+            val picker = UIDocumentPickerViewController(forOpeningContentTypes = listOf(UTTypeJSON), asCopy = true)
+            picker.delegate = delegate
+            viewController.presentViewController(picker, animated = true, completion = null)
+        }
+    }
+}
+
+@OptIn(BetaInteropApi::class, ExperimentalForeignApi::class)
+private class FileOpenerDelegate : NSObject(), UIDocumentPickerDelegateProtocol {
+    var onResult: (String?) -> Unit = {}
+
+    override fun documentPicker(controller: UIDocumentPickerViewController, didPickDocumentsAtURLs: List<*>) {
+        val url = didPickDocumentsAtURLs.firstOrNull() as? NSURL
+        onResult(url?.let { NSString.create(contentsOfURL = it, encoding = NSUTF8StringEncoding, error = null)?.toString() })
+    }
+
+    override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) {
+        onResult(null)
+    }
 }

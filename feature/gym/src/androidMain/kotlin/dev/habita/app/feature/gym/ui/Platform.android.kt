@@ -70,3 +70,13 @@ internal actual fun rememberTextCopier(): (String) -> Unit {
         }
     }
 }
+
+@Composable
+internal actual fun rememberFileOpener(onResult: (String?) -> Unit): () -> Unit {
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        onResult(uri?.let { runCatching { context.contentResolver.openInputStream(it)!!.use { stream -> stream.readBytes().decodeToString() } }.getOrNull() })
+    }
+    // Any type: cloud drives don't always label a backup as JSON. The contents are checked instead.
+    return remember(launcher) { { launcher.launch(arrayOf("*/*")) } }
+}
