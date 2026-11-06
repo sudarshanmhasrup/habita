@@ -13,3 +13,7 @@ internal expect fun rememberRestAlert(): () -> Unit
  */
 @Composable
 internal expect fun rememberFileSaver(onResult: (Boolean?) -> Unit): (fileName: String, contents: String) -> Unit
+
+/** Returns a function that puts text on the clipboard, for pasting into another app. */
+@Composable
+internal expect fun rememberTextCopier(): (String) -> Unit

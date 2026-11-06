@@ -4,6 +4,7 @@ import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import dev.habita.app.feature.gym.db.GymDatabase
 import dev.habita.app.shared.api.SyncCollections
 import dev.habita.app.shared.gym.BodyLog
+import dev.habita.app.shared.gym.CheckIn
 import dev.habita.app.shared.gym.ExerciseSwap
 import java.nio.file.Files
 import java.nio.file.Path
@@ -28,9 +29,11 @@ class GymRecordsTest {
 
             store.saveBody(BodyLog("2026-11-07", weightGrams = 78_000, updatedAt = 1))
             store.saveSwap(ExerciseSwap("pec-deck-fly", "cable-fly", updatedAt = 1))
+            store.saveCheckIn(CheckIn("c1", at = 1, updatedAt = 1))
 
             assertEquals(78_000, store.bodyLog("2026-11-07")?.weightGrams)
             assertEquals(listOf("cable-fly"), store.swaps().map { it.replacementId })
+            assertEquals(listOf("c1"), store.checkIns().map { it.id })
         }
         Files.deleteIfExists(released)
     }

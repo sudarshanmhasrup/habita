@@ -2,6 +2,7 @@ package dev.habita.app.feature.gym.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.habita.app.feature.gym.data.CheckInStatus
 import dev.habita.app.feature.gym.data.GymRepository
 import dev.habita.app.feature.gym.data.SessionReport
 import dev.habita.app.core.sync.SyncState
@@ -107,6 +108,11 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
             if (route is GymRoute.Summary) flow<SessionReport?> { emit(repository.report(route.sessionId)) } else flowOf(null)
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    val checkIn: StateFlow<CheckInStatus?> = repository.checkIn.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** The check-in text for an AI chat; getting it counts as a check-in. */
+    suspend fun checkInText(): String? = repository.checkInText(today(), ::backupDate)
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()

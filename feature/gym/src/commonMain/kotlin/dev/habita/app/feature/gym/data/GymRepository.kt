@@ -10,6 +10,10 @@ import dev.habita.app.shared.api.Export
 import dev.habita.app.shared.api.ExportedProgram
 import dev.habita.app.shared.api.ProgramResponse
 import dev.habita.app.shared.gym.BodyLog
+import dev.habita.app.shared.gym.CheckIn
+import dev.habita.app.shared.gym.CheckInData
+import dev.habita.app.shared.gym.CheckInReason
+import dev.habita.app.shared.gym.CheckIns
 import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.ExerciseSwap
 import dev.habita.app.shared.gym.Swaps
@@ -25,6 +29,8 @@ import dev.habita.app.shared.gym.Workout
 import dev.habita.app.shared.gym.WorkoutSession
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -68,6 +74,37 @@ class GymRepository(core: Core) {
 
     /** Exercises swapped at this gym, by the planned exercise they replace. */
     val swaps: Flow<Map<String, String>> = store.allSwaps.map(Swaps::active)
+
+    /** Whether the plan needs a check-in, and which exercises are stuck, as workouts are logged. */
+    val checkIn: Flow<CheckInStatus> =
+        combine(store.program, store.allSessions, store.allSets, store.allCheckIns) { program, sessions, sets, checkIns ->
+            val plan = program?.program ?: return@combine CheckInStatus(null, emptyList(), null)
+            val now = nowMillis()
+            val last = checkIns.filter { !it.deleted }.maxOfOrNull { it.at }
+            val plateaus = CheckIns.plateaus(plan, sessions, sets, now)
+            CheckInStatus(CheckIns.due(last, sessions, plateaus, now), plateaus.mapNotNull { plan.exercise(it.exerciseId)?.name }, last)
+        }.flowOn(Dispatchers.Default)
+
+    /** The check-in text to paste into an AI chat. Copying it counts as a check-in. */
+    suspend fun checkInText(today: String, formatDate: (Long) -> String): String? = write {
+        val program = store.program()?.program ?: return@write null
+        val now = nowMillis()
+        val text = CheckIns.text(
+            CheckInData(
+                program = program,
+                sessions = store.sessions(),
+                sets = store.allSets(),
+                body = store.everythingBody(),
+                swaps = Swaps.active(store.swaps()),
+                lastCheckIn = store.checkIns().filter { !it.deleted }.maxOfOrNull { it.at },
+                now = now,
+                today = today,
+                formatDate = formatDate,
+            ),
+        )
+        store.saveCheckIn(CheckIn(newId(), now, now))
+        text
+    }
 
     /** Saves today's weight, keeping a waist already logged today. */
     suspend fun logWeight(day: String, grams: Int) = write {
@@ -344,3 +381,9 @@ class GymRepository(core: Core) {
 internal const val BUNDLED_VERSION = 0L
 
 private val backupJson = Json { prettyPrint = true }
+
+/**
+ * Whether a check-in is due and why, the names of stuck exercises, and when the last one was, or
+ * `null` before the first.
+ */
+data class CheckInStatus(val due: CheckInReason?, val stuck: List<String>, val lastAt: Long?)

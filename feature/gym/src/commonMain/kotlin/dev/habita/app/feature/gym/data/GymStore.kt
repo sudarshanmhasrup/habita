@@ -4,6 +4,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import dev.habita.app.feature.gym.db.Body_log
+import dev.habita.app.feature.gym.db.Check_in
 import dev.habita.app.feature.gym.db.Exercise_step
 import dev.habita.app.feature.gym.db.Exercise_swap
 import dev.habita.app.feature.gym.db.GymDatabase
@@ -15,6 +16,7 @@ import dev.habita.app.shared.api.ProgramResponse
 import dev.habita.app.shared.api.SyncChanges
 import dev.habita.app.shared.api.SyncCollections
 import dev.habita.app.shared.gym.BodyLog
+import dev.habita.app.shared.gym.CheckIn
 import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.ExerciseStep
 import dev.habita.app.shared.gym.ExerciseSwap
@@ -39,6 +41,7 @@ class GymStore(private val database: GymDatabase) {
     private val values = database.gymValueQueries
     internal val body = database.bodyLogQueries
     internal val swaps = database.exerciseSwapQueries
+    internal val checkIns = database.checkInQueries
     private val json = Json { ignoreUnknownKeys = true }
 
     fun <T> transaction(block: () -> T): T = database.transactionWithResult { block() }
@@ -106,6 +109,8 @@ class GymStore(private val database: GymDatabase) {
 
     fun saveBody(log: BodyLog) = saveBody(log, dirty = true)
 
+    fun everythingBody(): List<BodyLog> = body.selectAll().executeAsList().map { it.toModel() }
+
     internal fun saveBody(log: BodyLog, dirty: Boolean) = body.save(
         log.day, log.weightGrams?.toLong(), log.waistMm?.toLong(), log.updatedAt, log.deleted.toLong(), dirty.toLong(),
     )
@@ -121,6 +126,24 @@ class GymStore(private val database: GymDatabase) {
 
     internal fun saveSwap(swap: ExerciseSwap, dirty: Boolean) =
         swaps.save(swap.exerciseId, swap.replacementId, swap.updatedAt, swap.deleted.toLong(), dirty.toLong())
+
+    // Check-ins
+
+    val allCheckIns: Flow<List<CheckIn>> =
+        checkIns.selectAll().asFlow().mapToList(Dispatchers.Default).map { rows -> rows.map { it.toModel() } }
+
+    fun checkIns(): List<CheckIn> = checkIns.selectAll().executeAsList().map { it.toModel() }
+
+    fun saveCheckIn(checkIn: CheckIn) = saveCheckIn(checkIn, dirty = true)
+
+    internal fun saveCheckIn(checkIn: CheckIn, dirty: Boolean) =
+        checkIns.save(checkIn.id, checkIn.at, checkIn.updatedAt, checkIn.deleted.toLong(), dirty.toLong())
+
+    /** Every set, for the check-in, refreshed as sets are logged or synced. */
+    val allSets: Flow<List<SetLog>> =
+        sets.selectAll().asFlow().mapToList(Dispatchers.Default).map { rows -> rows.map { it.toModel() } }
+
+    fun allSets(): List<SetLog> = sets.selectAll().executeAsList().map { it.toModel() }
 
     /** Every record, including deleted ones and ones already synced, for a backup. */
     fun everything(): SyncChanges = transaction {
@@ -248,5 +271,7 @@ internal fun Body_log.toModel() = BodyLog(
 )
 
 internal fun Exercise_swap.toModel() = ExerciseSwap(exercise_id, replacement_id, updated_at, deleted == 1L)
+
+internal fun Check_in.toModel() = CheckIn(id, at, updated_at, deleted == 1L)
 
 private fun Exercise_step.toModel() = ExerciseStep(exercise_id, step.toInt(), updated_at)

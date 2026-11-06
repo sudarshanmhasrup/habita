@@ -16,6 +16,7 @@ import platform.Foundation.create
 import platform.Foundation.writeToURL
 import platform.UIKit.UIDocumentPickerDelegateProtocol
 import platform.UIKit.UIDocumentPickerViewController
+import platform.UIKit.UIPasteboard
 import platform.darwin.NSObject
 
 /** The full-strength system buzz; iOS has no custom patterns without Core Haptics. */
@@ -70,4 +71,9 @@ private class FileSaverDelegate : NSObject(), UIDocumentPickerDelegateProtocol {
         temporaryFile = null
         onResult(result)
     }
+}
+
+@Composable
+internal actual fun rememberTextCopier(): (String) -> Unit = remember {
+    { text -> UIPasteboard.generalPasteboard.string = text }
 }

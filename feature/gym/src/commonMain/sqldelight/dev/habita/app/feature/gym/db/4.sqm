@@ -1,0 +1,8 @@
+-- Version 5: plan check-ins.
+CREATE TABLE check_in (
+    id TEXT NOT NULL PRIMARY KEY,
+    at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    deleted INTEGER NOT NULL,
+    dirty INTEGER NOT NULL
+);
