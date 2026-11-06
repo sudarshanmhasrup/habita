@@ -114,6 +114,21 @@ class GymRepository(core: Core) {
         }
     }
 
+    /**
+     * Sets both values of any [day], for fixing or filling in a past day. With both `null` the day
+     * is deleted.
+     */
+    suspend fun setBody(day: String, weightGrams: Int?, waistMm: Int?) = write {
+        val now = nowMillis()
+        store.transaction {
+            val existing = store.bodyLog(day)
+            when {
+                weightGrams != null || waistMm != null -> store.saveBody(BodyLog(day, weightGrams, waistMm, now))
+                existing != null && !existing.deleted -> store.saveBody(existing.copy(deleted = true, updatedAt = now))
+            }
+        }
+    }
+
     /** Saves today's waist, keeping a weight already logged today. */
     suspend fun logWaist(day: String, mm: Int) = write {
         store.transaction {
@@ -307,6 +322,15 @@ class GymRepository(core: Core) {
             records = sync.records.associate { it.collection to it.everything() }.filterValues { it.isNotEmpty() },
         )
         backupJson.encodeToString(export)
+    }
+
+    /**
+     * Merges a backup file into the phone: records newer than the phone's copies are kept. Returns
+     * `null` when the file isn't a Habita backup.
+     */
+    suspend fun restore(text: String): RestoreResult? = write {
+        val collections = GymRestore.read(text) ?: return@write null
+        GymRestore.merge(sync.tables, collections) { block -> store.transaction(block) }
     }
 
     /** The summary of [sessionId] with the data for its charts. */

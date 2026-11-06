@@ -83,10 +83,11 @@ now, so the app never needs a calorie target:
 - Less than 0.2 kg lost in two weeks: eat about 150 kcal a day less, or walk more. If the waist
   went down at least 0.5 cm over four weeks meanwhile, that's recomposition, so keep going.
 
-Weighing at the gym before each workout works too, as long as it's always the same way. On
-Sundays, Android shows a reminder at 9:00 to measure the waist, and the home screen's gym card says
-so too, unless it was measured in the last six days. The reminder is set on the phone, so it needs
-no server or push service.
+Weighing at the gym before each workout works too, as long as it's always the same way. "Past two
+weeks" lists the last 14 days: tap one to fix a typo, add a missed weigh-in or delete the day. On
+Sundays, the phone shows a reminder at 9:00 to measure the waist (Android and iOS), and the home
+screen's gym card says so too, unless it was measured in the last six days. The reminder is set on
+the phone, so it needs no server or push service.
 
 ### Check-ins
 
@@ -210,10 +211,12 @@ need HTTPS.
 
 Every set and payment is saved on the phone as it is done, so the app works with no connection.
 Android's automatic backup includes it, and the gym screen's "Save a backup file" button writes the
-gym's records to a JSON file you choose. With the login on, workouts, payments, categories, the
-income and the daily routine sync in the background whenever the server is reachable, including
-what was saved before the login was turned on, and the server's workout plan replaces the built-in
-one. How syncing works is in the [server README](server/README.md#sync).
+gym's records to a JSON file you choose. "Restore from a backup file" reads one back, from the app
+or the server's export, keeping whatever is newer on the phone, so it never undoes newer work.
+With the login on, workouts, payments, categories, the income and the daily routine sync in the
+background whenever the server is reachable, including what was saved before the login was turned
+on, and the server's workout plan replaces the built-in one. How syncing works is in the
+[server README](server/README.md#sync).
 
 ### Run the desktop app
 

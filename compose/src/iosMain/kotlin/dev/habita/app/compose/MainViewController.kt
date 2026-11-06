@@ -2,6 +2,7 @@ package dev.habita.app.compose
 
 import androidx.compose.ui.window.ComposeUIViewController
 import dev.habita.app.core.data.IosDatabaseFactory
+import dev.habita.app.feature.gym.ios.WaistReminder
 import platform.UIKit.UIUserInterfaceStyle
 import platform.UIKit.UIViewController
 
@@ -11,6 +12,7 @@ private val app: HabitaApp by lazy { HabitaApp(config = IOS_CONFIG, databases = 
 /** The whole app as one view controller, shown by the Swift app in ios/. */
 @Suppress("FunctionName", "unused")
 fun MainViewController(): UIViewController {
+    WaistReminder.start(app.gym)
     lateinit var controller: UIViewController
     controller = ComposeUIViewController {
         // Matches the status bar text to the app's theme, not the system's.

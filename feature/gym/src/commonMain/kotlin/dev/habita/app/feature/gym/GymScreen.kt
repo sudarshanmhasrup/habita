@@ -24,9 +24,12 @@ import dev.habita.app.feature.gym.ui.SelectScreen
 import dev.habita.app.feature.gym.ui.SummaryScreen
 import dev.habita.app.feature.gym.ui.WorkoutScreen
 import dev.habita.app.feature.gym.ui.backupDate
+import dev.habita.app.feature.gym.ui.currentDay
 import dev.habita.app.feature.gym.ui.daysBetween
 import dev.habita.app.feature.gym.ui.estimateMinutes
 import dev.habita.app.feature.gym.ui.startOfWeek
+import dev.habita.app.feature.gym.data.RestoreResult
+import dev.habita.app.feature.gym.ui.rememberFileOpener
 import dev.habita.app.feature.gym.ui.rememberFileSaver
 import dev.habita.app.feature.gym.ui.rememberTextCopier
 import dev.habita.app.feature.gym.ui.today as todayDate
@@ -37,6 +40,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -74,10 +78,20 @@ class GymFeature(core: Core) {
         _openRequest.value = null
     }
 
+    /** The coming Sundays that need a waist reminder, for platforms that queue them ahead. */
+    val waistReminderDays: Flow<List<String>> =
+        combine(repository.body, currentDay) { body, day -> Body.waistReminderDays(body, day, 4) }.distinctUntilChanged()
+
     /** Whether to remind about the waist today; for the Sunday notification. */
     suspend fun waistDue(): Boolean = Body.waistDue(repository.body.first(), todayDate())
 
-    val today: Flow<GymToday?> = combine(repository.program, repository.sessions, repository.active, repository.body) { program, sessions, active, body ->
+    val today: Flow<GymToday?> = combine(
+        repository.program,
+        repository.sessions,
+        repository.active,
+        repository.body,
+        currentDay,
+    ) { program, sessions, active, body, day ->
         val plan = program?.program ?: return@combine null
         val workout = active?.workout ?: Rotation.next(plan, sessions)
         val now = nowMillis()
@@ -95,7 +109,7 @@ class GymFeature(core: Core) {
             trainedDays = trained,
             todayIndex = daysBetween(weekStart, now),
             workoutsThisWeek = trained.size,
-            waistDue = Body.waistDue(body, todayDate()),
+            waistDue = Body.waistDue(body, day),
         )
     }
 }
@@ -119,6 +133,17 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
     val report by viewModel.report.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var backupMessage by remember { mutableStateOf<String?>(null) }
+    val openFile = rememberFileOpener { text ->
+        if (text == null) return@rememberFileOpener
+        scope.launch {
+            val result = viewModel.restore(text)
+            backupMessage = when {
+                result == null -> "That file isn't a Habita backup."
+                result.total == 0 -> "Nothing to restore: the phone already has everything in that file."
+                else -> "Restored ${restoredLine(result)}. Anything newer on the phone was kept."
+            }
+        }
+    }
     val checkIn by viewModel.checkIn.collectAsStateWithLifecycle()
     var checkInMessage by remember { mutableStateOf<String?>(null) }
     val copyText = rememberTextCopier()
@@ -154,6 +179,7 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
                     onResume = viewModel::resume,
                     onDiscard = viewModel::discard,
                     onRetry = viewModel::retrySync,
+                    onRestore = openFile,
                     onBackup = {
                         scope.launch { saveFile("habita-backup-${backupDate(nowMillis())}.json", viewModel.backup()) }
                     },
@@ -161,6 +187,7 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
                     onWeight = viewModel::logWeight,
                     onWaist = viewModel::logWaist,
                     onNewGym = viewModel::newGym,
+                    onSetBody = viewModel::setBody,
                     checkIn = checkIn,
                     onCopyCheckIn = {
                         scope.launch {
@@ -189,4 +216,16 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
             }
         }
     }
+}
+
+/** "12 workouts, 300 sets and 20 body days". */
+private fun restoredLine(result: RestoreResult): String {
+    fun count(n: Int, one: String, many: String) = if (n == 1) "1 $one" else "$n $many"
+    val parts = listOfNotNull(
+        count(result.workouts, "workout", "workouts").takeIf { result.workouts > 0 },
+        count(result.sets, "set", "sets").takeIf { result.sets > 0 },
+        count(result.bodyDays, "body day", "body days").takeIf { result.bodyDays > 0 },
+        count(result.other, "other record", "other records").takeIf { result.other > 0 },
+    )
+    return if (parts.size <= 1) parts.joinToString() else parts.dropLast(1).joinToString(", ") + " and " + parts.last()
 }

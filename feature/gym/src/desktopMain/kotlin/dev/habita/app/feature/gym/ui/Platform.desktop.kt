@@ -32,3 +32,11 @@ internal actual fun rememberFileSaver(onResult: (Boolean?) -> Unit): (fileName: 
 internal actual fun rememberTextCopier(): (String) -> Unit = remember {
     { text -> Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null) }
 }
+
+@Composable
+internal actual fun rememberFileOpener(onResult: (String?) -> Unit): () -> Unit = {
+    val dialog = FileDialog(null as Frame?, "Restore a backup", FileDialog.LOAD).apply { isVisible = true }
+    val directory = dialog.directory
+    val name = dialog.file
+    onResult(if (directory == null || name == null) null else runCatching { File(directory, name).readText() }.getOrNull())
+}
