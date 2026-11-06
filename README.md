@@ -83,6 +83,11 @@ now, so the app never needs a calorie target:
 - Less than 0.2 kg lost in two weeks: eat about 150 kcal a day less, or walk more. If the waist
   went down at least 0.5 cm over four weeks meanwhile, that's recomposition, so keep going.
 
+Weighing at the gym before each workout works too, as long as it's always the same way. On
+Sundays, Android shows a reminder at 9:00 to measure the waist, and the home screen's gym card says
+so too, unless it was measured in the last six days. The reminder is set on the phone, so it needs
+no server or push service.
+
 ### Check-ins
 
 There is no coach and no AI inside the app. Instead, about every three months, or sooner when an

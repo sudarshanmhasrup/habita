@@ -110,6 +110,16 @@ object Body {
         )
     }
 
+    /** Whether [today] is Sunday and the waist hasn't been measured in the last six days. */
+    fun waistDue(logs: List<BodyLog>, today: String): Boolean {
+        val todayEpoch = epochDay(today)
+        if (dayOfWeek(today) != 6) return false
+        return logs.none { !it.deleted && it.waistMm != null && epochDay(it.day) in todayEpoch - 6..todayEpoch }
+    }
+
+    /** 0 for Monday up to 6 for Sunday. 1970-01-01 was a Thursday. */
+    fun dayOfWeek(day: String): Int = ((epochDay(day) + 3) % 7 + 7).toInt() % 7
+
     /**
      * Days since 1970-01-01 for a date written as `2026-11-07`, so week windows need no time zone
      * or calendar library.

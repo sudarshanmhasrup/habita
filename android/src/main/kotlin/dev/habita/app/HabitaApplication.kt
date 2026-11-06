@@ -8,8 +8,11 @@ import dev.habita.app.core.AppConfig
 import dev.habita.app.core.data.AndroidDatabaseFactory
 import dev.habita.app.feature.expense.ExpenseFeature
 import dev.habita.app.feature.expense.android.ExpenseHost
+import dev.habita.app.feature.gym.GymFeature
+import dev.habita.app.feature.gym.android.GymHost
+import dev.habita.app.feature.gym.android.WaistReminder
 
-class HabitaApplication : Application(), ExpenseHost {
+class HabitaApplication : Application(), ExpenseHost, GymHost {
     /** Created on first use and kept for the life of the process. */
     val app: HabitaApp by lazy {
         HabitaApp(
@@ -23,7 +26,14 @@ class HabitaApplication : Application(), ExpenseHost {
         )
     }
 
+    override fun onCreate() {
+        super.onCreate()
+        WaistReminder.schedule(this)
+    }
+
     override val expense: ExpenseFeature get() = app.expense
+
+    override val gym: GymFeature get() = app.gym
 
     override val notificationIcon: Int = R.drawable.ic_launcher_monochrome
 

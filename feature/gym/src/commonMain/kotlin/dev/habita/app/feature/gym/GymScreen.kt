@@ -29,12 +29,15 @@ import dev.habita.app.feature.gym.ui.estimateMinutes
 import dev.habita.app.feature.gym.ui.startOfWeek
 import dev.habita.app.feature.gym.ui.rememberFileSaver
 import dev.habita.app.feature.gym.ui.rememberTextCopier
+import dev.habita.app.feature.gym.ui.today as todayDate
+import dev.habita.app.shared.gym.Body
 import dev.habita.app.shared.gym.Rotation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -49,6 +52,8 @@ data class GymToday(
     val trainedDays: Set<Int>,
     val todayIndex: Int,
     val workoutsThisWeek: Int,
+    /** Sunday, and the waist hasn't been measured this week. */
+    val waistDue: Boolean = false,
 )
 
 /** The gym feature. Create it once at startup, so syncing starts as soon as the user is logged in. */
@@ -69,7 +74,10 @@ class GymFeature(core: Core) {
         _openRequest.value = null
     }
 
-    val today: Flow<GymToday?> = combine(repository.program, repository.sessions, repository.active) { program, sessions, active ->
+    /** Whether to remind about the waist today; for the Sunday notification. */
+    suspend fun waistDue(): Boolean = Body.waistDue(repository.body.first(), todayDate())
+
+    val today: Flow<GymToday?> = combine(repository.program, repository.sessions, repository.active, repository.body) { program, sessions, active, body ->
         val plan = program?.program ?: return@combine null
         val workout = active?.workout ?: Rotation.next(plan, sessions)
         val now = nowMillis()
@@ -87,6 +95,7 @@ class GymFeature(core: Core) {
             trainedDays = trained,
             todayIndex = daysBetween(weekStart, now),
             workoutsThisWeek = trained.size,
+            waistDue = Body.waistDue(body, todayDate()),
         )
     }
 }

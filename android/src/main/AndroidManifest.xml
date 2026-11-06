@@ -8,8 +8,10 @@
     <uses-permission android:name="android.permission.READ_SMS" />
     <!-- Lets a new payment open the app on its record screen from the background. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <!-- A note for each payment, to pick its category. -->
+    <!-- A note for each payment, to pick its category, and the Sunday waist reminder. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Sets the Sunday waist reminder again after the phone restarts. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Installs updates downloaded from the Habita server; Android asks the user each time. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
@@ -47,5 +49,16 @@
         <receiver
             android:name=".InstallResultReceiver"
             android:exported="false" />
+        <receiver
+            android:name="dev.habita.app.feature.gym.android.WaistReminderReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="dev.habita.app.feature.gym.android.ReminderRestoreReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
