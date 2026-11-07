@@ -44,6 +44,7 @@ object SyncCollections {
     const val ROUTINE_GROUPS = "routine.groups"
     const val ROUTINE_TASKS = "routine.tasks"
     const val ROUTINE_CHECKS = "routine.checks"
+    const val ROUTINE_SETTINGS = "routine.settings"
     const val APP_PREFERENCES = "app.preferences"
 }
 

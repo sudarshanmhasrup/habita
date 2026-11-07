@@ -14,7 +14,8 @@ class ChecklistTest {
         RoutineTask("o1", "office", "Commute", true, 0),
     )
 
-    private fun day(weekday: Int) = Day("2026-11-0${weekday + 2}", weekday, "Day", 0)
+    // Weekdays no longer matter; the round is just a key.
+    private fun day(weekday: Int) = Period("2026-11-0${weekday + 2}", 0)
 
     @Test
     fun `every section shows every day, weekends included`() {
@@ -74,5 +75,14 @@ class ChecklistTest {
         val second = Defaults.tasks.filter { it.groupId == "fixed-2" }.sortedBy { it.position }.map { it.title }
         assertEquals("Drink 4 tsp Bhringrajasava with 4 tsp water (30 mins after breakfast).", second.first())
         assertEquals("Make the office bag ready.", second[1])
+    }
+
+    @Test
+    fun `a round is saved and read back the same`() {
+        val round = Period("r-0f3a", 1_799_000_000_000)
+
+        assertEquals(round, Period.decode(round.encode()))
+        assertEquals(Period("2026-11-07", 0), Period.decode("2026-11-07@0"))
+        assertNull(Period.decode("broken"))
     }
 }

@@ -22,6 +22,7 @@ fun recordTables(database: HabitaDatabase): List<RecordTable> = listOf(
     SyncCollections.ROUTINE_GROUPS,
     SyncCollections.ROUTINE_TASKS,
     SyncCollections.ROUTINE_CHECKS,
+    SyncCollections.ROUTINE_SETTINGS,
     SyncCollections.APP_PREFERENCES,
 ).map { RecordTable(it, database) }
 

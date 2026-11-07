@@ -51,8 +51,13 @@ internal class RoutineViewModel(private val repository: RoutineRepository, check
     private val tasks = repository.tasks.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     fun toggle(taskId: String, done: Boolean) {
-        val day = checklist.value?.day ?: return
-        viewModelScope.launch { repository.setDone(day.key, taskId, done) }
+        val period = checklist.value?.period ?: return
+        viewModelScope.launch { repository.setDone(period.key, taskId, done) }
+    }
+
+    /** Unticks everything, starting a new round. */
+    fun reset() {
+        viewModelScope.launch { repository.reset() }
     }
 
     fun edit() {

@@ -35,12 +35,29 @@ object Days {
 
 /**
  * One calendar day in the device's time zone. [key] is "2026-11-06", [weekday] runs from 0 for
- * Monday to 6 for Sunday, and [endsAt] is the next midnight, when the checklist resets.
+ * Monday to 6 for Sunday, and [endsAt] is the next midnight.
  */
 data class Day(val key: String, val weekday: Int, val title: String, val endsAt: Long)
 
-/** Today's checklist: every section in order, with its tasks and which are done. */
-data class Checklist(val day: Day, val groups: List<ChecklistGroup>) {
+/**
+ * One round of ticks, from one reset to the next. Ticks are saved under [key]; [startedAt] is
+ * when the round began. The round that was running when daily resets went away has today's date
+ * as its key, so those ticks carry over.
+ */
+data class Period(val key: String, val startedAt: Long) {
+    fun encode(): String = "$key@$startedAt"
+
+    companion object {
+        fun decode(value: String): Period? {
+            val at = value.lastIndexOf('@')
+            if (at <= 0) return null
+            return value.substring(at + 1).toLongOrNull()?.let { Period(value.substring(0, at), it) }
+        }
+    }
+}
+
+/** The current round's checklist: every section in order, with its tasks and which are done. */
+data class Checklist(val period: Period, val groups: List<ChecklistGroup>) {
     val total: Int get() = groups.sumOf { it.tasks.size }
     val done: Int get() = groups.sumOf { it.done }
 
@@ -50,14 +67,14 @@ data class Checklist(val day: Day, val groups: List<ChecklistGroup>) {
     }
 
     companion object {
-        /** Builds the day from every group and task and the ids of the tasks done today. */
-        fun of(day: Day, groups: List<RoutineGroup>, tasks: List<RoutineTask>, done: Set<String>): Checklist {
+        /** Builds the round from every group and task and the ids of the tasks done in it. */
+        fun of(period: Period, groups: List<RoutineGroup>, tasks: List<RoutineTask>, done: Set<String>): Checklist {
             val byGroup = tasks.groupBy { it.groupId }
             val sections = groups.sortedWith(compareBy({ it.position }, { it.id })).map { group ->
                 val list = byGroup[group.id].orEmpty().sortedWith(compareBy({ it.position }, { it.id }))
                 ChecklistGroup(group, list.map { ChecklistTask(it, it.id in done) })
             }
-            return Checklist(day = day, groups = sections)
+            return Checklist(period = period, groups = sections)
         }
     }
 }

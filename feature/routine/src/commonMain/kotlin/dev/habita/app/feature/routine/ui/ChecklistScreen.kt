@@ -14,6 +14,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +44,7 @@ import dev.habita.app.core.ui.appear
 import dev.habita.app.feature.routine.data.Checklist
 import dev.habita.app.feature.routine.data.ChecklistGroup
 import dev.habita.app.feature.routine.data.ChecklistTask
+import dev.habita.app.feature.routine.data.dayOf
 
 /**
  * Today's checklist, laid out like the routine is written: the sections in order, each headed
@@ -52,6 +57,7 @@ internal fun ChecklistScreen(
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onToggle: (taskId: String, done: Boolean) -> Unit,
+    onReset: () -> Unit,
 ) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
@@ -63,9 +69,9 @@ internal fun ChecklistScreen(
             Gap(Space.inside)
             HText("Routine", type.headline)
             Gap(Space.tiny)
-            HText("Keep an eye on these and get them done ASAP. It all resets every night.", type.body, color = colors.muted)
+            HText("Keep an eye on these and get them done ASAP. Reset when you start over.", type.body, color = colors.muted)
             Gap(Space.item)
-            Overview(checklist, Modifier.appear(0))
+            Overview(checklist, onReset, Modifier.appear(0))
         },
         second = {
             if (wide) Gap(56.dp)
@@ -80,15 +86,27 @@ internal fun ChecklistScreen(
     )
 }
 
-/** Done out of total, a bar, and what comes next. */
+/** Done out of total, a bar, what comes next, and Reset, which asks once before unticking. */
 @Composable
-private fun Overview(checklist: Checklist, modifier: Modifier) {
+private fun Overview(checklist: Checklist, onReset: () -> Unit, modifier: Modifier) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
+    var confirming by remember(checklist.period) { mutableStateOf(false) }
     HabitaCard(modifier.fillMaxWidth()) {
-        Overline(checklist.day.title, color = colors.accent)
+        Overline("Since ${dayOf(checklist.period.startedAt).title}", color = colors.accent)
         Gap(Space.inside)
-        HText("${checklist.done} of ${checklist.total} done", type.title)
+        if (confirming) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                HText("Untick all ${checklist.total} tasks?", type.label, modifier = Modifier.weight(1f))
+                TextAction("Cancel", { confirming = false }, color = colors.muted)
+                TextAction("Reset", { confirming = false; onReset() }, color = colors.error)
+            }
+        } else {
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                HText("${checklist.done} of ${checklist.total} done", type.title, modifier = Modifier.weight(1f))
+                if (checklist.done > 0) TextAction("Reset", { confirming = true })
+            }
+        }
         Gap(Space.item)
         ProgressBar(if (checklist.total > 0) checklist.done.toFloat() / checklist.total else 0f, height = 6.dp)
         Gap(Space.item)
@@ -96,7 +114,7 @@ private fun Overview(checklist: Checklist, modifier: Modifier) {
         HText(
             when {
                 checklist.total == 0 -> "Nothing on the list today."
-                next == null -> "All done for today. It starts again at midnight."
+                next == null -> "All done. Tap Reset to start again."
                 else -> "Next: ${next.second.title}"
             },
             type.body,

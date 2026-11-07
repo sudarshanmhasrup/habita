@@ -55,4 +55,18 @@ class RoutineSyncTest {
         table.applyRemote(sender.table(SyncCollections.ROUTINE_CHECKS).dirty())
         assertEquals(emptyList(), receiver.routineCheckQueries.doneOn("2026-11-06").executeAsList())
     }
+
+    @Test
+    fun `a reset on one device starts the same round on another`() {
+        val sender = database()
+        val round = Period("r-abc", 5_000)
+        sender.routineValueQueries.save("period", round.encode(), 5_000, 1)
+        val record = sender.table(SyncCollections.ROUTINE_SETTINGS).dirty().single()
+        val receiver = database()
+        receiver.routineValueQueries.save("period", Period("2026-11-07", 0).encode(), 0, 0)
+
+        receiver.table(SyncCollections.ROUTINE_SETTINGS).applyRemote(listOf(record))
+
+        assertEquals(round, Period.decode(receiver.routineValueQueries.byKey("period").executeAsOne().value_))
+    }
 }

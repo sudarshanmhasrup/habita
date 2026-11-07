@@ -183,7 +183,7 @@ private fun RoutineCard(routine: RoutineToday, onOpen: () -> Unit, onDone: (Stri
         Gap(Space.inside)
         HText(routine.nextTask ?: "All done for today", type.headline)
         Gap(2.dp)
-        HText(if (routine.nextTask != null) "Up next" else "It starts again at midnight.", type.body, color = colors.muted)
+        HText(if (routine.nextTask != null) "Up next" else "All done. Reset it in the routine to start again.", type.body, color = colors.muted)
         Gap(Space.item)
         ProgressBar(if (routine.total > 0) routine.done.toFloat() / routine.total else 0f, height = 6.dp)
         Gap(Space.card)
