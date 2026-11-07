@@ -33,6 +33,7 @@ fun ExpenseScreen(feature: ExpenseFeature, onExit: () -> Unit) {
     val draft by viewModel.draft.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val deleted by viewModel.deleted.collectAsStateWithLifecycle()
+    val laterBudget by viewModel.laterBudget.collectAsStateWithLifecycle()
     val openRequest by feature.openRequest.collectAsStateWithLifecycle()
     val sms = rememberSmsAccess()
     val scope = rememberCoroutineScope()
@@ -99,8 +100,11 @@ fun ExpenseScreen(feature: ExpenseFeature, onExit: () -> Unit) {
                 }
 
                 ExpenseRoute.Budget -> BudgetScreen(
+                    month = month,
+                    laterBudget = laterBudget,
                     income = summary?.incomePaise ?: 0,
-                    categories = categories.filter { !it.archived },
+                    // The month's own limits, not the ones from before budgets were per month.
+                    categories = summary?.categories.orEmpty().map { it.category }.filter { !it.archived },
                     onBack = { viewModel.back() },
                     onSave = viewModel::saveBudget,
                 )

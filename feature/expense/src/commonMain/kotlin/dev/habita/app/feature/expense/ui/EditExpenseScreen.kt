@@ -39,7 +39,9 @@ import dev.habita.app.feature.expense.data.BankSms
 import dev.habita.app.feature.expense.data.Category
 import dev.habita.app.feature.expense.data.ExpenseSource
 import dev.habita.app.feature.expense.data.PaymentMode
+import dev.habita.app.feature.expense.data.YearMonth
 import dev.habita.app.feature.expense.data.dayLabel
+import dev.habita.app.feature.expense.data.monthLabel
 import dev.habita.app.feature.expense.data.parseRupees
 import dev.habita.app.feature.expense.data.startOfDay
 
@@ -152,10 +154,15 @@ private fun DayStepper(paidAt: Long, onChange: (Long) -> Unit) {
     }
 }
 
-/** The monthly income and each category's limit. A limit of 0 means no limit. */
+/**
+ * [month]'s income and each category's limit, which hold for the months after it too, up to
+ * [laterBudget] when a later month has its own. A limit of 0 means no limit.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun BudgetScreen(
+    month: YearMonth,
+    laterBudget: YearMonth?,
     income: Long,
     categories: List<Category>,
     onBack: () -> Unit,
@@ -164,7 +171,8 @@ internal fun BudgetScreen(
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     var incomeText by remember { mutableStateOf(rupeesText(income)) }
-    val limits = remember(categories) { categories.associate { it.id to mutableStateOf(rupeesText(it.limitPaise)) } }
+    // Keyed on which categories there are, not the list, so typing survives a sync or a new SMS.
+    val limits = remember(categories.map { it.id }) { categories.associate { it.id to mutableStateOf(rupeesText(it.limitPaise)) } }
     var newName by remember { mutableStateOf("") }
     var newLimit by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize()) {
@@ -178,7 +186,13 @@ internal fun BudgetScreen(
             Gap(Space.inside)
             HText("Budget", type.headline)
             Gap(Space.tiny)
-            HText("Monthly amounts in rupees. Leave a limit at 0 for no limit.", type.body, color = colors.muted)
+            HText(
+                "For ${monthLabel(month)}" +
+                    (laterBudget?.let { " until ${monthLabel(it)}, which has its own" } ?: " and the months after it") +
+                    ". Earlier months keep theirs. Amounts in rupees; a limit of 0 means no limit.",
+                type.body,
+                color = colors.muted,
+            )
             Gap(Space.card)
             LabeledField(
                 label = "Monthly income",
@@ -216,12 +230,11 @@ internal fun BudgetScreen(
         PrimaryButton(
             text = "Save budget",
             onClick = {
-                val changed = categories.mapNotNull { category ->
-                    val paise = (limits.getValue(category.id).value.toLongOrNull() ?: 0) * 100
-                    (category.id to paise).takeIf { paise != category.limitPaise }
-                }.toMap()
+                val all = categories.associate { category ->
+                    category.id to (limits.getValue(category.id).value.toLongOrNull() ?: 0) * 100
+                }
                 val newCategory = newName.trim().takeIf { it.isNotEmpty() }?.let { it to (newLimit.toLongOrNull() ?: 0) * 100 }
-                onSave(incomeText.toLongOrNull()?.times(100), changed, newCategory)
+                onSave(incomeText.toLongOrNull()?.times(100), all, newCategory)
             },
             modifier = Modifier.fillMaxWidth().padding(horizontal = Space.screen, vertical = Space.item),
         )
