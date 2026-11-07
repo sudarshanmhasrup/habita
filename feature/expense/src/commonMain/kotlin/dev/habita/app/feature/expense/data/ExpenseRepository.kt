@@ -76,7 +76,10 @@ class ExpenseRepository(core: Core) {
                     .executeAsOneOrNull() != null
             }
             if (duplicate) return@transactionWithResult SmsOutcome.Duplicate
-            val categoryId = debit.payee?.let { rules.forPayee(BankSms.payeeKey(it)).executeAsOneOrNull() }
+            val categoryId = debit.payee?.let { payee ->
+                expenses.lastCategoryForPayee(payee).executeAsOneOrNull()
+                    ?: rules.forPayee(BankSms.payeeKey(payee)).executeAsOneOrNull()
+            }
             val category = categoryId?.let { id ->
                 categoryQueries.all(::toCategory).executeAsList().firstOrNull { it.id == id && !it.archived }
             }
