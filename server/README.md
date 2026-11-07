@@ -62,14 +62,20 @@ by collection name, such as `gym.sets` or `expense.expenses` (`SyncCollections` 
 - **Last write wins.** A record replaces the stored copy when its `updatedAt` is later. On a tie
   the copy whose data sorts last wins, so every device settles on the same one (`winsOver` in
   `shared/`). The app applies the same rule, so both sides agree.
-- **Bad records are refused one by one** and listed in the push reply; the rest are saved.
+- **Bad records are refused one by one** and listed in the push reply; the rest are saved. A
+  refusal a newer server could accept (an unknown collection or field, or a value it can't read)
+  is `retryable`: the app keeps that record and sends it again on later syncs. Others are dropped.
 - **Clocks.** A time more than 5 minutes ahead of the server is pulled back, so a phone with a
   wrong clock can't make a record impossible to edit.
 - **Deletes** are kept as tombstones (`deleted: true`), so they reach every device.
 - **Cursor.** Every saved record gets the next server sequence number. Pull returns changes after
   the app's cursor, oldest first, with `hasMore` while there are more pages.
-- **Server id.** Pull also returns `serverId`, made once per database. If it changes, for example
-  after restoring an older backup, the app sends everything it has again.
+- **Server id.** Pull also returns `serverId`, made once per database. If it changes, the app sends
+  everything it has again. A restored backup keeps the id stored inside it, so the server also
+  writes its position to `<database>.position` next to the database after every push; when the
+  database starts behind that position, it was restored, and the server makes a new id. Keep the
+  position file when restoring. As a second check, the app treats a server position below one it
+  has already seen as a restore.
 
 The app pulls before it pushes, and keeps a local edit that hasn't reached the server yet unless
 the server's copy wins over it.

@@ -36,6 +36,8 @@ object Summary {
         sets: List<SetLog>,
         steps: Map<String, Int>,
         now: Long,
+        /** Exercises swapped at this gym, by the planned exercise they replace. */
+        swaps: Map<String, String> = emptyMap(),
     ): WorkoutSummary {
         val end = session.endedAt ?: now
         val mainStart = session.mainStartedAt ?: end
@@ -62,8 +64,10 @@ object Summary {
             val history = History.performances(exerciseId, sessions, sets)
             val today = history.firstOrNull { it.sessionId == session.id } ?: return@forEach
             val before = history.filter { it.performedAt < today.performedAt && it.hasCompletedSets }
-            // A swapped-in exercise takes the slot of the planned one it replaces.
+            // A swapped-in exercise takes the slot of the planned one it replaces: the one actually
+            // swapped for it, or else the first that lists it as an alternative.
             val slot = workout?.exercises?.firstOrNull { it.exerciseId == exerciseId }
+                ?: workout?.exercises?.firstOrNull { swaps[it.exerciseId] == exerciseId }?.copy(exerciseId = exerciseId)
                 ?: workout?.exercises?.firstOrNull { exerciseId in program.exercise(it.exerciseId)?.alternatives.orEmpty() }
                     ?.copy(exerciseId = exerciseId)
 

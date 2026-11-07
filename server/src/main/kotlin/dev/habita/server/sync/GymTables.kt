@@ -15,6 +15,8 @@ import dev.habita.server.db.Set_log
 import dev.habita.server.db.Warm_up_log
 import dev.habita.server.db.Workout_session
 import kotlinx.serialization.KSerializer
+import dev.habita.server.sync.SyncEngine.Companion.UNKNOWN_FIELDS
+import dev.habita.server.sync.SyncEngine.Companion.UNREADABLE
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 
@@ -43,9 +45,9 @@ private abstract class ModelTable<T>(
         // Fields this server doesn't know would be dropped by the typed table, so the record is
         // refused instead: the app keeps it and sends it again once a newer server is deployed.
         if (runCatching { strictJson.decodeFromJsonElement(serializer, record.data) }.isFailure) {
-            return if (decode(record) == null) "Unreadable record" else "Has fields this server doesn't know"
+            return if (decode(record) == null) UNREADABLE else UNKNOWN_FIELDS
         }
-        val model = decode(record) ?: return "Unreadable record"
+        val model = decode(record) ?: return UNREADABLE
         return problem(model)
     }
 

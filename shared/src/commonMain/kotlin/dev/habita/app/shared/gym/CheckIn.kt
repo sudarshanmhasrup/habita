@@ -70,7 +70,12 @@ object CheckIns {
         return sets.groupBy { it.exerciseId }.mapNotNull { (id, own) ->
             val exercise = program.exercise(id) ?: return@mapNotNull null
             val done = History.performances(id, sessions, own).filter { it.hasCompletedSets }
-            val before = done.filter { it.performedAt in previousStart until windowStart }
+            // Sessions from before the latest long break don't count: coming back lighter and
+            // building up again is progress, not a plateau.
+            val comeback = done.sortedBy { it.performedAt }.zipWithNext()
+                .lastOrNull { (a, b) -> b.performedAt - a.performedAt > Progression.LONG_BREAK_MILLIS }
+                ?.second?.performedAt ?: Long.MIN_VALUE
+            val before = done.filter { it.performedAt in maxOf(previousStart, comeback) until windowStart }
             val recent = done.filter { it.performedAt >= windowStart }
             if (before.isEmpty() || recent.size < MIN_SESSIONS) return@mapNotNull null
             val bestBefore = before.maxOf { score(it, exercise) }

@@ -61,30 +61,16 @@ class GymRepository(core: Core) {
 
     init {
         loadBundledProgram()
-        closeAbandonedSessions()
+        recoverUnreadableWorkout()
     }
 
     /**
-     * Closes workouts left open for over 12 hours that aren't the one in progress, for example
-     * after the app was killed or an update couldn't read the saved workout. One with done sets is
-     * finished at its last set, so it counts; one with none is removed.
+     * A workout in progress this version can't read back, for example after an update changed how
+     * it is saved, can't be resumed. Its session is finished at its last done set, so it counts, and
+     * the gym is free to start a new one. Only this phone's own workout is touched.
      */
-    private fun closeAbandonedSessions() {
-        val now = nowMillis()
-        val inProgress = store.active()?.sessionId
-        store.transaction {
-            store.sessions()
-                .filter { !it.deleted && it.endedAt == null && it.id != inProgress && now - it.startedAt > ABANDONED_MILLIS }
-                .forEach { session ->
-                    val done = store.setsForSession(session.id).filter { !it.deleted && !it.warmUp && !it.isSkipped }
-                    if (done.isEmpty()) {
-                        store.saveSession(session.copy(deleted = true, updatedAt = now))
-                    } else {
-                        val end = done.maxOf { it.completedAt }
-                        store.saveSession(session.copy(mainStartedAt = session.mainStartedAt ?: session.startedAt, endedAt = end, updatedAt = now))
-                    }
-                }
-        }
+    private fun recoverUnreadableWorkout() {
+        store.recoverUnreadableActive(nowMillis())
     }
 
     /**
@@ -259,34 +245,49 @@ class GymRepository(core: Core) {
             store.saveSet(log)
             if (next.isFinished) finishSession(next, now) else store.saveActive(next)
         }
-        // The set can be taken back during the rest that follows, until anything else happens.
-        _undoable.value = if (next.isFinished) null else Undo(active, log.id)
+        // The set can be taken back until anything else changes the workout.
+        _undoable.value = Undo(active, next, log.id)
         next.sessionId.takeIf { next.isFinished }
     }
 
-    private class Undo(val before: ActiveWorkout, val setId: String)
+    /** The set [setId] took the workout from [before] to [after]. */
+    private class Undo(val before: ActiveWorkout, val after: ActiveWorkout, val setId: String)
 
     private val _undoable = MutableStateFlow<Undo?>(null)
 
+    /**
+     * Whether [undo] still applies: the workout is as the set left it, apart from its rest timer,
+     * or, when that set finished it, nothing has started since.
+     */
+    private fun stillUndoable(undo: Undo, active: ActiveWorkout?): Boolean =
+        if (undo.after.isFinished) {
+            active == null && store.session(undo.after.sessionId)?.let { !it.deleted && it.endedAt != null } == true
+        } else {
+            active != null && active.copy(rest = null) == undo.after.copy(rest = null)
+        }
+
     /** The id of the set that "Undo last set" would take back, or `null`. */
-    val undoableSet: Flow<String?> = _undoable.map { it?.setId }
+    val undoableSet: Flow<String?> = combine(_undoable, store.active) { undo, active ->
+        undo?.takeIf { withContext(Dispatchers.Default) { stillUndoable(it, active) } }?.setId
+    }
 
     /**
      * Takes back the set just logged, by mistake or with the wrong numbers: it is deleted and the
-     * workout goes back to just before it, so the set can be done again.
+     * workout goes back to just before it, so the set can be done again. A set that finished the
+     * workout reopens it. Returns whether a set was taken back.
      */
-    suspend fun undoLastSet() = write {
-        val undo = _undoable.value ?: return@write
+    suspend fun undoLastSet(): Boolean = write {
+        val undo = _undoable.value ?: return@write false
+        if (!stillUndoable(undo, store.active())) return@write false
         _undoable.value = null
-        val active = store.active() ?: return@write
-        // Only while nothing else has been logged since.
-        if (active.sessionId != undo.before.sessionId || active.loggedSets.lastOrNull()?.id != undo.setId) return@write
         val now = nowMillis()
         store.transaction {
-            store.setsForSession(active.sessionId).firstOrNull { it.id == undo.setId }
+            store.setsForSession(undo.before.sessionId).firstOrNull { it.id == undo.setId }
                 ?.let { store.saveSet(it.copy(deleted = true, updatedAt = now)) }
+            if (undo.after.isFinished) updateSession(undo.before.sessionId) { it.copy(endedAt = null, updatedAt = now) }
             store.saveActive(undo.before)
         }
+        true
     }
 
     /** Logs the current exercise's warm-up set, or skips it when [reps] is `null`. */
@@ -431,6 +432,7 @@ class GymRepository(core: Core) {
             sets = sets,
             steps = store.steps(),
             now = nowMillis(),
+            swaps = Swaps.active(store.swaps()),
         )
         Reports.of(summary, session, program, sessions, sets)
     }
@@ -484,9 +486,6 @@ class GymRepository(core: Core) {
         }
     }
 }
-
-/** A workout open this long, not the one in progress, was abandoned. */
-private const val ABANDONED_MILLIS = 12L * 60 * 60 * 1000
 
 /** How long the data must stay still before the check-in is worked out again. */
 private const val CHECK_IN_SETTLE_MILLIS = 1_000L

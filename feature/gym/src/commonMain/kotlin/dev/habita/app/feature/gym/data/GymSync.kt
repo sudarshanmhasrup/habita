@@ -9,7 +9,12 @@ import dev.habita.app.shared.api.SyncCollections
 import dev.habita.app.shared.api.SyncRecord
 import dev.habita.app.shared.api.gymChanges
 import dev.habita.app.shared.api.toCollections
+import dev.habita.app.shared.gym.ExerciseStep
+import dev.habita.app.shared.gym.SetLog
+import dev.habita.app.shared.gym.WarmUpLog
+import dev.habita.app.shared.gym.WorkoutSession
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.Json
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -38,6 +43,9 @@ class GymSync(private val store: GymStore, private val core: Core) {
     }
 
     val state: StateFlow<SyncState> = core.sync.state
+
+    /** Local changes the server refused for now; they go up once a newer server takes them. */
+    val refused: StateFlow<Int> = core.sync.refused
 
     fun request() = core.sync.request()
 }
@@ -70,6 +78,18 @@ internal class GymSyncTable(override val collection: String, private val store: 
     /** Saves restored records as unsent, so the server gets them too. */
     fun restore(records: List<SyncRecord>) = store.applyRemote(gymChanges(mapOf(collection to records)), dirty = true)
 
-    override fun canRead(record: SyncRecord): Boolean =
-        gymChanges(mapOf(collection to listOf(record))).toCollections()[collection].orEmpty().isNotEmpty()
+    /** Strictly: a record with fields this version doesn't know waits for an update, whole. */
+    override fun canRead(record: SyncRecord): Boolean {
+        val serializer = when (collection) {
+            SyncCollections.GYM_SESSIONS -> WorkoutSession.serializer()
+            SyncCollections.GYM_SETS -> SetLog.serializer()
+            SyncCollections.GYM_WARM_UPS -> WarmUpLog.serializer()
+            SyncCollections.GYM_STEPS -> ExerciseStep.serializer()
+            else -> return false
+        }
+        return runCatching { StrictJson.decodeFromJsonElement(serializer, record.data) }.isSuccess
+    }
 }
+
+/** Like the sync format, but refuses fields it doesn't know instead of dropping them. */
+internal val StrictJson = Json { ignoreUnknownKeys = false }

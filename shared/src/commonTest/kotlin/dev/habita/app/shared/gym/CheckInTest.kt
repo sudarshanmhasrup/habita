@@ -113,4 +113,13 @@ class CheckInTest {
 
         assertTrue(plateaus(old + recent, oldSets + recentSets).isEmpty())
     }
+
+    @Test
+    fun `the first weeks back after a long break are not stuck`() {
+        // 30 kg right before a 9-week break, then building back up from 24 kg.
+        val (old, oldSets) = benchOn(120, 124, weightGrams = 30 * KG)
+        val (back, backSets) = benchOn(187, 190, 194, 197, weightGrams = 24 * KG)
+
+        assertTrue(plateaus(old + back, oldSets + backSets).isEmpty())
+    }
 }

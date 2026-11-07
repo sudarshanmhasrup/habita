@@ -7,6 +7,8 @@ import dev.habita.app.shared.gym.Body
 import dev.habita.app.shared.gym.BodyLog
 import dev.habita.app.shared.gym.CheckIn
 import dev.habita.app.shared.gym.ExerciseSwap
+import dev.habita.app.shared.gym.WorkoutSession
+import dev.habita.app.shared.gym.SetLog
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -105,6 +107,27 @@ class GymRecordsTest {
                 assertEquals(true, phoneTable.local("2026-11-08")?.dirty)
                 assertEquals(merged, desktop.bodyLog("2026-11-08"))
             }
+        }
+    }
+
+    @Test
+    fun `a saved workout this version can't read is finished at its last set`() {
+        JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).use { driver ->
+            GymDatabase.Schema.create(driver)
+            val database = GymDatabase(driver)
+            val store = GymStore(database)
+            store.saveSession(WorkoutSession("s1", "upper-a", programVersion = 1, startedAt = 100, updatedAt = 100))
+            store.saveSet(SetLog("set1", "s1", "bench", 1, 20_000, 12, 12, completedAt = 500, updatedAt = 500))
+            // Saved by a version whose workout shape this one doesn't know.
+            database.gymValueQueries.save("active_workout", """{"sessionId":"s1","shapeFromTheFuture":true}""")
+
+            assertEquals("s1", store.recoverUnreadableActive(now = 900))
+
+            val session = store.session("s1")!!
+            assertEquals(500, session.endedAt)
+            assertEquals(null, store.active())
+            // Nothing left to recover, and a workout that reads fine is never touched.
+            assertEquals(null, store.recoverUnreadableActive(now = 1_000))
         }
     }
 }

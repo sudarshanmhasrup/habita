@@ -180,7 +180,9 @@ object Body {
             day = day,
             weightGrams = weightGrams,
             waistMm = waistMm,
-            updatedAt = now,
+            // Always after the copy it changes, even on a device whose clock is behind, so the
+            // change wins wherever it goes.
+            updatedAt = maxOf(now, (existing?.updatedAt ?: Long.MIN_VALUE) + 1),
             weightAt = at(weightGrams, live?.weightGrams, live?.weightAt),
             waistAt = at(waistMm, live?.waistMm, live?.waistAt),
         )
@@ -194,10 +196,26 @@ object Body {
      */
     fun merge(a: BodyLog, b: BodyLog): BodyLog {
         val (older, newer) = if (b.updatedAt > a.updatedAt || (b.updatedAt == a.updatedAt && b.toString() > a.toString())) a to b else b to a
-        if (newer.deleted || older.deleted) return newer
-        // A value without its own time was set when its record was; a missing one claims nothing.
-        fun weightTime(log: BodyLog) = log.weightAt ?: if (log.weightGrams != null) log.updatedAt else Long.MIN_VALUE
-        fun waistTime(log: BodyLog) = log.waistAt ?: if (log.waistMm != null) log.updatedAt else Long.MIN_VALUE
+        // A record from before value times, from an older app, set all its values, empty ones
+        // included, when it was saved. Otherwise a value without its own time claims nothing.
+        fun legacy(log: BodyLog) = log.weightAt == null && log.waistAt == null && (log.weightGrams != null || log.waistMm != null)
+        fun weightTime(log: BodyLog) = log.weightAt ?: if (log.weightGrams != null || legacy(log)) log.updatedAt else Long.MIN_VALUE
+        fun waistTime(log: BodyLog) = log.waistAt ?: if (log.waistMm != null || legacy(log)) log.updatedAt else Long.MIN_VALUE
+        if (newer.deleted) return newer
+        if (older.deleted) {
+            // Values set before the deletion stay deleted; only ones set after it come back.
+            val kept = newer.copy(
+                weightGrams = newer.weightGrams.takeIf { weightTime(newer) > older.updatedAt },
+                weightAt = newer.weightAt.takeIf { weightTime(newer) > older.updatedAt },
+                waistMm = newer.waistMm.takeIf { waistTime(newer) > older.updatedAt },
+                waistAt = newer.waistAt.takeIf { waistTime(newer) > older.updatedAt },
+            )
+            return when {
+                kept == newer -> newer
+                kept.weightGrams == null && kept.waistMm == null -> older.copy(updatedAt = newer.updatedAt + 1)
+                else -> kept.copy(updatedAt = newer.updatedAt + 1)
+            }
+        }
         val weightFrom = if (weightTime(older) > weightTime(newer)) older else newer
         val waistFrom = if (waistTime(older) > waistTime(newer)) older else newer
         val merged = newer.copy(

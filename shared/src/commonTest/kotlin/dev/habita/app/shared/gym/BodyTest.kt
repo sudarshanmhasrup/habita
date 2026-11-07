@@ -222,4 +222,36 @@ class BodyTest {
         assertEquals(78_000, merged.weightGrams)
         assertEquals(850, merged.waistMm)
     }
+
+    @Test
+    fun `values set before a deletion stay deleted`() {
+        val logged = Body.update(null, "2026-11-08", weightGrams = 78_000, waistMm = null, now = 10)
+        val deleted = logged.copy(deleted = true, updatedAt = 20)
+        // The other device hadn't heard of the deletion and added a waist.
+        val withWaist = Body.update(logged, "2026-11-08", weightGrams = 78_000, waistMm = 850, now = 25)
+
+        val merged = Body.merge(deleted, withWaist)
+
+        assertNull(merged.weightGrams)
+        assertEquals(850, merged.waistMm)
+        assertEquals(merged, Body.merge(withWaist, deleted))
+    }
+
+    @Test
+    fun `an edit is always later than the copy it changes`() {
+        val fromFastClock = Body.update(null, "2026-11-08", weightGrams = null, waistMm = 850, now = 1_000)
+
+        val edit = Body.update(fromFastClock, "2026-11-08", weightGrams = 78_000, waistMm = 850, now = 900)
+
+        assertTrue(edit.updatedAt > fromFastClock.updatedAt)
+    }
+
+    @Test
+    fun `an older app clearing a value clears it`() {
+        val logged = Body.update(null, "2026-11-08", weightGrams = 78_000, waistMm = 850, now = 10)
+        // An app from before value times saves the day with the weight cleared.
+        val oldApp = BodyLog("2026-11-08", weightGrams = null, waistMm = 850, updatedAt = 20)
+
+        assertNull(Body.merge(logged, oldApp).weightGrams)
+    }
 }
