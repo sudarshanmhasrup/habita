@@ -34,6 +34,8 @@ fun ExpenseScreen(feature: ExpenseFeature, onExit: () -> Unit) {
     val message by viewModel.message.collectAsStateWithLifecycle()
     val deleted by viewModel.deleted.collectAsStateWithLifecycle()
     val laterBudget by viewModel.laterBudget.collectAsStateWithLifecycle()
+    val canGoBack by viewModel.canGoBack.collectAsStateWithLifecycle()
+    val canGoForward by viewModel.canGoForward.collectAsStateWithLifecycle()
     val openRequest by feature.openRequest.collectAsStateWithLifecycle()
     val sms = rememberSmsAccess()
     val scope = rememberCoroutineScope()
@@ -72,8 +74,8 @@ fun ExpenseScreen(feature: ExpenseFeature, onExit: () -> Unit) {
                     sms = sms,
                     message = message,
                     deleted = deleted,
-                    canGoBack = viewModel.canGoBack,
-                    canGoForward = viewModel.canGoForward,
+                    canGoBack = canGoBack,
+                    canGoForward = canGoForward,
                     onBack = onExit,
                     onPrevious = viewModel::previousMonth,
                     onNext = viewModel::nextMonth,

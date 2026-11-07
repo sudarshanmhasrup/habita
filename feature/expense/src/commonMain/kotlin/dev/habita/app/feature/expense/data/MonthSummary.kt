@@ -51,7 +51,8 @@ data class MonthSummary(
  * closer look at where the money went.
  */
 fun MonthSummary.toMarkdown(): String = buildString {
-    val names = categories.associate { it.category.id to it.category.name }
+    // A "|" would split a table cell.
+    val names = categories.associate { it.category.id to it.category.name.replace("|", "/") }
     appendLine("# ${monthLabel(month)}")
     appendLine()
     appendLine("## Income")
