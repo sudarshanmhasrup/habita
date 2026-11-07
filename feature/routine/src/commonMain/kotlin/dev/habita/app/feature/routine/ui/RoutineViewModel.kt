@@ -7,11 +7,15 @@ import dev.habita.app.feature.routine.data.Sections
 import dev.habita.app.feature.routine.data.RoutineGroup
 import dev.habita.app.feature.routine.data.RoutineRepository
 import dev.habita.app.feature.routine.data.RoutineTask
+import dev.habita.app.feature.routine.data.Period
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -52,12 +56,37 @@ internal class RoutineViewModel(private val repository: RoutineRepository, check
 
     fun toggle(taskId: String, done: Boolean) {
         val period = checklist.value?.period ?: return
+        // A tick in the new round means the reset was meant.
+        dropUndo()
         viewModelScope.launch { repository.setDone(period.key, taskId, done) }
     }
 
-    /** Unticks everything, starting a new round. */
+    private val ended = MutableStateFlow<Period?>(null)
+    private var undoTimer: Job? = null
+
+    /** Whether the reset just made can still be taken back. */
+    val canUndoReset: StateFlow<Boolean> = ended.map { it != null }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** Unticks everything, starting a new round. For a few seconds after, [undoReset] takes it back. */
     fun reset() {
-        viewModelScope.launch { repository.reset() }
+        undoTimer?.cancel()
+        undoTimer = viewModelScope.launch {
+            ended.value = repository.reset()
+            delay(UNDO_MILLIS)
+            ended.value = null
+        }
+    }
+
+    /** Brings back the round a reset just ended, ticks and all. */
+    fun undoReset() {
+        val round = ended.value ?: return
+        dropUndo()
+        viewModelScope.launch { repository.resume(round) }
+    }
+
+    private fun dropUndo() {
+        undoTimer?.cancel()
+        ended.value = null
     }
 
     private val _editFrom = MutableStateFlow<String?>(null)
@@ -138,3 +167,5 @@ internal class RoutineViewModel(private val repository: RoutineRepository, check
         return true
     }
 }
+
+private const val UNDO_MILLIS = 8_000L

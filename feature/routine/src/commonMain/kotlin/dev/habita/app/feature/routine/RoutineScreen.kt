@@ -25,6 +25,7 @@ fun RoutineScreen(feature: RoutineFeature, onExit: () -> Unit) {
     val taskDraft by viewModel.taskDraft.collectAsStateWithLifecycle()
     val sectionDraft by viewModel.sectionDraft.collectAsStateWithLifecycle()
     val editFrom by viewModel.editFrom.collectAsStateWithLifecycle()
+    val canUndoReset by viewModel.canUndoReset.collectAsStateWithLifecycle()
 
     NavigationBackHandler(
         state = rememberNavigationEventState(NavigationEventInfo.None),
@@ -36,7 +37,15 @@ fun RoutineScreen(feature: RoutineFeature, onExit: () -> Unit) {
         ScreenTransition(route, isForward = { from, to -> to.depth > from.depth }) { screen ->
             when (screen) {
                 RoutineRoute.Today -> checklist?.let {
-                    ChecklistScreen(checklist = it, onBack = onExit, onEdit = { viewModel.edit(it) }, onToggle = viewModel::toggle, onReset = viewModel::reset)
+                    ChecklistScreen(
+                        checklist = it,
+                        canUndoReset = canUndoReset,
+                        onBack = onExit,
+                        onEdit = { group -> viewModel.edit(group) },
+                        onToggle = viewModel::toggle,
+                        onReset = viewModel::reset,
+                        onUndoReset = viewModel::undoReset,
+                    )
                 }
 
                 RoutineRoute.Edit -> checklist?.let {
