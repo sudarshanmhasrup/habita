@@ -27,6 +27,8 @@ object HabitaIcons {
     val Pencil = icon("Pencil", "M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4")
     val Trash = icon("Trash", "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3")
     val Check = icon("Check", "M5 12.5l4.5 4.5L19 7.5")
+    /** Two short lines: a handle to drag a row by. */
+    val Grip = icon("Grip", "M6 9.5h12M6 14.5h12")
     val Clock = icon("Clock", "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 7v5l3 2")
     val Flame = icon("Flame", "M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.5 1.5-4 2.5-5c0 2 1 3 2 3c0-3-1-5.5 .5-8z")
     val TrendUp = icon("TrendUp", "M4 17l6-6 4 4 6-7M15 8h5v5")

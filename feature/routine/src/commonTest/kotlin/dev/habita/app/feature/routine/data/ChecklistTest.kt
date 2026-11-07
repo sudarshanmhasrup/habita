@@ -3,6 +3,7 @@ package dev.habita.app.feature.routine.data
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ChecklistTest {
     private val morning = RoutineGroup("morning", "Morning", 0, Days.EVERY_DAY)
@@ -16,16 +17,13 @@ class ChecklistTest {
     private fun day(weekday: Int) = Day("2026-11-0${weekday + 2}", weekday, "Day", 0)
 
     @Test
-    fun `the office block shows on weekdays and is off at the weekend`() {
+    fun `every section shows every day, weekends included`() {
         val friday = Checklist.of(day(4), listOf(office, morning), tasks, emptySet())
         val saturday = Checklist.of(day(5), listOf(office, morning), tasks, emptySet())
 
         assertEquals(listOf("morning", "office"), friday.groups.map { it.group.id })
-        assertEquals(3, friday.total)
-        assertEquals(listOf("morning"), saturday.groups.map { it.group.id })
-        assertEquals(listOf("office"), saturday.off.map { it.group.id })
-        assertEquals(listOf("o1"), saturday.off.single().adjustable.map { it.task.id })
-        assertEquals(2, saturday.total)
+        assertEquals(listOf("morning", "office"), saturday.groups.map { it.group.id })
+        assertEquals(3, saturday.total)
     }
 
     @Test
@@ -66,9 +64,15 @@ class ChecklistTest {
     }
 
     @Test
-    fun `the built-in routine has unique ids and the office block on weekdays`() {
+    fun `the built-in routine is the written one, Fixed and Adjustable in turn`() {
         assertEquals(Defaults.tasks.size, Defaults.tasks.map { it.id }.toSet().size)
-        assertEquals(Days.WEEKDAYS, Defaults.groups.single { it.id == "office" }.days)
-        assertEquals(setOf("morning", "office", "evening", "night"), Defaults.tasks.map { it.groupId }.toSet())
+        assertEquals(
+            listOf("Fixed", "Adjustable", "Fixed", "Adjustable", "Fixed", "Adjustable", "Fixed"),
+            Defaults.groups.sortedBy { it.position }.map { it.name },
+        )
+        assertTrue(Defaults.groups.all { it.days == Days.EVERY_DAY })
+        val second = Defaults.tasks.filter { it.groupId == "fixed-2" }.sortedBy { it.position }.map { it.title }
+        assertEquals("Drink 4 tsp Bhringrajasava with 4 tsp water (30 mins after breakfast).", second.first())
+        assertEquals("Make the office bag ready.", second[1])
     }
 }

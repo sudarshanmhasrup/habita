@@ -4,6 +4,9 @@ package dev.habita.app.feature.routine.data
  * The routine a new install starts with. Ids are fixed, so every device starts with the same
  * records, and they count as never edited: a change made on any device wins over them. Edit the
  * routine in the app, not here.
+ *
+ * It is written as the old blocks and turned into sections the same way an existing routine is
+ * ([Sections.convert]), so a new install and a converted phone end up with the same records.
  */
 internal object Defaults {
     private class Block(val id: String, val name: String, val days: Int, val fixed: List<String>, val adjustable: List<String>)
@@ -95,11 +98,18 @@ internal object Defaults {
         ),
     )
 
-    val groups: List<RoutineGroup> = blocks.mapIndexed { index, block -> RoutineGroup(block.id, block.name, index.toLong(), block.days) }
+    private val blockGroups = blocks.mapIndexed { index, block -> RoutineGroup(block.id, block.name, index.toLong(), block.days) }
 
-    val tasks: List<RoutineTask> = blocks.flatMap { block ->
+    private val blockTasks = blocks.flatMap { block ->
         (block.fixed.map { it to false } + block.adjustable.map { it to true }).mapIndexed { index, (title, adjustable) ->
             RoutineTask("${block.id}-${(index + 1).toString().padStart(2, '0')}", block.id, title, adjustable, index.toLong())
         }
     }
+
+    private val sections = Sections.convert(blockGroups, blockTasks)
+
+    /** The sections, Fixed and Adjustable in turn, as the written routine has them. */
+    val groups: List<RoutineGroup> = sections.first
+
+    val tasks: List<RoutineTask> = sections.second
 }

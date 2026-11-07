@@ -3,8 +3,6 @@ package dev.habita.app.feature.routine.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,30 +32,24 @@ import dev.habita.app.core.ui.Overline
 import dev.habita.app.core.ui.PrimaryButton
 import dev.habita.app.core.ui.SecondaryButton
 import dev.habita.app.core.ui.TopBar
-import dev.habita.app.feature.routine.data.Days
-import dev.habita.app.feature.routine.data.RoutineGroup
 
-/** Adding or editing a task: its name, its group, and whether it's fixed or adjustable. */
-@OptIn(ExperimentalLayoutApi::class)
+/** Adding or renaming a task. Where it sits is changed by dragging it in the edit list. */
 @Composable
 internal fun EditTaskScreen(
     draft: TaskDraft,
-    groups: List<RoutineGroup>,
     onBack: () -> Unit,
     onChange: (TaskDraft) -> Unit,
     onSave: () -> Unit,
     onDelete: () -> Unit,
-    onMove: (by: Int) -> Unit,
 ) {
     EditForm(
-        title = if (draft.id == null) "Add task" else "Edit task",
+        title = if (draft.id == null) "Add task" else "Rename task",
         isNew = draft.id == null,
         canSave = draft.title.isNotBlank(),
         deleteText = "Delete task",
         onBack = onBack,
         onSave = onSave,
         onDelete = onDelete,
-        onMove = onMove,
     ) { focus ->
         LabeledField(
             label = "Task",
@@ -67,76 +59,47 @@ internal fun EditTaskScreen(
             keyboardActions = KeyboardActions(onDone = { if (draft.title.isNotBlank()) onSave() }),
             fieldModifier = Modifier.focusRequester(focus),
         )
-        Gap(Space.section)
-        Overline("Group")
-        Gap(Space.item)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.inside), verticalArrangement = Arrangement.spacedBy(Space.inside)) {
-            groups.forEach { group ->
-                Chip(group.name, selected = group.id == draft.groupId, onClick = { onChange(draft.copy(groupId = group.id)) })
-            }
-        }
-        Gap(Space.section)
-        Overline("Timing")
+    }
+}
+
+/** Adding a section, or switching one between Fixed and Adjustable. */
+@Composable
+internal fun EditSectionScreen(
+    draft: SectionDraft,
+    onBack: () -> Unit,
+    onChange: (SectionDraft) -> Unit,
+    onSave: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
+    EditForm(
+        title = if (draft.id == null) "Add section" else "Change section",
+        isNew = draft.id == null,
+        canSave = true,
+        deleteText = "Delete section and its tasks",
+        onBack = onBack,
+        onSave = onSave,
+        onDelete = onDelete,
+    ) { _ ->
+        Overline("Kind")
         Gap(Space.item)
         Row(horizontalArrangement = Arrangement.spacedBy(Space.item)) {
             Chip("Fixed", selected = !draft.adjustable, onClick = { onChange(draft.copy(adjustable = false)) }, modifier = Modifier.weight(1f))
             Chip("Adjustable", selected = draft.adjustable, onClick = { onChange(draft.copy(adjustable = true)) }, modifier = Modifier.weight(1f))
         }
-    }
-}
-
-/** Adding or editing a group: its name and the days it shows on. */
-@Composable
-internal fun EditGroupScreen(
-    draft: GroupDraft,
-    onBack: () -> Unit,
-    onChange: (GroupDraft) -> Unit,
-    onSave: () -> Unit,
-    onDelete: () -> Unit,
-    onMove: (by: Int) -> Unit,
-) {
-    val colors = HabitaTheme.colors
-    val type = HabitaTheme.typography
-    EditForm(
-        title = if (draft.id == null) "Add group" else "Edit group",
-        isNew = draft.id == null,
-        canSave = draft.name.isNotBlank(),
-        deleteText = "Delete group and its tasks",
-        onBack = onBack,
-        onSave = onSave,
-        onDelete = onDelete,
-        onMove = onMove,
-    ) { focus ->
-        LabeledField(
-            label = "Name",
-            value = draft.name,
-            onValueChange = { onChange(draft.copy(name = it)) },
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { if (draft.name.isNotBlank()) onSave() }),
-            fieldModifier = Modifier.focusRequester(focus),
-        )
-        Gap(Space.section)
-        Overline("Shows on")
-        Gap(Space.item)
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.tiny)) {
-            Days.letters.forEachIndexed { index, letter ->
-                val bit = 1 shl index
-                Chip(
-                    letter,
-                    selected = draft.days and bit != 0,
-                    onClick = { onChange(draft.copy(days = draft.days xor bit)) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
         Gap(Space.inside)
-        HText(Days.label(draft.days), type.caption, color = colors.muted)
+        HText(
+            if (draft.adjustable) "Tasks that can move around the day." else "Tasks done in this order, at this point of the day.",
+            type.caption,
+            color = colors.muted,
+        )
     }
 }
 
 /**
- * The frame both forms share: title, fields, then for an existing item buttons to move it and to
- * delete it, and Save at the bottom. Moving takes effect straight away.
+ * The frame both forms share: title, fields, then for an existing item a button to delete it,
+ * which asks once more, and Save at the bottom.
  */
 @Composable
 private fun EditForm(
@@ -147,14 +110,13 @@ private fun EditForm(
     onBack: () -> Unit,
     onSave: () -> Unit,
     onDelete: () -> Unit,
-    onMove: (by: Int) -> Unit,
     fields: @Composable ColumnScope.(FocusRequester) -> Unit,
 ) {
     val colors = HabitaTheme.colors
     var confirmDelete by remember { mutableStateOf(false) }
     // Something new starts with the keyboard up on its name.
     val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { if (isNew) focus.requestFocus() }
+    LaunchedEffect(Unit) { if (isNew) runCatching { focus.requestFocus() } }
     Column(Modifier.fillMaxSize()) {
         Column(
             Modifier
@@ -169,13 +131,6 @@ private fun EditForm(
             fields(focus)
             if (!isNew) {
                 Gap(Space.section)
-                Overline("Order")
-                Gap(Space.item)
-                Row(horizontalArrangement = Arrangement.spacedBy(Space.item)) {
-                    SecondaryButton("Move up", { onMove(-1) }, Modifier.weight(1f))
-                    SecondaryButton("Move down", { onMove(1) }, Modifier.weight(1f))
-                }
-                Gap(Space.item)
                 SecondaryButton(
                     text = if (confirmDelete) "Tap again to delete" else deleteText,
                     onClick = { if (confirmDelete) onDelete() else confirmDelete = true },

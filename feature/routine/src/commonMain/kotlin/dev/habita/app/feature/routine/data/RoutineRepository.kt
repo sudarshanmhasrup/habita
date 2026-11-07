@@ -9,6 +9,7 @@ import dev.habita.app.feature.routine.db.RoutineDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -35,6 +36,24 @@ internal class RoutineRepository(core: Core) {
         routineSyncTables(database).forEach(sync::register)
     }
 
+    /** Rewrites a routine of blocks as sections ([Sections.convert]), saving only what changed. */
+    private fun convertToSections() = database.transaction {
+        val oldGroups = groupQueries.active { id, name, position, days, _, _, _ -> RoutineGroup(id, name, position, days.toInt()) }.executeAsList()
+        if (oldGroups.all(Sections::isSection)) return@transaction
+        val oldTasks = taskQueries.active { id, groupId, title, adjustable, position, _, _, _ ->
+            RoutineTask(id, groupId, title, adjustable == 1L, position)
+        }.executeAsList()
+        val (groups, tasks) = Sections.convert(oldGroups, oldTasks)
+        val now = nowMillis()
+        val kept = groups.map { it.id }.toSet()
+        oldGroups.filter { it.id !in kept }.forEach {
+            groupQueries.save(it.id, it.name, it.position, it.days.toLong(), 1, now, 1)
+        }
+        groups.filter { it !in oldGroups }.forEach { writeGroup(it) }
+        tasks.filter { it !in oldTasks }.forEach { writeTask(it) }
+        sync.request()
+    }
+
     val groups: Flow<List<RoutineGroup>> = groupQueries.active { id, name, position, days, _, _, _ ->
         RoutineGroup(id, name, position, days.toInt())
     }.asFlow().mapToList(Dispatchers.Default)
@@ -43,11 +62,49 @@ internal class RoutineRepository(core: Core) {
         RoutineTask(id, groupId, title, adjustable == 1L, position)
     }.asFlow().mapToList(Dispatchers.Default)
 
+    init {
+        // After the flows above exist: the old blocks (Morning, Office, ...) become sections, now
+        // or whenever a device that hasn't updated yet syncs some in.
+        core.scope.launch {
+            groups.collect { list -> if (list.any { !Sections.isSection(it) }) convertToSections() }
+        }
+    }
+
     /** The ids of the tasks done on [day]. */
     fun doneOn(day: String): Flow<Set<String>> = checkQueries.doneOn(day).asFlow().mapToList(Dispatchers.Default).map { it.toSet() }
 
     suspend fun setDone(day: String, taskId: String, done: Boolean) = change {
         checkQueries.save("$day/$taskId", day, taskId, if (done) 1 else 0, nowMillis(), 1)
+    }
+
+    /**
+     * Saves the order dragged into place: every section in turn, each with its tasks. A task
+     * dragged into another section takes that section's kind. Only what changed is written.
+     */
+    suspend fun saveOrder(order: List<Pair<RoutineGroup, List<RoutineTask>>>) = change {
+        database.transaction {
+            order.forEachIndexed { sectionIndex, (group, sectionTasks) ->
+                if (group.position != sectionIndex.toLong()) writeGroup(group.copy(position = sectionIndex.toLong()))
+                sectionTasks.forEachIndexed { index, task ->
+                    val placed = task.copy(groupId = group.id, position = index.toLong(), adjustable = Sections.isAdjustable(group))
+                    if (placed != task) writeTask(placed)
+                }
+            }
+        }
+    }
+
+    /** Adds a Fixed or Adjustable section at the end, or changes one's kind and its tasks with it. */
+    suspend fun saveSection(id: String?, adjustable: Boolean, tasks: List<RoutineTask>) = change {
+        database.transaction {
+            val name = if (adjustable) Sections.ADJUSTABLE else Sections.FIXED
+            val old = id?.let { groupQueries.byId(it).executeAsOneOrNull() }
+            if (old == null) {
+                writeGroup(RoutineGroup(newId(), name, groupQueries.nextPosition().executeAsOne() ?: 0, Days.EVERY_DAY))
+            } else {
+                writeGroup(RoutineGroup(old.id, name, old.position, Days.EVERY_DAY))
+                tasks.filter { it.groupId == old.id && it.adjustable != adjustable }.forEach { writeTask(it.copy(adjustable = adjustable)) }
+            }
+        }
     }
 
     /** Saves a new task ([RoutineTask.id] blank) at the end of its group, or an edited one. */

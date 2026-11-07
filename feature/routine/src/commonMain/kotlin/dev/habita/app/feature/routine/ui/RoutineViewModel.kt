@@ -3,7 +3,7 @@ package dev.habita.app.feature.routine.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.habita.app.feature.routine.data.Checklist
-import dev.habita.app.feature.routine.data.Days
+import dev.habita.app.feature.routine.data.Sections
 import dev.habita.app.feature.routine.data.RoutineGroup
 import dev.habita.app.feature.routine.data.RoutineRepository
 import dev.habita.app.feature.routine.data.RoutineTask
@@ -19,16 +19,19 @@ import kotlinx.coroutines.launch
 internal sealed interface RoutineRoute {
     data object Today : RoutineRoute
 
+    /** The list with handles, bins and add buttons. */
+    data object Edit : RoutineRoute
+
     data object EditTask : RoutineRoute
 
-    data object EditGroup : RoutineRoute
+    data object EditSection : RoutineRoute
 }
 
-/** The form for adding ([id] `null`) or editing a task. */
-internal data class TaskDraft(val id: String?, val groupId: String, val title: String = "", val adjustable: Boolean = false)
+/** The form for adding ([id] `null`) or renaming a task in section [groupId]. */
+internal data class TaskDraft(val id: String?, val groupId: String, val title: String = "")
 
-/** The form for adding ([id] `null`) or editing a group. */
-internal data class GroupDraft(val id: String?, val name: String = "", val days: Int = Days.EVERY_DAY)
+/** The form for adding ([id] `null`) or changing a section. */
+internal data class SectionDraft(val id: String?, val adjustable: Boolean = false)
 
 internal class RoutineViewModel(private val repository: RoutineRepository, checklist: Flow<Checklist>) : ViewModel() {
     private val _route = MutableStateFlow<RoutineRoute>(RoutineRoute.Today)
@@ -37,15 +40,13 @@ internal class RoutineViewModel(private val repository: RoutineRepository, check
     private val _taskDraft = MutableStateFlow<TaskDraft?>(null)
     val taskDraft: StateFlow<TaskDraft?> = _taskDraft.asStateFlow()
 
-    private val _groupDraft = MutableStateFlow<GroupDraft?>(null)
-    val groupDraft: StateFlow<GroupDraft?> = _groupDraft.asStateFlow()
+    private val _sectionDraft = MutableStateFlow<SectionDraft?>(null)
+    val sectionDraft: StateFlow<SectionDraft?> = _sectionDraft.asStateFlow()
 
     val checklist: StateFlow<Checklist?> = checklist.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    // Kept up to date while the screen exists, since moving and deleting read them directly.
-
-    /** Every group in order, including the ones that are off today. */
-    val groups = repository.groups.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    // Kept up to date while the screen exists, since saving and deleting read them directly.
+    private val groups = repository.groups.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val tasks = repository.tasks.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
@@ -54,82 +55,74 @@ internal class RoutineViewModel(private val repository: RoutineRepository, check
         viewModelScope.launch { repository.setDone(day.key, taskId, done) }
     }
 
-    fun addTask(groupId: String) {
-        open(TaskDraft(null, groupId))
+    fun edit() {
+        _route.value = RoutineRoute.Edit
     }
 
-    fun editTask(task: RoutineTask) {
-        open(TaskDraft(task.id, task.groupId, task.title, task.adjustable))
-    }
+    fun addTask(groupId: String) = open(TaskDraft(null, groupId))
 
-    fun addGroup() {
-        open(GroupDraft(null))
-    }
+    fun editTask(task: RoutineTask) = open(TaskDraft(task.id, task.groupId, task.title))
 
-    fun editGroup(group: RoutineGroup) {
-        open(GroupDraft(group.id, group.name, group.days))
-    }
+    fun addSection() = open(SectionDraft(null))
+
+    fun editSection(group: RoutineGroup) = open(SectionDraft(group.id, Sections.isAdjustable(group)))
 
     private fun open(draft: TaskDraft) {
         _taskDraft.value = draft
         _route.value = RoutineRoute.EditTask
     }
 
-    private fun open(draft: GroupDraft) {
-        _groupDraft.value = draft
-        _route.value = RoutineRoute.EditGroup
+    private fun open(draft: SectionDraft) {
+        _sectionDraft.value = draft
+        _route.value = RoutineRoute.EditSection
     }
 
     fun update(draft: TaskDraft) {
         _taskDraft.value = draft
     }
 
-    fun update(draft: GroupDraft) {
-        _groupDraft.value = draft
+    fun update(draft: SectionDraft) {
+        _sectionDraft.value = draft
     }
 
     fun save(draft: TaskDraft) {
         if (draft.title.isBlank()) return
+        val group = groups.value.firstOrNull { it.id == draft.groupId } ?: return
         viewModelScope.launch {
-            repository.saveTask(RoutineTask(draft.id.orEmpty(), draft.groupId, draft.title, draft.adjustable, 0))
+            repository.saveTask(RoutineTask(draft.id.orEmpty(), draft.groupId, draft.title, Sections.isAdjustable(group), 0))
         }
         back()
     }
 
-    fun save(draft: GroupDraft) {
-        if (draft.name.isBlank()) return
-        viewModelScope.launch { repository.saveGroup(RoutineGroup(draft.id.orEmpty(), draft.name, 0, draft.days)) }
+    fun save(draft: SectionDraft) {
+        viewModelScope.launch { repository.saveSection(draft.id, draft.adjustable, tasks.value) }
         back()
     }
 
     fun deleteTask(taskId: String) {
         viewModelScope.launch { repository.deleteTask(taskId) }
-        // From the list this does nothing; from the form it closes the form.
-        back()
+        // From the list this changes nothing; from the form it goes back to the list.
+        if (_route.value == RoutineRoute.EditTask) back()
     }
 
-    fun deleteGroup(groupId: String) {
+    fun deleteSection(groupId: String) {
         val group = groups.value.firstOrNull { it.id == groupId } ?: return
         viewModelScope.launch { repository.deleteGroup(group, tasks.value) }
-        back()
+        if (_route.value == RoutineRoute.EditSection) back()
     }
 
-    /** Moves a task up ([by] -1) or down ([by] 1) within its group. */
-    fun moveTask(taskId: String, by: Int) {
-        val task = tasks.value.firstOrNull { it.id == taskId } ?: return
-        val siblings = tasks.value.filter { it.groupId == task.groupId }.sortedWith(compareBy({ it.position }, { it.id }))
-        viewModelScope.launch { repository.moveTask(task, siblings, by) }
+    /** Saves the order dragged into place in the edit list. */
+    fun saveOrder(order: List<Pair<RoutineGroup, List<RoutineTask>>>) {
+        viewModelScope.launch { repository.saveOrder(order) }
     }
 
-    fun moveGroup(groupId: String, by: Int) {
-        val group = groups.value.firstOrNull { it.id == groupId } ?: return
-        viewModelScope.launch { repository.moveGroup(group, groups.value, by) }
-    }
-
-    /** Goes back one screen; `false` when already on the checklist. */
+    /** Goes back one screen: a form to the edit list, the edit list to the checklist. */
     fun back(): Boolean {
-        if (_route.value == RoutineRoute.Today) return false
-        _route.value = RoutineRoute.Today
+        _route.value = when (_route.value) {
+            RoutineRoute.Today -> return false
+            RoutineRoute.Edit -> RoutineRoute.Today
+            RoutineRoute.EditTask, RoutineRoute.EditSection -> RoutineRoute.Edit
+        }
         return true
     }
 }

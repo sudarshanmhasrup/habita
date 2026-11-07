@@ -117,6 +117,16 @@ and diet targets are saved, so they never go into this repository. If it suggest
 replies with tables to paste into [program/PROGRAM.md](program/PROGRAM.md). "Copy check-in for AI"
 under the backup button does the same at any time.
 
+## The daily routine
+
+The routine is one list of sections, each Fixed or Adjustable, shown every day in the order it's
+written, and unticked again every midnight. The page itself only has the checkboxes. Edit opens
+the list with a handle on every task and section: drag a task anywhere, into another section too,
+and drag a section's header to move the whole section. Tap a task to rename it or a header to
+switch it between Fixed and Adjustable; the bins and the add buttons live there too. A routine
+from before sections (Morning, Office, Evening, Night, with Office on weekdays only) is turned
+into sections on its own, keeping today's ticks.
+
 ## The workout plan
 
 The plan lives in [program/PROGRAM.md](program/PROGRAM.md): every exercise, warm-up and workout,
