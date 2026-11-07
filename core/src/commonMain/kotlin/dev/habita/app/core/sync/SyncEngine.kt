@@ -169,11 +169,20 @@ class SyncEngine(
         page.collections.forEach { (collection, records) ->
             unreadable += applyCollection(collection, records)
         }
-        if (unreadable.isNotEmpty()) savePending(checkpoint.pending() + unreadable)
+        // A kept-aside copy that a newer pulled one replaces is stale: drop it.
+        val pulled = page.collections.flatMap { (collection, records) -> records.map { (collection to it.id) to it } }.toMap()
+        val kept = checkpoint.pending().filter { old ->
+            val newer = pulled[old.collection to old.record.id]
+            newer == null || old.record.winsOver(newer)
+        }
+        if (unreadable.isNotEmpty() || kept.size != checkpoint.pending().size) savePending(kept + unreadable)
     }
 
-    /** Saves the records this version reads and returns the ones it can't, to keep aside. */
-    private fun applyCollection(collection: String, records: List<SyncRecord>): List<PendingRecord> {
+    /**
+     * Saves the records this version reads and returns the ones it can't, to keep aside. A
+     * [retried] record was pulled earlier, so it only replaces a local copy it is newer than.
+     */
+    private fun applyCollection(collection: String, records: List<SyncRecord>, retried: Boolean = false): List<PendingRecord> {
         // A collection from a newer app version is kept for when this app is updated.
         val table = tables[collection] ?: return records.map { PendingRecord(collection, it) }
         val (readable, unreadable) = records.partition(table::canRead)
@@ -181,7 +190,7 @@ class SyncEngine(
             table.inTransaction {
                 val winners = if (table.mergesItself) readable else readable.filter { record ->
                     val local = table.local(record.id)
-                    local == null || !local.dirty || record.winsOver(local.record)
+                    local == null || (!local.dirty && !retried) || record.winsOver(local.record)
                 }
                 if (winners.isNotEmpty()) table.applyRemote(winners)
             }
@@ -194,7 +203,7 @@ class SyncEngine(
         val pending = checkpoint.pending()
         if (pending.isEmpty()) return
         val still = pending.groupBy({ it.collection }, { it.record }).flatMap { (collection, records) ->
-            applyCollection(collection, records)
+            applyCollection(collection, records, retried = true)
         }
         checkpoint.savePending(still)
     }
@@ -215,11 +224,12 @@ class SyncEngine(
             val collections: Map<String, List<SyncRecord>> = batch.groupBy({ it.first }, { it.second })
             val result = transport.push(SyncPush(collections))
             if (result.cursor > checkpoint.highestSeen()) checkpoint.saveHighestSeen(result.cursor)
-            // Refused records stay unsent: a newer server may accept them, so they are offered again.
-            val rejected = result.rejected.map { it.collection to it.id }.toSet()
-            refused += rejected.size
+            // Refusals a newer server could accept stay unsent, to offer again; the rest no server
+            // will take, so they are cleared like sent ones.
+            val kept = result.rejected.filter { it.retryable }.map { it.collection to it.id }.toSet()
+            refused += kept.size
             collections.forEach { (collection, records) ->
-                tables.getValue(collection).markClean(records.filter { (collection to it.id) !in rejected })
+                tables.getValue(collection).markClean(records.filter { (collection to it.id) !in kept })
             }
         }
         _refused.value = refused

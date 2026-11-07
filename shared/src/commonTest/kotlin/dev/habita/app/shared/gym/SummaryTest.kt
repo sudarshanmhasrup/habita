@@ -97,4 +97,28 @@ class SummaryTest {
 
         assertTrue("leg-press" in summary.nextIncreases)
     }
+
+    @Test
+    fun `the swap decides which slot a shared alternative takes`() {
+        val program = testProgram.copy(
+            exercises = testProgram.exercises.map {
+                when (it.id) {
+                    "bench" -> it.copy(alternatives = listOf("plank"))
+                    "leg-press" -> it.copy(alternatives = listOf("plank"))
+                    else -> it
+                }
+            },
+            workouts = testProgram.workouts + Workout(
+                "d", "D", "upper", rotation = 4,
+                exercises = listOf(benchSlot, legPressSlot.copy(sets = 2, target = 8)),
+            ),
+        )
+        val session = session("s1", "d", 1 * DAY)
+        val sets = sets("s1", "plank", 1 * DAY, 0, 8, 8, 8)
+
+        val swapped = Summary.of(session, program, listOf(session), sets, emptyMap(), now = 2 * DAY, swaps = mapOf("leg-press" to "plank"))
+
+        // Swapped for leg press (2 × 8), both sets hit 8, so the hold goes up next time.
+        assertTrue("plank" in swapped.nextIncreases)
+    }
 }

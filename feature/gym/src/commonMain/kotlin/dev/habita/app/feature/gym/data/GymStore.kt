@@ -31,6 +31,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * The gym's local database. Local writes are marked dirty until the server has them. Which server
@@ -64,6 +66,31 @@ class GymStore(private val database: GymDatabase) {
     fun saveProgram(program: ProgramResponse) = values.save(PROGRAM, json.encodeToString(program))
 
     fun active(): ActiveWorkout? = readValue(ACTIVE) { json.decodeFromString<ActiveWorkout>(it) }
+
+    /**
+     * Finishes the session of a saved workout in progress that can't be read, at its last done
+     * set, and clears it. One with no done sets is left unfinished, which counts for nothing.
+     * Returns the session id, or `null` when the saved workout reads fine or there is none.
+     */
+    fun recoverUnreadableActive(now: Long): String? = transaction {
+        val raw = values.select(ACTIVE).executeAsOneOrNull() ?: return@transaction null
+        if (runCatching { json.decodeFromString<ActiveWorkout>(raw) }.isSuccess) return@transaction null
+        values.remove(ACTIVE)
+        val sessionId = runCatching { json.parseToJsonElement(raw).jsonObject["sessionId"]?.jsonPrimitive?.content }.getOrNull()
+            ?: return@transaction null
+        val session = session(sessionId)?.takeIf { it.endedAt == null && !it.deleted } ?: return@transaction sessionId
+        val done = setsForSession(sessionId).filter { !it.deleted && !it.warmUp && !it.isSkipped }
+        if (done.isNotEmpty()) {
+            saveSession(
+                session.copy(
+                    mainStartedAt = session.mainStartedAt ?: session.startedAt,
+                    endedAt = done.maxOf { it.completedAt },
+                    updatedAt = now,
+                ),
+            )
+        }
+        sessionId
+    }
 
     fun saveActive(active: ActiveWorkout?) {
         if (active == null) values.remove(ACTIVE) else values.save(ACTIVE, json.encodeToString(active))

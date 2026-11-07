@@ -79,6 +79,8 @@ internal data class GymData(
     val day: String = today(),
     /** Every body log, for editing past days. */
     val bodyLogs: List<BodyLog> = emptyList(),
+    /** Changes waiting for a server that accepts them. */
+    val refused: Int = 0,
 ) {
     /** [id] as it will be done here: the plan's workout with this gym's swaps. */
     fun workout(id: String): Workout? =
@@ -107,7 +109,7 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
         repository.goal,
     ) { data, body, swaps, day, goal ->
         data.copy(body = Body.trend(body, day, goal), swaps = swaps, day = day, bodyLogs = body)
-    }
+    }.combine(repository.sync.refused) { data, refused -> data.copy(refused = refused) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Targets for the pre-start screen, refreshed when synced history or a swap arrives. */
@@ -163,12 +165,15 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
     fun open() {
         _error.value = null
         viewModelScope.launch {
-            val hasActive = repository.active.first() != null
+            val active = repository.active.first()
+            val hasActive = active != null
             val route = _route.value
             // Coming back to the gym goes to the workout in progress, wherever it was left; a
             // summary from earlier gives way to the list.
             _route.value = when {
-                hasActive && (route is GymRoute.Select || route is GymRoute.PreStart) -> GymRoute.Workout
+                // Looking at another workout's plan is left alone, for example across a rotation.
+                hasActive && (route is GymRoute.Select || (route is GymRoute.PreStart && route.workoutId == active?.workout?.id)) ->
+                    GymRoute.Workout
                 !hasActive && route == GymRoute.Workout -> GymRoute.Select
                 route is GymRoute.Summary && isOld(route.sessionId) -> GymRoute.Select
                 else -> route
@@ -232,7 +237,8 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
 
     fun logWarmUpSet(weightGrams: Int, reps: Int?) = settled { repository.logWarmUpSet(weightGrams, reps) }
 
-    fun extendRest(seconds: Int) = settled { repository.extendRest(seconds) }
+    // The +30 s button stays put, so quick repeated taps are all meant: no settling.
+    fun extendRest(seconds: Int) = act { repository.extendRest(seconds) }
 
     /** Logs the current set; [achieved] is `null` for a skipped set. */
     fun logSet(weightGrams: Int, achieved: Int?, effort: Effort?) = settled {
@@ -301,7 +307,10 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
         }
     }
 
-    fun undoLastSet() = settled { repository.undoLastSet() }
+    /** Takes back the last set; from the summary, that reopens the workout on it. */
+    fun undoLastSet() = settled {
+        if (repository.undoLastSet() && _route.value is GymRoute.Summary) _route.value = GymRoute.Workout
+    }
 
     /** The set "Undo last set" would take back, shown during the rest after it. */
     val undoableSet: StateFlow<String?> = repository.undoableSet.stateIn(viewModelScope, SharingStarted.Eagerly, null)

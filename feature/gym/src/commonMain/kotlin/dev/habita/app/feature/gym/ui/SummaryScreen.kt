@@ -1,32 +1,30 @@
 package dev.habita.app.feature.gym.ui
 
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.Animatable
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Box
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.theme.Space
-import dev.habita.app.core.ui.appear
 import dev.habita.app.core.ui.Gap
 import dev.habita.app.core.ui.HIcon
 import dev.habita.app.core.ui.HText
@@ -37,17 +35,21 @@ import dev.habita.app.core.ui.Overline
 import dev.habita.app.core.ui.Pill
 import dev.habita.app.core.ui.PrimaryButton
 import dev.habita.app.core.ui.StatTile
+import dev.habita.app.core.ui.TextAction
 import dev.habita.app.core.ui.TwoPane
+import dev.habita.app.core.ui.appear
 import dev.habita.app.feature.gym.data.ExerciseReport
 import dev.habita.app.feature.gym.data.SessionReport
 import dev.habita.app.shared.gym.Effort
 import dev.habita.app.shared.gym.WorkoutSummary
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** The end of a workout: the headline numbers, then charts of how it went. */
 @Composable
-internal fun SummaryScreen(report: SessionReport?, onDone: () -> Unit) {
+internal fun SummaryScreen(report: SessionReport?, onDone: () -> Unit, onUndo: (() -> Unit)? = null) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     val wide = LocalWideLayout.current
@@ -77,6 +79,15 @@ internal fun SummaryScreen(report: SessionReport?, onDone: () -> Unit) {
                 }
             },
         )
+        if (onUndo != null) {
+            // The last set finished the workout; taking it back reopens the workout on it.
+            TextAction(
+                "Undo last set",
+                onUndo,
+                Modifier.align(Alignment.CenterHorizontally).heightIn(min = 48.dp),
+                color = HabitaTheme.colors.muted,
+            )
+        }
         PrimaryButton(
             "Done",
             onDone,

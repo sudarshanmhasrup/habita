@@ -7,6 +7,9 @@ import dev.habita.app.shared.api.SyncPushResult
 import dev.habita.app.shared.api.SyncRecord
 import dev.habita.app.shared.api.winsOver
 import dev.habita.server.db.HabitaDatabase
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.UUID
 import kotlin.time.Duration.Companion.minutes
 
@@ -15,15 +18,26 @@ import kotlin.time.Duration.Companion.minutes
  * A record replaces the stored one only when it wins ([winsOver]), and each saved record gets the
  * next server sequence number, which is what the app's cursor counts.
  */
-class SyncEngine(private val database: HabitaDatabase, tables: List<SyncTable>) {
+class SyncEngine(
+    private val database: HabitaDatabase,
+    tables: List<SyncTable>,
+    private val positionFile: File? = null,
+) {
     private val tables = tables.associateBy { it.collection }
     private val counter = database.syncQueries
 
-    /** Made once, when the database is created. */
+    /**
+     * Made once, when the database is created, and made again when the database turns out to have
+     * been restored from a backup: its position is behind the one last written to [positionFile],
+     * which lives outside the database. Apps that see a new id send everything they have, so
+     * changes made after the backup come back.
+     */
     val serverId: String = database.transactionWithResult {
         counter.saveServerId(UUID.randomUUID().toString())
+        val seen = positionFile?.let(::readPosition)
+        if (seen != null && counter.current().executeAsOne() < seen) counter.replaceServerId(UUID.randomUUID().toString())
         counter.serverId().executeAsOne()
-    }
+    }.also { writePosition() }
 
     /**
      * Saves every record that wins over the stored copy, and returns the records it refused. One
@@ -36,9 +50,9 @@ class SyncEngine(private val database: HabitaDatabase, tables: List<SyncTable>) 
         push.collections.forEach { (collection, records) ->
             val table = tables[collection]
             records.forEach { incoming ->
-                val reason = if (table == null) "Unknown collection" else basicCheck(incoming) ?: table.check(incoming)
+                val reason = if (table == null) UNKNOWN_COLLECTION else basicCheck(incoming) ?: table.check(incoming)
                 if (reason != null) {
-                    rejected += RejectedRecord(collection, incoming.id, reason)
+                    rejected += RejectedRecord(collection, incoming.id, reason, retryable = reason in RETRYABLE)
                 } else {
                     val record = incoming.copy(updatedAt = minOf(incoming.updatedAt, now + MAX_CLOCK_AHEAD))
                     if (record.winsOver(table!!.get(record.id))) table.save(record, nextSeq())
@@ -46,7 +60,17 @@ class SyncEngine(private val database: HabitaDatabase, tables: List<SyncTable>) 
             }
         }
         SyncPushResult(counter.current().executeAsOne(), rejected)
+    }.also { writePosition() }
+
+    /** Writes the current position next to the database, replacing the file in one step. */
+    private fun writePosition() {
+        val file = positionFile ?: return
+        val temporary = File(file.path + ".tmp")
+        temporary.writeText(counter.current().executeAsOne().toString())
+        Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     }
+
+    private fun readPosition(file: File): Long? = if (file.exists()) file.readText().trim().toLongOrNull() else null
 
     /** Up to [limit] changes after [since], across every collection, oldest first. */
     fun pull(since: Long, limit: Int): SyncPull = database.transactionWithResult {
@@ -76,6 +100,13 @@ class SyncEngine(private val database: HabitaDatabase, tables: List<SyncTable>) 
     }
 
     companion object {
+        const val UNKNOWN_COLLECTION = "Unknown collection"
+        const val UNREADABLE = "Unreadable record"
+        const val UNKNOWN_FIELDS = "Has fields this server doesn't know"
+
+        /** Refusals a newer server could accept. Bad ids, sizes or numbers never will be. */
+        val RETRYABLE = setOf(UNKNOWN_COLLECTION, UNREADABLE, UNKNOWN_FIELDS)
+
         /** The most records one push may carry; the app sends more in several pushes. */
         const val MAX_PUSH = 1_000
 

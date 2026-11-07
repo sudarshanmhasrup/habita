@@ -298,4 +298,37 @@ class SyncEngineTest {
         assertEquals(pushed, server.seq)
         assertTrue(phone.dirty().isEmpty())
     }
+
+    @Test
+    fun `a kept-aside copy never replaces a newer one`() = runBlocking {
+        val server = FakeServer()
+        val newer = Phone(server)
+        newer.edit(note("n1", "v1 unreadable", at = 1))
+        newer.engine.sync()
+        val older = Phone(server).apply { readable = { "unreadable" !in it.data.toString() } }
+        older.engine.sync()
+
+        newer.edit(note("n1", "v2 readable", at = 2))
+        newer.engine.sync()
+        older.engine.sync()
+        older.readable = { true }
+        older.engine.sync()
+
+        assertEquals("\"v2 readable\"", older.text("n1"))
+    }
+
+    @Test
+    fun `a refusal no server would accept is not sent again`() = runBlocking {
+        val server = object : SyncTransport by FakeServer() {
+            override suspend fun push(push: SyncPush) =
+                SyncPushResult(0, listOf(RejectedRecord(NOTES, "n1", "Invalid id", retryable = false)))
+        }
+        val phone = Phone(server)
+        phone.edit(note("n1", "bad", at = 1))
+
+        phone.engine.sync()
+
+        assertFalse(phone.rows.getValue("n1").dirty)
+        assertEquals(0, phone.engine.refused.value)
+    }
 }

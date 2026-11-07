@@ -59,6 +59,11 @@ data class RejectedRecord(
     val collection: String,
     val id: String,
     val reason: String,
+    /**
+     * Whether a newer server could accept it, such as one that knows its collection or fields.
+     * The app keeps those to send again and drops the rest, which no server will take.
+     */
+    val retryable: Boolean = true,
 )
 
 /** [cursor] is the server position after the push. */

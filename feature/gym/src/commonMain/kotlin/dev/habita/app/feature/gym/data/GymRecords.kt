@@ -127,8 +127,9 @@ internal class GymRecordTable<T>(
         return result as R
     }
 
+    /** Strictly: a record with fields this version doesn't know waits for an update, whole. */
     override fun canRead(record: SyncRecord): Boolean =
-        runCatching { SyncJson.decodeFromJsonElement(serializer, record.data) }.isSuccess
+        runCatching { StrictJson.decodeFromJsonElement(serializer, record.data) }.isSuccess
 
     /** Saves restored records as unsent, so the server gets them too. */
     fun restore(records: List<SyncRecord>) = transaction {

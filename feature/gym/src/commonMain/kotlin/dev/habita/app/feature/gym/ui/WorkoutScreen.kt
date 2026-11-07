@@ -128,7 +128,8 @@ internal fun WorkoutScreen(
         }
         }
     }
-    if (active.setsLogged.sum() == 0) {
+    // Skipped and warm-up sets don't count: a workout of only those is still empty.
+    if (active.loggedSets.none { !it.warmUp && !it.isSkipped }) {
         // Nothing logged: finishing would count an empty workout and move the rotation on.
         ConfirmPanel(
             visible = confirmFinish,
@@ -415,8 +416,8 @@ private fun WarmUpSetContent(active: ActiveWorkout, data: GymData, viewModel: Gy
     val suggested = working?.let { Progression.warmUpWeight(it, step) } ?: step.takeIf { exercise.isWeighted }
     var weightText by remember(active.sessionId, slotIndex, exercise.id) { mutableStateOf(suggested?.let(::formatKg) ?: "") }
     var repsText by remember(active.sessionId, slotIndex, exercise.id) { mutableStateOf(Progression.WARM_UP_REPS.toString()) }
-    val weightGrams = parseKg(weightText)
-    val reps = parseCount(repsText)
+    val weightGrams = parseKg(weightText)?.takeIf { it > 0 || !exercise.isWeighted }
+    val reps = parseCount(repsText)?.takeIf { it > 0 }
 
     ActionLayout(
         actions = {

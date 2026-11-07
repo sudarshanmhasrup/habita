@@ -1,10 +1,12 @@
 package dev.habita.app.feature.gym.ui
 
 import android.Manifest
+import android.app.Activity
 import android.app.NotificationManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -99,11 +101,17 @@ internal actual fun rememberNotificationAccess(): NotificationAccess? {
         return permitted && context.getSystemService(NotificationManager::class.java).areNotificationsEnabled()
     }
     var on by remember { mutableStateOf(enabled()) }
-    // After one "Don't allow", Android stops showing the prompt, so later taps open the settings.
-    var asked by remember { mutableStateOf(false) }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        asked = true
+    fun openSettings() = context.startActivity(
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+    )
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         on = enabled()
+        // After the second "Don't allow", Android answers no without asking: the only way left is
+        // the app's notification settings, so go there instead of seeming to do nothing.
+        val asksAgain = context.findActivity()?.shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) == true
+        if (!granted && !asksAgain) openSettings()
     }
     // The user can change it in the settings while the app is away.
     LifecycleResumeEffect(Unit) {
@@ -111,16 +119,16 @@ internal actual fun rememberNotificationAccess(): NotificationAccess? {
         onPauseOrDispose { }
     }
     return NotificationAccess(on) {
-        val canPrompt = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !asked &&
+        // The permission prompt when Android still shows one; otherwise, or when notifications are
+        // switched off in the settings, the settings.
+        val needsPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        if (canPrompt) {
-            launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            context.startActivity(
-                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            )
-        }
+        if (needsPermission) launcher.launch(Manifest.permission.POST_NOTIFICATIONS) else openSettings()
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

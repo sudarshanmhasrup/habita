@@ -145,9 +145,13 @@ object Progression {
             return result(weight + step, slot.target, TargetReason.FELT_EASY)
         }
         val tooHeavy = last.workingResults.any { it < floor(slot.target) }
-        // Back to a weight that held: a lighter one done well that same day, or the weight from
-        // the session before when last time was a jump up from it.
-        val heldToday = last.sets
+        // Back to a weight that held: a lighter one done well that same day before going up to the
+        // working weight, or the weight from the session before when last time was a jump up from
+        // it. Lighter sets after the working weight are back-off sets, often the app's own advice
+        // after a hard set, so they never count.
+        val inOrder = last.sets.sortedBy { it.setNumber }
+        val firstAtWeight = inOrder.indexOfFirst { !it.isSkipped && it.weightGrams == weight }
+        val heldToday = inOrder.take(maxOf(firstAtWeight, 0))
             .filter { !it.isSkipped && it.weightGrams < weight && it.achieved!! >= floor(slot.target) }
             .maxOfOrNull { it.weightGrams }
         val beforeJump = done.getOrNull(1)?.workingWeight?.takeIf { it < weight }
@@ -155,7 +159,8 @@ object Progression {
         if (tooHeavy && dropTo != null) {
             return result(dropTo, slot.target, TargetReason.DROP_BACK)
         }
-        if (isStalled(done.take(STALL_SESSIONS), slot)) {
+        // A weight already at one step can't go lighter: it just repeats.
+        if (isStalled(done.take(STALL_SESSIONS), slot) && deload(weight, step) < weight) {
             return result(deload(weight, step), slot.target, TargetReason.DELOAD)
         }
         return result(weight, slot.target, TargetReason.REPEAT)

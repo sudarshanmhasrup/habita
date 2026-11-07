@@ -311,10 +311,10 @@ private fun adviceText(trend: BodyTrend): Pair<String, String> {
             BodyGoal.BUILD_MUSCLE -> "No gain this week yet."
         } + " One week can be water. Keep eating the same and check again next week."
         BodyAdvice.ON_TRACK -> "On track, keep eating the same" to when (trend.goal) {
-            BodyGoal.LOSE_FAT -> if ((trend.weeklyChangeGrams ?: 0) <= 0) {
-                "Down $change kg this week. That's a pace that keeps your muscle."
-            } else {
-                "Up $change kg this week, but down over two weeks. One week can be water."
+            BodyGoal.LOSE_FAT -> when {
+                (trend.weeklyChangeGrams ?: 0) < 0 -> "Down $change kg this week. That's a pace that keeps your muscle."
+                trend.weeklyChangeGrams == 0 -> "Flat this week, but down over two weeks. One week can be water."
+                else -> "Up $change kg this week, but down over two weeks. One week can be water."
             }
             BodyGoal.MAINTAIN -> "Your weight is holding steady."
             BodyGoal.BUILD_MUSCLE -> "A slow, steady gain: mostly muscle, little fat."

@@ -133,6 +133,7 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
     val preStartTargets by viewModel.preStartTargets.collectAsStateWithLifecycle()
     val report by viewModel.report.collectAsStateWithLifecycle()
     val progress by viewModel.progress.collectAsStateWithLifecycle()
+    val undoable by viewModel.undoableSet.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var backupMessage by remember { mutableStateOf<String?>(null) }
     val openFile = rememberFileOpener { text ->
@@ -216,7 +217,11 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
                     WorkoutScreen(active, current, viewModel, onBack = { viewModel.back() })
                 }
 
-                is GymRoute.Summary -> SummaryScreen(report = report, onDone = { viewModel.back() })
+                is GymRoute.Summary -> SummaryScreen(
+                    report = report,
+                    onDone = { viewModel.back() },
+                    onUndo = viewModel::undoLastSet.takeIf { undoable != null && current.active == null },
+                )
 
                 GymRoute.Progress -> ProgressScreen(progress, onBack = { viewModel.back() })
             }

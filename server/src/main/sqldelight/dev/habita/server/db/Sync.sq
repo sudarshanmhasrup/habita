@@ -24,3 +24,7 @@ SELECT server_id FROM sync_server WHERE id = 1;
 
 saveServerId:
 INSERT OR IGNORE INTO sync_server (id, server_id) VALUES (1, ?);
+
+-- A new id after the database was found restored, so every app sends everything again.
+replaceServerId:
+UPDATE sync_server SET server_id = ? WHERE id = 1;

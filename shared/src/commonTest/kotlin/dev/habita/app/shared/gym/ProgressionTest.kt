@@ -221,4 +221,27 @@ class ProgressionTest {
         assertEquals(TargetReason.DROP_BACK, target.reason)
         assertEquals(20 * KG, target.weightGrams)
     }
+
+    @Test
+    fun `a back-off set after a hard set does not drop the next session`() {
+        // 20×12, then 20×7 felt hard, so the app advised 18 kg for the last set.
+        val today = sets("s2", "any", now - 3 * DAY, 20 * KG, 12, 12, 7) +
+            sets("s2c", "any", now - 3 * DAY + 10_000, 18 * KG, 12, 12).map { it.copy(sessionId = "s2", setNumber = 3) }
+        val target = bench(
+            Performance("s2", now - 3 * DAY, today),
+            performance("s1", now - 6 * DAY, 20 * KG, 12, 12, 12, 11),
+        )
+
+        assertEquals(TargetReason.REPEAT, target.reason)
+        assertEquals(20 * KG, target.weightGrams)
+    }
+
+    @Test
+    fun `a stalled weight already at one step repeats instead of a lighter week that isn't`() {
+        val stalled = (0 until 3).map { performance("s$it", now - (3 + it * 3) * DAY, 2 * KG, 12, 12, 10, 9) }
+        val target = bench(*stalled.toTypedArray(), step = 2 * KG)
+
+        assertEquals(TargetReason.REPEAT, target.reason)
+        assertEquals(2 * KG, target.weightGrams)
+    }
 }

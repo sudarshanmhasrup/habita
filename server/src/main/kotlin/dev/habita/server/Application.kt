@@ -74,7 +74,9 @@ fun Application.module(config: ServerConfig, clock: () -> Long = System::current
     monitor.subscribe(ApplicationStopped) { driver.close() }
     val store = Store(database)
     val records = recordTables(database)
-    val sync = SyncEngine(database, gymTables(database) + records)
+    // The position file sits next to the database but outside it, so a restored backup can't
+    // bring an old one back with it.
+    val sync = SyncEngine(database, gymTables(database) + records, File(config.databasePath + ".position"))
     val program = loadProgram(config.programPath, store, clock()) { environment.log.warn(it) }
     environment.log.info("Loaded program version ${program.version} from ${config.programPath}")
     val fingerprint = passwordFingerprint(config.passwordHash)

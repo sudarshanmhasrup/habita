@@ -408,6 +408,15 @@ private fun ColumnScope.StorageNote(
             }
         }
         Gap(Space.item)
+        if (data.refused > 0) {
+            HText(
+                "${data.refused} ${if (data.refused == 1) "change is" else "changes are"} waiting for a server update. " +
+                    "They're safe on this phone and go up once the server is updated.",
+                type.caption,
+                color = colors.error,
+            )
+            Gap(Space.item)
+        }
         SecondaryButton("Save a backup file", onBackup, Modifier.fillMaxWidth())
         Gap(Space.inside)
         SecondaryButton("Restore from a backup file", onRestore, Modifier.fillMaxWidth())

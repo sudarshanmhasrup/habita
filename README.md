@@ -33,7 +33,8 @@ every midnight.
    target, filled in so that a normal set is one tap. Log a set by tapping how it felt: Easy,
    Medium or Hard. The weight can be changed on any set, and the next set is suggested from how
    this one felt. Finishing a set starts its rest timer, and the phone buzzes when it ends.
-   Logged the wrong numbers? "Undo last set" during the rest takes it back. Taps right after a
+   Logged the wrong numbers? "Undo last set" during the rest takes it back, and after the final
+   set, the summary has it too, reopening the workout. Taps right after a
    step are ignored until the next step shows, so a double tap never logs twice. Finishing with
    nothing logged offers to discard instead, so an empty workout never counts.
 4. At the end, see the workout summary: time spent, volume, sets, personal bests and what goes up
