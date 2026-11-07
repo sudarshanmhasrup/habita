@@ -48,6 +48,14 @@ UPDATE expense SET deleted = 1, updated_at = ?, dirty = 1 WHERE id = ?;
 restore:
 UPDATE expense SET deleted = 0, updated_at = ?, dirty = 1 WHERE id = ?;
 
+-- The category of the payee's most recently sorted payment, from any device, so a new phone
+-- sorts repeat payees on its own as well.
+lastCategoryForPayee:
+SELECT category_id FROM expense
+WHERE payee = ? AND category_id IS NOT NULL AND deleted = 0
+ORDER BY updated_at DESC
+LIMIT 1;
+
 -- Earliest payment, so the month picker knows where history starts.
 firstPaidAt:
 SELECT MIN(paid_at) FROM expense WHERE deleted = 0;

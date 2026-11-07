@@ -1,4 +1,6 @@
--- The category last chosen for a payee, so the next payment to them is sorted on its own.
+-- The category last chosen for a payee on this device, so the next payment to them is sorted on
+-- its own. It doesn't sync: synced payments carry the same choice (Expense.lastCategoryForPayee),
+-- and this is the fallback when every such payment was deleted.
 CREATE TABLE payee_rule (
     payee TEXT NOT NULL PRIMARY KEY,
     category_id TEXT NOT NULL
