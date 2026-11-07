@@ -61,10 +61,11 @@ class ExpenseRepository(core: Core) {
         }
     }
 
-    /** The month of the oldest payment, or `null` with none yet. */
-    suspend fun firstMonth(): YearMonth? = io {
-        expenses.firstPaidAt().executeAsOneOrNull()?.MIN?.let(::monthOf)
-    }
+    /**
+     * The month of the oldest payment, or `null` with none yet. It follows new payments and ones
+     * synced in, such as a new phone getting its history.
+     */
+    val firstMonth: Flow<YearMonth?> = expenses.firstPaidAt().asFlow().mapToOneOrNull(Dispatchers.Default).map { it?.MIN?.let(::monthOf) }
 
     suspend fun expense(id: String): Expense? = io { expenses.byId(id, ::toExpense).executeAsOneOrNull() }
 

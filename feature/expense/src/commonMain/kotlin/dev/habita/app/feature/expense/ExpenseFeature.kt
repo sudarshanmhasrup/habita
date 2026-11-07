@@ -5,6 +5,7 @@ import dev.habita.app.core.data.nowMillis
 import dev.habita.app.feature.expense.data.Category
 import dev.habita.app.feature.expense.data.ExpenseRepository
 import dev.habita.app.feature.expense.data.SmsOutcome
+import dev.habita.app.feature.expense.data.currentMonth
 import dev.habita.app.feature.expense.data.formatRupees
 import dev.habita.app.feature.expense.data.monthLabel
 import dev.habita.app.feature.expense.data.monthOf
@@ -16,7 +17,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 
 /**
@@ -61,7 +61,7 @@ class ExpenseFeature(core: Core) {
      * income is set), payments waiting for a category, and the latest payments.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val today: Flow<ExpenseToday> = flow { emit(monthOf(nowMillis())) }
+    val today: Flow<ExpenseToday> = currentMonth
         .flatMapLatest { repository.summary(it) }
         .map { summary ->
             val names = summary.categories.associate { it.category.id to it.category.name }

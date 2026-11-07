@@ -11,6 +11,7 @@ import dev.habita.app.feature.expense.data.MonthSummary
 import dev.habita.app.feature.expense.data.PaymentMode
 import dev.habita.app.feature.expense.data.SmsOutcome
 import dev.habita.app.feature.expense.data.YearMonth
+import dev.habita.app.feature.expense.data.currentMonth
 import dev.habita.app.feature.expense.data.monthOf
 import dev.habita.app.feature.expense.data.nextOwnBudget
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -85,22 +86,24 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
     private val _deleted = MutableStateFlow<Expense?>(null)
     val deleted: StateFlow<Expense?> = _deleted.asStateFlow()
 
-    private var firstMonth: YearMonth? = null
+    private val thisMonth = currentMonth.stateIn(viewModelScope, SharingStarted.Eagerly, monthOf(nowMillis()))
 
-    init {
-        viewModelScope.launch { firstMonth = repository.firstMonth() }
-    }
+    private val firstMonth = repository.firstMonth.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    val canGoBack: Boolean get() = firstMonth?.let { _month.value > it } ?: false
+    /** Whether there are older payments to go back to. */
+    val canGoBack: StateFlow<Boolean> = combine(_month, firstMonth) { month, first -> first != null && month > first }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    val canGoForward: Boolean get() = _month.value < monthOf(nowMillis())
+    /** Whether the month shown is before this one. */
+    val canGoForward: StateFlow<Boolean> = combine(_month, thisMonth) { month, now -> month < now }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun previousMonth() {
-        if (canGoBack) _month.value = _month.value.previous()
+        if (canGoBack.value) _month.value = _month.value.previous()
     }
 
     fun nextMonth() {
-        if (canGoForward) _month.value = _month.value.next()
+        if (canGoForward.value) _month.value = _month.value.next()
     }
 
     /** Goes back one screen. Returns `false` on the month screen, where back leaves the tracker. */
@@ -124,7 +127,7 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
             } else {
                 ExpenseDraft(
                     id = existing.id,
-                    amountText = (existing.amountPaise / 100.0).let { if (existing.amountPaise % 100 == 0L) "${existing.amountPaise / 100}" else "$it" },
+                    amountText = amountText(existing.amountPaise),
                     description = existing.description,
                     categoryId = existing.categoryId,
                     mode = existing.mode,
@@ -212,7 +215,6 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
             messages.forEach { sms ->
                 if (repository.recordSms(sms.body, sms.sender, sms.receivedAt) is SmsOutcome.Recorded) added++
             }
-            firstMonth = repository.firstMonth()
             _message.value = when (added) {
                 0 -> "No new bank payments in this month's or last month's SMS."
                 1 -> "Added 1 payment from your SMS."
@@ -224,4 +226,10 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
     fun showMessage(text: String?) {
         _message.value = text
     }
+}
+
+/** Paise as the amount field shows them: "39", "39.5" or "1234567.05", never "1.2E7". */
+internal fun amountText(paise: Long): String {
+    val rest = paise % 100
+    return if (rest == 0L) "${paise / 100}" else "${paise / 100}." + rest.toString().padStart(2, '0').trimEnd('0')
 }
