@@ -2,6 +2,7 @@ package dev.habita.app.feature.routine.data
 
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
+import app.cash.sqldelight.coroutines.mapToOneOrNull
 import dev.habita.app.core.Core
 import dev.habita.app.core.data.newId
 import dev.habita.app.core.data.nowMillis
@@ -23,11 +24,19 @@ internal class RoutineRepository(core: Core) {
     private val groupQueries = database.routineGroupQueries
     private val taskQueries = database.routineTaskQueries
     private val checkQueries = database.routineCheckQueries
+    private val valueQueries = database.routineValueQueries
 
     init {
         // A new install starts with the built-in routine. It counts as never edited (time 0, not
         // dirty), so the routine as edited on another device wins once it syncs.
         database.transaction {
+            // Ticks used to start over every midnight; now they last until Reset. The round in
+            // progress is today's, so today's ticks carry over. Like the built-in routine, it
+            // counts as never set, so a reset on any device wins over it.
+            if (valueQueries.byKey(PERIOD).executeAsOneOrNull() == null) {
+                val today = dayOf(nowMillis())
+                valueQueries.save(PERIOD, Period(today.key, today.endsAt - DAY_MILLIS).encode(), 0, 0)
+            }
             if (groupQueries.count().executeAsOne() == 0L) {
                 Defaults.groups.forEach { groupQueries.save(it.id, it.name, it.position, it.days.toLong(), 0, 0, 0) }
                 Defaults.tasks.forEach { taskQueries.save(it.id, it.groupId, it.title, if (it.adjustable) 1 else 0, it.position, 0, 0, 0) }
@@ -68,6 +77,17 @@ internal class RoutineRepository(core: Core) {
         core.scope.launch {
             groups.collect { list -> if (list.any { !Sections.isSection(it) }) convertToSections() }
         }
+    }
+
+    /** The current round of ticks, which lasts until [reset]. */
+    val period: Flow<Period> = valueQueries.byKey(PERIOD).asFlow().mapToOneOrNull(Dispatchers.Default).map { row ->
+        row?.let { Period.decode(it.value_) } ?: dayOf(nowMillis()).let { Period(it.key, it.endsAt - DAY_MILLIS) }
+    }
+
+    /** Starts a new round: every task is unticked, on every device. */
+    suspend fun reset() = change {
+        val now = nowMillis()
+        valueQueries.save(PERIOD, Period("r-${newId()}", now).encode(), now, 1)
     }
 
     /** The ids of the tasks done on [day]. */
@@ -199,3 +219,6 @@ internal fun reordered(ids: List<String>, id: String, by: Int): List<String> {
     val to = (from + by).coerceIn(0, ids.lastIndex)
     return ids.toMutableList().apply { add(to, removeAt(from)) }
 }
+
+private const val PERIOD = "period"
+private const val DAY_MILLIS = 24L * 60 * 60 * 1000

@@ -1,0 +1,22 @@
+-- Single routine values that sync, by key, such as the current round of ticks ("period").
+CREATE TABLE routine_value (
+    key TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    dirty INTEGER NOT NULL DEFAULT 0
+);
+
+byKey:
+SELECT * FROM routine_value WHERE key = ?;
+
+save:
+INSERT OR REPLACE INTO routine_value (key, value, updated_at, dirty) VALUES (?, ?, ?, ?);
+
+selectDirty:
+SELECT * FROM routine_value WHERE dirty = 1;
+
+markClean:
+UPDATE routine_value SET dirty = 0 WHERE key = ? AND updated_at = ?;
+
+markAllDirty:
+UPDATE routine_value SET dirty = 1;

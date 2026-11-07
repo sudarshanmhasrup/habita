@@ -10,12 +10,13 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.jsonObject
 import dev.habita.app.feature.routine.db.Routine_check as CheckRow
+import dev.habita.app.feature.routine.db.Routine_value as ValueRow
 import dev.habita.app.feature.routine.db.Routine_group as GroupRow
 import dev.habita.app.feature.routine.db.Routine_task as TaskRow
 
 /** The routine's collections. The server stores them as they come, without reading them. */
 internal fun routineSyncTables(database: RoutineDatabase): List<LocalSyncTable> =
-    listOf(GroupTable(database), TaskTable(database), CheckTable(database))
+    listOf(GroupTable(database), TaskTable(database), CheckTable(database), ValueTable(database))
 
 @Serializable
 internal data class GroupData(val name: String, val position: Long, val days: Int)
@@ -25,6 +26,9 @@ internal data class TaskData(val groupId: String, val title: String, val adjusta
 
 @Serializable
 internal data class CheckData(val day: String, val taskId: String, val done: Boolean)
+
+@Serializable
+internal data class ValueData(val value: String)
 
 private fun <T> encode(serializer: KSerializer<T>, data: T, id: String, updatedAt: Long, deleted: Boolean = false) =
     SyncRecord(id, updatedAt, deleted, SyncJson.encodeToJsonElement(serializer, data).jsonObject)
@@ -121,4 +125,33 @@ private class CheckTable(private val database: RoutineDatabase) : LocalSyncTable
     }
 
     private fun CheckRow.toRecord() = encode(CheckData.serializer(), CheckData(day, task_id, done == 1L), id, updated_at)
+}
+
+/** Single values by key, such as the current round of ticks. Never deleted. */
+private class ValueTable(private val database: RoutineDatabase) : LocalSyncTable {
+    private val queries = database.routineValueQueries
+
+    override fun <T> inTransaction(block: () -> T): T = database.transactionWithResult { block() }
+    override val collection = SyncCollections.ROUTINE_SETTINGS
+
+    override fun dirty() = queries.selectDirty().executeAsList().map { it.toRecord() }
+
+    override fun markClean(pushed: List<SyncRecord>) = database.transaction {
+        pushed.forEach { queries.markClean(it.id, it.updatedAt) }
+    }
+
+    override fun local(id: String) = queries.byKey(id).executeAsOneOrNull()?.let { LocalRecord(it.toRecord(), it.dirty == 1L) }
+
+    override fun applyRemote(records: List<SyncRecord>) = database.transaction {
+        records.forEach { record ->
+            val data = decode(ValueData.serializer(), record) ?: return@forEach
+            queries.save(record.id, data.value, record.updatedAt, 0)
+        }
+    }
+
+    override fun markAllDirty() {
+        queries.markAllDirty()
+    }
+
+    private fun ValueRow.toRecord() = encode(ValueData.serializer(), ValueData(value_), key, updated_at)
 }

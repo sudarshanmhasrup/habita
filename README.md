@@ -5,8 +5,8 @@ own copy. It works offline first and syncs across devices through a small self-h
 
 The first feature is a gym tracker built around progressive overload: it remembers what you lifted
 last time and tells you what to lift today, so there is nothing to remember or work out at the gym.
-Next to it are an expense tracker with a monthly budget and a daily routine checklist that resets
-every midnight.
+Next to it are an expense tracker with a monthly budget and a routine checklist you reset when you
+start over.
 
 ## Status
 
@@ -120,7 +120,8 @@ under the backup button does the same at any time.
 ## The daily routine
 
 The routine is one list of sections, each Fixed or Adjustable, shown every day in the order it's
-written, and unticked again every midnight. The page itself only has the checkboxes. Edit opens
+written. Ticks stay until you tap Reset on the progress card, which asks once and then unticks
+everything, on every device. The page itself only has the checkboxes and Reset. Edit opens
 the list with a handle on every task and section: drag a task anywhere, into another section too,
 and drag a section's header to move the whole section. Tap a task to rename it or a header to
 switch it between Fixed and Adjustable; the bins and the add buttons live there too. A routine
@@ -153,7 +154,7 @@ data as one JSON file, ready to review yourself or with an AI before you change 
 | `feature/auth`    | The login screen                                                       |
 | `feature/gym`     | The gym flow and its local database                                    |
 | `feature/expense` | The expense tracker: payments, categories, budget and its database     |
-| `feature/routine` | The daily routine checklist, reset every midnight, and its database    |
+| `feature/routine` | The routine checklist, reset by hand, and its database                 |
 | `shared`          | Code for every platform and the server: models, progression, summaries |
 | `server`          | Ktor server: login, sync, targets, summaries and export                |
 | `program`         | The workout plan                                                       |

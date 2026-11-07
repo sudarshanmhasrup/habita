@@ -35,7 +35,7 @@ fun RoutineScreen(feature: RoutineFeature, onExit: () -> Unit) {
         ScreenTransition(route, isForward = { from, to -> to.depth > from.depth }) { screen ->
             when (screen) {
                 RoutineRoute.Today -> checklist?.let {
-                    ChecklistScreen(checklist = it, onBack = onExit, onEdit = viewModel::edit, onToggle = viewModel::toggle)
+                    ChecklistScreen(checklist = it, onBack = onExit, onEdit = viewModel::edit, onToggle = viewModel::toggle, onReset = viewModel::reset)
                 }
 
                 RoutineRoute.Edit -> checklist?.let {
