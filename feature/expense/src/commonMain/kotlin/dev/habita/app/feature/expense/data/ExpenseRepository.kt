@@ -8,7 +8,10 @@ import dev.habita.app.core.data.newId
 import dev.habita.app.core.data.nowMillis
 import dev.habita.app.feature.expense.db.ExpenseDatabase
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -51,13 +54,25 @@ class ExpenseRepository(core: Core) {
         }.toMap()
     }
 
-    fun summary(month: YearMonth): Flow<MonthSummary> {
-        val payments = expenses.inRange(startOf(month), startOf(month.next()), ::toExpense)
+    /** The day of the month the salary comes, which budget months start on. 1 by default. */
+    val payDay: Flow<Int> = values.select(PAY_DAY).asFlow().mapToOneOrNull(Dispatchers.Default)
+        .map(::toPayDay)
+        .distinctUntilChanged()
+
+    /** The salary day as it is now, for setting up a screen. */
+    fun payDayNow(): Int = toPayDay(values.select(PAY_DAY).executeAsOneOrNull())
+
+    /** The budget month it is now. */
+    val thisMonth: Flow<YearMonth> = currentPeriod(payDay)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun summary(month: YearMonth): Flow<MonthSummary> = payDay.flatMapLatest { day ->
+        val payments = expenses.inRange(periodStart(month, day), periodStart(month.next(), day), ::toExpense)
             .asFlow()
             .mapToList(Dispatchers.Default)
-        return combine(income, categories, budgets, payments) { income, categories, budgets, list ->
+        combine(income, categories, budgets, payments) { income, categories, budgets, list ->
             val (monthIncome, monthCategories) = budgetFor(month, income, categories, budgets)
-            MonthSummary.of(month, monthIncome, monthCategories, list)
+            MonthSummary.of(month, monthIncome, monthCategories, list, day)
         }
     }
 
@@ -65,7 +80,9 @@ class ExpenseRepository(core: Core) {
      * The month of the oldest payment, or `null` with none yet. It follows new payments and ones
      * synced in, such as a new phone getting its history.
      */
-    val firstMonth: Flow<YearMonth?> = expenses.firstPaidAt().asFlow().mapToOneOrNull(Dispatchers.Default).map { it?.MIN?.let(::monthOf) }
+    val firstMonth: Flow<YearMonth?> = combine(expenses.firstPaidAt().asFlow().mapToOneOrNull(Dispatchers.Default), payDay) { first, day ->
+        first?.MIN?.let { periodOf(it, day) }
+    }
 
     suspend fun expense(id: String): Expense? = io { expenses.byId(id, ::toExpense).executeAsOneOrNull() }
 
@@ -147,6 +164,11 @@ class ExpenseRepository(core: Core) {
         }
     }
 
+    /** Makes budget months start on [day] of the month, on every device. */
+    internal suspend fun setPayDay(day: Int) = change {
+        values.save(PAY_DAY, day.coerceIn(1, MAX_PAY_DAY).toString(), nowMillis(), 1)
+    }
+
     /** Renames categories ([names]), removes some ([remove]) and brings removed ones back. */
     internal suspend fun saveCategories(names: Map<String, String>, remove: Set<String>, bringBack: Set<String>) {
         val ids = names.keys + remove + bringBack
@@ -200,6 +222,9 @@ class ExpenseRepository(core: Core) {
 
     private companion object {
         const val INCOME = "income_paise"
+        const val PAY_DAY = "pay_day"
+
+        fun toPayDay(value: String?): Int = value?.toIntOrNull()?.coerceIn(1, MAX_PAY_DAY) ?: 1
         const val DUPLICATE_WINDOW = 2 * 60 * 1000L
 
         fun toCategory(

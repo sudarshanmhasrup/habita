@@ -52,6 +52,7 @@ import dev.habita.app.core.ui.TopBar
 import dev.habita.app.feature.expense.data.BankSms
 import dev.habita.app.feature.expense.data.Category
 import dev.habita.app.feature.expense.data.Defaults
+import dev.habita.app.feature.expense.data.MAX_PAY_DAY
 import dev.habita.app.feature.expense.data.ExpenseSource
 import dev.habita.app.feature.expense.data.PaymentMode
 import dev.habita.app.feature.expense.data.YearMonth
@@ -179,6 +180,7 @@ private fun DayStepper(paidAt: Long, onChange: (Long) -> Unit) {
 internal fun BudgetScreen(
     month: YearMonth,
     laterBudget: YearMonth?,
+    payDay: Int,
     income: Long,
     categories: List<Category>,
     removed: List<Category>,
@@ -188,6 +190,8 @@ internal fun BudgetScreen(
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     var incomeText by remember { mutableStateOf(rupeesText(income)) }
+    var payDayText by remember { mutableStateOf(payDay.toString()) }
+    val payDayValue = payDayText.toIntOrNull()?.takeIf { it in 1..MAX_PAY_DAY }
     // Keyed on which categories there are, not the list, so typing survives a sync or a new SMS.
     val everyone = categories + removed
     val ids = everyone.map { it.id }
@@ -223,6 +227,25 @@ internal fun BudgetScreen(
                 value = incomeText,
                 onValueChange = { incomeText = it.filter(Char::isDigit) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
+            Gap(Space.item)
+            LabeledField(
+                label = "Salary day",
+                value = payDayText,
+                onValueChange = { payDayText = it.filter(Char::isDigit).take(2) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
+            Gap(Space.tiny)
+            HText(
+                if (payDayValue == null) {
+                    "A day from 1 to $MAX_PAY_DAY."
+                } else if (payDayValue == 1) {
+                    "Months run from the 1st to the last day. Every month, not just this one."
+                } else {
+                    "Each month runs from the ${ordinal(payDayValue)} to the day before the next ${ordinal(payDayValue)}. Every month, not just this one."
+                },
+                type.caption,
+                color = if (payDayValue == null) colors.error else colors.muted,
             )
             Gap(Space.section)
             Overline("Categories")
@@ -292,7 +315,8 @@ internal fun BudgetScreen(
             Gap(Space.card)
         }
         PrimaryButton(
-            text = "Save budget",
+            text = if (payDayValue == null) "Enter a salary day" else "Save budget",
+            enabled = payDayValue != null,
             onClick = {
                 val renamed = everyone.mapNotNull { category ->
                     val name = names.getValue(category.id).value.trim()
@@ -306,6 +330,7 @@ internal fun BudgetScreen(
                         remove = removing,
                         bringBack = bringingBack,
                         newCategory = newName.trim().takeIf { it.isNotEmpty() }?.let { it to (newLimit.toLongOrNull() ?: 0) * 100 },
+                        payDay = payDayValue,
                     ),
                 )
             },
@@ -331,3 +356,12 @@ private fun Bin(label: String, onClick: () -> Unit) {
 }
 
 private fun rupeesText(paise: Long): String = (paise / 100).toString()
+
+/** "1st", "2nd", "5th", "22nd". */
+private fun ordinal(day: Int): String = day.toString() + when {
+    day % 100 in 11..13 -> "th"
+    day % 10 == 1 -> "st"
+    day % 10 == 2 -> "nd"
+    day % 10 == 3 -> "rd"
+    else -> "th"
+}

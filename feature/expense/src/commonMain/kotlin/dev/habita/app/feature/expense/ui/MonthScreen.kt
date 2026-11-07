@@ -94,7 +94,7 @@ internal fun MonthScreen(
                     if (summary?.expenses?.isNotEmpty() == true) TextAction("Export", onExport)
                 }
                 Gap(Space.item)
-                MonthSwitcher(month, canGoBack, canGoForward, onPrevious, onNext)
+                MonthSwitcher(month, summary?.rangeLabel, canGoBack, canGoForward, onPrevious, onNext)
                 Gap(Space.item)
                 if (summary != null) Overview(summary, onBudget, Modifier.appear(0))
                 if (sms.supported && !canGoForward) {
@@ -151,10 +151,14 @@ internal fun MonthScreen(
 }
 
 @Composable
-private fun MonthSwitcher(month: YearMonth, canGoBack: Boolean, canGoForward: Boolean, onPrevious: () -> Unit, onNext: () -> Unit) {
+private fun MonthSwitcher(month: YearMonth, range: String?, canGoBack: Boolean, canGoForward: Boolean, onPrevious: () -> Unit, onNext: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         RoundArrow(HabitaIcons.ChevronLeft, "Previous month", canGoBack, onPrevious)
-        HText(monthLabel(month), HabitaTheme.typography.bodyStrong, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+            HText(monthLabel(month), HabitaTheme.typography.bodyStrong, textAlign = TextAlign.Center)
+            // A month from salary to salary says which days it covers.
+            if (range != null) HText(range, HabitaTheme.typography.caption, color = HabitaTheme.colors.muted, textAlign = TextAlign.Center)
+        }
         RoundArrow(HabitaIcons.ChevronRight, "Next month", canGoForward, onNext)
     }
 }

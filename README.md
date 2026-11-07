@@ -125,11 +125,13 @@ categories; a payee seen before is sorted on its own, on any phone, because the 
 with the synced payments. "Scan recent SMS" catches up on this month's and last month's inbox
 without adding anything twice or bringing back a payment you deleted. Cash is added by hand.
 
-The budget is kept per month. Saving it sets the income and limits for the month on screen and
-the months after it, until one that has its own, so a raise or a new limit never changes what
-earlier months show. Categories are renamed, removed and brought back on the same screen; a
-removed category stays on its old payments. Export writes the month as markdown, laid out like a
-Notion budget page, to paste into Notion or hand to an AI.
+The budget is kept per month. A month can run from salary day to salary day: with "Salary day" set
+to 5 on the budget screen, November is 5 November to 4 December, and the month screen shows those
+dates. Saving it sets the income and limits for the month on screen and the months after it, until
+one that has its own, so a raise or a new limit never changes what earlier months show. Categories
+are renamed, removed and brought back on the same screen; a removed category stays on its old
+payments. Export writes the month as markdown, laid out like a Notion budget page, to paste into
+Notion or hand to an AI.
 
 ## The daily routine
 
