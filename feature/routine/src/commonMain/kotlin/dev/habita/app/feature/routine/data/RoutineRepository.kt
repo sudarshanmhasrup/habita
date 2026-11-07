@@ -9,6 +9,7 @@ import dev.habita.app.core.data.nowMillis
 import dev.habita.app.feature.routine.db.RoutineDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -84,10 +85,22 @@ internal class RoutineRepository(core: Core) {
         row?.let { Period.decode(it.value_) } ?: dayOf(nowMillis()).let { Period(it.key, it.endsAt - DAY_MILLIS) }
     }
 
-    /** Starts a new round: every task is unticked, on every device. */
-    suspend fun reset() = change {
-        val now = nowMillis()
-        valueQueries.save(PERIOD, Period("r-${newId()}", now).encode(), now, 1)
+    /**
+     * Starts a new round: every task is unticked, on every device. Returns the round it ended,
+     * whose ticks are kept, so [resume] can bring it back.
+     */
+    suspend fun reset(): Period {
+        val ended = period.first()
+        change {
+            val now = nowMillis()
+            valueQueries.save(PERIOD, Period("r-${newId()}", now).encode(), now, 1)
+        }
+        return ended
+    }
+
+    /** Makes [round] the current one again, with the ticks it had, on every device. */
+    suspend fun resume(round: Period) = change {
+        valueQueries.save(PERIOD, round.encode(), nowMillis(), 1)
     }
 
     /** The ids of the tasks done on [day]. */

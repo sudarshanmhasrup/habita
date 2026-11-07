@@ -54,10 +54,12 @@ import dev.habita.app.feature.routine.data.dayOf
 @Composable
 internal fun ChecklistScreen(
     checklist: Checklist,
+    canUndoReset: Boolean,
     onBack: () -> Unit,
     onEdit: (groupId: String?) -> Unit,
     onToggle: (taskId: String, done: Boolean) -> Unit,
     onReset: () -> Unit,
+    onUndoReset: () -> Unit,
 ) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
@@ -71,7 +73,7 @@ internal fun ChecklistScreen(
             Gap(Space.tiny)
             HText("Keep an eye on these and get them done ASAP. Reset when you start over.", type.body, color = colors.muted)
             Gap(Space.item)
-            Overview(checklist, onReset, Modifier.appear(0))
+            Overview(checklist, canUndoReset, onReset, onUndoReset, Modifier.appear(0))
         },
         second = {
             if (wide) Gap(56.dp)
@@ -86,9 +88,12 @@ internal fun ChecklistScreen(
     )
 }
 
-/** Done out of total, a bar, what comes next, and Reset, which asks once before unticking. */
+/**
+ * Done out of total, a bar, what comes next, and Reset, which asks once before unticking and can
+ * be undone for a few seconds after.
+ */
 @Composable
-private fun Overview(checklist: Checklist, onReset: () -> Unit, modifier: Modifier) {
+private fun Overview(checklist: Checklist, canUndoReset: Boolean, onReset: () -> Unit, onUndoReset: () -> Unit, modifier: Modifier) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     var confirming by remember(checklist.period) { mutableStateOf(false) }
@@ -104,7 +109,10 @@ private fun Overview(checklist: Checklist, onReset: () -> Unit, modifier: Modifi
         } else {
             Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
                 HText("${checklist.done} of ${checklist.total} done", type.title, modifier = Modifier.weight(1f))
-                if (checklist.done > 0) TextAction("Reset", { confirming = true })
+                when {
+                    canUndoReset -> TextAction("Undo reset", onUndoReset)
+                    checklist.done > 0 -> TextAction("Reset", { confirming = true })
+                }
             }
         }
         Gap(Space.item)
