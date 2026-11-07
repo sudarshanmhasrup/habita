@@ -215,7 +215,7 @@ private fun Overview(summary: MonthSummary, onBudget: () -> Unit, modifier: Modi
     }
 }
 
-/** Asks for SMS access, or offers to catch up on this month's bank SMS. */
+/** Asks for SMS access, or offers to catch up on this month's and last month's bank SMS. */
 @Composable
 private fun ColumnScope.SmsCard(sms: SmsAccess, onImport: () -> Unit) {
     val colors = HabitaTheme.colors
@@ -247,7 +247,7 @@ private fun ColumnScope.SmsCard(sms: SmsAccess, onImport: () -> Unit) {
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             HText("Bank SMS tracking is on", type.caption, color = colors.muted, modifier = Modifier.weight(1f))
-            TextAction("Scan this month's SMS", onImport)
+            TextAction("Scan recent SMS", onImport)
         }
     }
 }

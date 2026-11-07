@@ -80,7 +80,7 @@ fun ExpenseScreen(feature: ExpenseFeature, onExit: () -> Unit) {
                     onOpen = { viewModel.openEdit(it) },
                     onSort = viewModel::setCategory,
                     onBudget = viewModel::openBudget,
-                    onImport = { scope.launch { viewModel.importSms(sms.inbox(feature.startOfThisMonth())) } },
+                    onImport = { scope.launch { viewModel.importSms(sms.inbox(feature.scanFrom())) } },
                     onExport = { summary?.let { saveFile("habita-expenses-${fileMonth(it.month)}.md", it.toMarkdown()) } },
                     onDismissMessage = { viewModel.showMessage(null) },
                     onUndo = viewModel::undoDelete,
