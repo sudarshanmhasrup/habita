@@ -8,6 +8,7 @@ import dev.habita.app.shared.api.SyncRecord
 import dev.habita.app.feature.expense.db.ExpenseDatabase
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import dev.habita.app.feature.expense.db.Category as CategoryRow
 import dev.habita.app.feature.expense.db.Expense as ExpenseRow
@@ -48,11 +49,23 @@ private fun <T> encode(serializer: KSerializer<T>, data: T, id: String, updatedA
 private fun <T> decode(serializer: KSerializer<T>, record: SyncRecord): T? =
     runCatching { SyncJson.decodeFromJsonElement(serializer, record.data) }.getOrNull()
 
+/** Like the sync format, but refuses fields it doesn't know instead of dropping them. */
+private val StrictJson = Json { ignoreUnknownKeys = false }
+
+/**
+ * Strictly: a record with fields this version doesn't know, such as one from a newer app, waits
+ * for an update whole. Saving it without them would lose them on the next edit.
+ */
+private fun <T> readable(serializer: KSerializer<T>, record: SyncRecord): Boolean =
+    runCatching { StrictJson.decodeFromJsonElement(serializer, record.data) }.isSuccess
+
 private class ExpenseTable(private val database: ExpenseDatabase) : LocalSyncTable {
     private val queries = database.expenseQueries
 
     override fun <T> inTransaction(block: () -> T): T = database.transactionWithResult { block() }
     override val collection = SyncCollections.EXPENSES
+
+    override fun canRead(record: SyncRecord) = readable(ExpenseData.serializer(), record)
 
     override fun dirty() = queries.selectDirty().executeAsList().map { it.toRecord() }
 
@@ -92,6 +105,8 @@ private class CategoryTable(private val database: ExpenseDatabase) : LocalSyncTa
     override fun <T> inTransaction(block: () -> T): T = database.transactionWithResult { block() }
     override val collection = SyncCollections.EXPENSE_CATEGORIES
 
+    override fun canRead(record: SyncRecord) = readable(CategoryData.serializer(), record)
+
     override fun dirty() = queries.selectDirty().executeAsList().map { it.toRecord() }
 
     override fun markClean(pushed: List<SyncRecord>) = database.transaction {
@@ -120,6 +135,8 @@ private class SettingTable(private val database: ExpenseDatabase) : LocalSyncTab
 
     override fun <T> inTransaction(block: () -> T): T = database.transactionWithResult { block() }
     override val collection = SyncCollections.EXPENSE_SETTINGS
+
+    override fun canRead(record: SyncRecord) = readable(SettingData.serializer(), record)
 
     override fun dirty() = queries.selectDirty().executeAsList().map { it.toRecord() }
 

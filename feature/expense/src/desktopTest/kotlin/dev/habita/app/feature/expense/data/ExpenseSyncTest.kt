@@ -4,8 +4,12 @@ import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import dev.habita.app.feature.expense.db.ExpenseDatabase
 import dev.habita.app.shared.api.SyncCollections
 import kotlin.test.Test
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ExpenseSyncTest {
     @Test
@@ -45,6 +49,23 @@ class ExpenseSyncTest {
             assertEquals(record, table.local("e1")!!.record)
             assertEquals(false, table.local("e1")!!.dirty)
             assertEquals(emptyList(), table.dirty())
+        }
+    }
+
+    @Test
+    fun `a payment with fields from a newer app waits for an update instead of losing them`() {
+        JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).use { driver ->
+            ExpenseDatabase.Schema.create(driver)
+            val database = ExpenseDatabase(driver)
+            database.expenseQueries.save("e1", 25_000, "Lunch", null, "food", "CASH", "MANUAL", null, 1_000, 2_000, 0)
+            val tables = expenseSyncTables(database).associateBy { it.collection }
+            val table = tables.getValue(SyncCollections.EXPENSES)
+            val record = table.dirty().single()
+            val newer = record.copy(data = JsonObject(record.data + ("tip" to JsonPrimitive(500))))
+
+            assertTrue(table.canRead(record))
+            assertFalse(table.canRead(newer))
+            assertFalse(tables.getValue(SyncCollections.EXPENSE_SETTINGS).canRead(newer))
         }
     }
 }

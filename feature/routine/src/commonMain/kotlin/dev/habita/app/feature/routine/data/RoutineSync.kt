@@ -8,6 +8,7 @@ import dev.habita.app.shared.api.SyncJson
 import dev.habita.app.shared.api.SyncRecord
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import dev.habita.app.feature.routine.db.Routine_check as CheckRow
 import dev.habita.app.feature.routine.db.Routine_value as ValueRow
@@ -36,6 +37,16 @@ private fun <T> encode(serializer: KSerializer<T>, data: T, id: String, updatedA
 private fun <T> decode(serializer: KSerializer<T>, record: SyncRecord): T? =
     runCatching { SyncJson.decodeFromJsonElement(serializer, record.data) }.getOrNull()
 
+/** Like the sync format, but refuses fields it doesn't know instead of dropping them. */
+private val StrictJson = Json { ignoreUnknownKeys = false }
+
+/**
+ * Strictly: a record with fields this version doesn't know, such as one from a newer app, waits
+ * for an update whole. Saving it without them would lose them on the next edit.
+ */
+private fun <T> readable(serializer: KSerializer<T>, record: SyncRecord): Boolean =
+    runCatching { StrictJson.decodeFromJsonElement(serializer, record.data) }.isSuccess
+
 private fun Boolean.toLong() = if (this) 1L else 0L
 
 private class GroupTable(private val database: RoutineDatabase) : LocalSyncTable {
@@ -43,6 +54,7 @@ private class GroupTable(private val database: RoutineDatabase) : LocalSyncTable
 
     override fun <T> inTransaction(block: () -> T): T = database.transactionWithResult { block() }
     override val collection = SyncCollections.ROUTINE_GROUPS
+    override fun canRead(record: SyncRecord) = readable(GroupData.serializer(), record)
 
     override fun dirty() = queries.selectDirty().executeAsList().map { it.toRecord() }
 
@@ -72,6 +84,7 @@ private class TaskTable(private val database: RoutineDatabase) : LocalSyncTable 
 
     override fun <T> inTransaction(block: () -> T): T = database.transactionWithResult { block() }
     override val collection = SyncCollections.ROUTINE_TASKS
+    override fun canRead(record: SyncRecord) = readable(TaskData.serializer(), record)
 
     override fun dirty() = queries.selectDirty().executeAsList().map { it.toRecord() }
 
@@ -104,6 +117,7 @@ private class CheckTable(private val database: RoutineDatabase) : LocalSyncTable
 
     override fun <T> inTransaction(block: () -> T): T = database.transactionWithResult { block() }
     override val collection = SyncCollections.ROUTINE_CHECKS
+    override fun canRead(record: SyncRecord) = readable(CheckData.serializer(), record)
 
     override fun dirty() = queries.selectDirty().executeAsList().map { it.toRecord() }
 
@@ -133,6 +147,7 @@ private class ValueTable(private val database: RoutineDatabase) : LocalSyncTable
 
     override fun <T> inTransaction(block: () -> T): T = database.transactionWithResult { block() }
     override val collection = SyncCollections.ROUTINE_SETTINGS
+    override fun canRead(record: SyncRecord) = readable(ValueData.serializer(), record)
 
     override fun dirty() = queries.selectDirty().executeAsList().map { it.toRecord() }
 
