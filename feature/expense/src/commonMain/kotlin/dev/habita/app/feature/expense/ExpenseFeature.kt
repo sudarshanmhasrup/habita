@@ -92,8 +92,11 @@ class ExpenseFeature(core: Core) {
         _openRequest.value = null
     }
 
-    /** The first millisecond of this month, for reading this month's SMS. */
-    fun startOfThisMonth(): Long = startOf(monthOf(nowMillis()))
+    /**
+     * Where a scan of the inbox starts: the first millisecond of last month, so payments missed
+     * in the last days of a month can still be caught up early in the next.
+     */
+    fun scanFrom(): Long = startOf(monthOf(nowMillis()).previous())
 }
 
 /**

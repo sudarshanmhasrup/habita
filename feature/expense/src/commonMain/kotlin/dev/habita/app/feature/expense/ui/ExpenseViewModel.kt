@@ -186,7 +186,7 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
             }
             firstMonth = repository.firstMonth()
             _message.value = when (added) {
-                0 -> "No new bank payments found this month."
+                0 -> "No new bank payments in this month's or last month's SMS."
                 1 -> "Added 1 payment from your SMS."
                 else -> "Added $added payments from your SMS."
             }

@@ -63,7 +63,8 @@ class ExpenseRepository(core: Core) {
      * Saves a payment from a bank SMS, sorted into the payee's remembered category when there is
      * one. Returns `null` for an SMS that isn't a debit, and [SmsOutcome.Duplicate] for one that
      * is already saved: the same reference number, or with none, the same amount within two
-     * minutes.
+     * minutes. A payment deleted after it came in counts as saved, so a rescan doesn't bring it
+     * back.
      */
     suspend fun recordSms(body: String, sender: String?, receivedAt: Long): SmsOutcome? = io {
         val debit = BankSms.parse(body, sender) ?: return@io null

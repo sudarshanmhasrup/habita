@@ -29,9 +29,12 @@ SELECT * FROM expense WHERE id = ?;
 bySmsRef:
 SELECT * FROM expense WHERE sms_ref = ?;
 
--- A payment with the same amount close in time, for SMS without a reference number.
+-- A payment with the same amount close in time, for SMS without a reference number. A deleted
+-- one from an SMS counts too, so a rescan doesn't bring back what was deleted.
 nearDuplicate:
-SELECT * FROM expense WHERE deleted = 0 AND amount_paise = ? AND paid_at BETWEEN ? AND ? LIMIT 1;
+SELECT * FROM expense
+WHERE amount_paise = ? AND paid_at BETWEEN ? AND ? AND (deleted = 0 OR source = 'SMS')
+LIMIT 1;
 
 save:
 INSERT OR REPLACE INTO expense VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1);
