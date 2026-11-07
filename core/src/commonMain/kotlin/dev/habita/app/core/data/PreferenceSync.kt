@@ -17,6 +17,8 @@ internal data class PreferenceData(val value: String)
 /** Synced preferences, such as the theme, so every device looks the same. */
 internal class PreferenceSyncTable(private val database: CoreDatabase) : LocalSyncTable {
     private val queries = database.preferenceQueries
+
+    override fun <T> inTransaction(block: () -> T): T = database.transactionWithResult { block() }
     override val collection = SyncCollections.APP_PREFERENCES
 
     override fun dirty() = queries.selectDirty().executeAsList().map { it.toRecord() }

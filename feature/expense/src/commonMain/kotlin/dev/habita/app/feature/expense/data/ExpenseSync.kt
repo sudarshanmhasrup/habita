@@ -50,6 +50,8 @@ private fun <T> decode(serializer: KSerializer<T>, record: SyncRecord): T? =
 
 private class ExpenseTable(private val database: ExpenseDatabase) : LocalSyncTable {
     private val queries = database.expenseQueries
+
+    override fun <T> inTransaction(block: () -> T): T = database.transactionWithResult { block() }
     override val collection = SyncCollections.EXPENSES
 
     override fun dirty() = queries.selectDirty().executeAsList().map { it.toRecord() }
@@ -86,6 +88,8 @@ private class ExpenseTable(private val database: ExpenseDatabase) : LocalSyncTab
 /** Categories are archived, never deleted, so the deleted flag is never set. */
 private class CategoryTable(private val database: ExpenseDatabase) : LocalSyncTable {
     private val queries = database.categoryQueries
+
+    override fun <T> inTransaction(block: () -> T): T = database.transactionWithResult { block() }
     override val collection = SyncCollections.EXPENSE_CATEGORIES
 
     override fun dirty() = queries.selectDirty().executeAsList().map { it.toRecord() }
@@ -113,6 +117,8 @@ private class CategoryTable(private val database: ExpenseDatabase) : LocalSyncTa
 
 private class SettingTable(private val database: ExpenseDatabase) : LocalSyncTable {
     private val queries = database.expenseValueQueries
+
+    override fun <T> inTransaction(block: () -> T): T = database.transactionWithResult { block() }
     override val collection = SyncCollections.EXPENSE_SETTINGS
 
     override fun dirty() = queries.selectDirty().executeAsList().map { it.toRecord() }

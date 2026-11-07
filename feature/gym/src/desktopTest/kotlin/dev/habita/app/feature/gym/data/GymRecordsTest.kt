@@ -3,6 +3,7 @@ package dev.habita.app.feature.gym.data
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import dev.habita.app.feature.gym.db.GymDatabase
 import dev.habita.app.shared.api.SyncCollections
+import dev.habita.app.shared.gym.Body
 import dev.habita.app.shared.gym.BodyLog
 import dev.habita.app.shared.gym.CheckIn
 import dev.habita.app.shared.gym.ExerciseSwap
@@ -76,6 +77,33 @@ class GymRecordsTest {
                 table(receiver, SyncCollections.GYM_SWAPS).applyRemote(table(sender, SyncCollections.GYM_SWAPS).dirty())
 
                 assertEquals(true, receiver.swaps().single().deleted)
+            }
+        }
+    }
+
+    @Test
+    fun `a weight and a waist logged on two devices for one day both survive`() {
+        JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).use { phoneDriver ->
+            JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).use { desktopDriver ->
+                GymDatabase.Schema.create(phoneDriver)
+                GymDatabase.Schema.create(desktopDriver)
+                val phone = store(phoneDriver)
+                val desktop = store(desktopDriver)
+                phone.saveBody(Body.update(null, "2026-11-08", weightGrams = 78_000, waistMm = null, now = 10))
+                desktop.saveBody(Body.update(null, "2026-11-08", weightGrams = null, waistMm = 850, now = 20))
+                val phoneTable = table(phone, SyncCollections.GYM_BODY)
+                val desktopTable = table(desktop, SyncCollections.GYM_BODY)
+
+                // The desktop's copy reaches the phone while the phone's weight is still unsent.
+                phoneTable.inTransaction { phoneTable.applyRemote(desktopTable.dirty()) }
+                val merged = phone.bodyLog("2026-11-08")!!
+                // The phone sends the merged copy; the desktop takes it.
+                desktopTable.inTransaction { desktopTable.applyRemote(phoneTable.dirty()) }
+
+                assertEquals(78_000, merged.weightGrams)
+                assertEquals(850, merged.waistMm)
+                assertEquals(true, phoneTable.local("2026-11-08")?.dirty)
+                assertEquals(merged, desktop.bodyLog("2026-11-08"))
             }
         }
     }

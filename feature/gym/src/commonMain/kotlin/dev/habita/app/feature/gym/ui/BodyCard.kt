@@ -219,7 +219,8 @@ private fun PastDays(logs: List<BodyLog>, today: String, onSetDay: (String, Int?
 private fun DayEditor(day: String, log: BodyLog?, today: String, onSave: (Int?, Int?) -> Unit, onCancel: () -> Unit) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
-    var weightText by remember(day) { mutableStateOf(log?.weightGrams?.let(::formatOneDecimal).orEmpty()) }
+    // The weight as logged, not rounded, so saving only a waist leaves it exactly as it was.
+    var weightText by remember(day) { mutableStateOf(log?.weightGrams?.let(::formatKg).orEmpty()) }
     var waistText by remember(day) { mutableStateOf(log?.waistMm?.let { formatOneDecimal(it * 100) }.orEmpty()) }
     val weight = parseWeight(weightText)
     val waist = parseWaist(waistText)
@@ -310,7 +311,11 @@ private fun adviceText(trend: BodyTrend): Pair<String, String> {
             BodyGoal.BUILD_MUSCLE -> "No gain this week yet."
         } + " One week can be water. Keep eating the same and check again next week."
         BodyAdvice.ON_TRACK -> "On track, keep eating the same" to when (trend.goal) {
-            BodyGoal.LOSE_FAT -> "Down $change kg this week. That's a pace that keeps your muscle."
+            BodyGoal.LOSE_FAT -> if ((trend.weeklyChangeGrams ?: 0) <= 0) {
+                "Down $change kg this week. That's a pace that keeps your muscle."
+            } else {
+                "Up $change kg this week, but down over two weeks. One week can be water."
+            }
             BodyGoal.MAINTAIN -> "Your weight is holding steady."
             BodyGoal.BUILD_MUSCLE -> "A slow, steady gain: mostly muscle, little fat."
         }

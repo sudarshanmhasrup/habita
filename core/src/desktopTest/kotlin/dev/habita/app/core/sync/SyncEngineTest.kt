@@ -1,6 +1,7 @@
 package dev.habita.app.core.sync
 
 import dev.habita.app.core.network.ApiException
+import dev.habita.app.shared.api.RejectedRecord
 import dev.habita.app.shared.api.SyncPull
 import dev.habita.app.shared.api.SyncPush
 import dev.habita.app.shared.api.SyncPushResult
@@ -29,12 +30,26 @@ private class FakeServer(var serverId: String = "server-1") : SyncTransport {
     var seq = 0L
     var online = true
 
+    /** Record ids this server refuses, like a server too old to understand them. */
+    var refuse = emptySet<String>()
+
     override suspend fun push(push: SyncPush): SyncPushResult {
         if (!online) throw ApiException.Offline(Exception("offline"))
+        val rejected = mutableListOf<RejectedRecord>()
         push.collections[NOTES].orEmpty().forEach { record ->
-            if (record.winsOver(records[record.id]?.second)) records[record.id] = ++seq to record
+            if (record.id in refuse) {
+                rejected += RejectedRecord(NOTES, record.id, "Unreadable record")
+            } else if (record.winsOver(records[record.id]?.second)) {
+                records[record.id] = ++seq to record
+            }
         }
-        return SyncPushResult(seq)
+        return SyncPushResult(seq, rejected)
+    }
+
+    /** Goes back to how it was at [atSeq], as restoring an older backup does. The id stays. */
+    fun restore(atSeq: Long) {
+        records.values.removeAll { it.first > atSeq }
+        seq = atSeq
     }
 
     override suspend fun pull(since: Long, limit: Int): SyncPull {
@@ -62,6 +77,11 @@ private class Phone(server: SyncTransport) : LocalSyncTable, SyncCheckpoint {
     val rows = mutableMapOf<String, LocalRecord>()
     private var cursor = 0L
     private var serverId: String? = null
+    private var kept = emptyList<PendingRecord>()
+    private var highest = 0L
+
+    /** Which records this app version can read; all of them unless a test says otherwise. */
+    var readable: (SyncRecord) -> Boolean = { true }
     val engine = SyncEngine(CoroutineScope(Dispatchers.Unconfined), server, this, MutableStateFlow(true))
 
     init {
@@ -96,6 +116,20 @@ private class Phone(server: SyncTransport) : LocalSyncTable, SyncCheckpoint {
     override fun saveCheckpoint(cursor: Long, serverId: String) {
         this.cursor = cursor
         this.serverId = serverId
+    }
+
+    override fun canRead(record: SyncRecord) = readable(record)
+
+    override fun pending() = kept
+
+    override fun highestSeen() = highest
+
+    override fun saveHighestSeen(position: Long) {
+        highest = position
+    }
+
+    override fun savePending(records: List<PendingRecord>) {
+        kept = records
     }
 }
 
@@ -195,5 +229,73 @@ class SyncEngineTest {
 
         assertEquals(note("n1", "keep me", at = 1), server.records.getValue("n1").second)
         assertFalse(phone.rows.getValue("n1").dirty)
+    }
+
+    @Test
+    fun `a server restored from an older backup gets this phone's later changes back`() = runBlocking {
+        val server = FakeServer()
+        val phone = Phone(server)
+        phone.edit(note("n1", "before the backup", at = 1))
+        phone.engine.sync()
+        val backupSeq = server.seq
+        phone.edit(note("n2", "after the backup", at = 2))
+        phone.engine.sync()
+
+        // The disk dies; last night's backup comes back with the same server id.
+        server.restore(backupSeq)
+        phone.engine.sync()
+
+        assertEquals(note("n2", "after the backup", at = 2), server.records.getValue("n2").second)
+    }
+
+    @Test
+    fun `refused changes stay unsent and go up once the server accepts them`() = runBlocking {
+        val server = FakeServer().apply { refuse = setOf("n1") }
+        val phone = Phone(server)
+        phone.edit(note("n1", "too new for this server", at = 1))
+
+        phone.engine.sync()
+
+        assertTrue(phone.rows.getValue("n1").dirty)
+        assertEquals(1, phone.engine.refused.value)
+
+        server.refuse = emptySet()
+        phone.engine.sync()
+
+        assertFalse(phone.rows.getValue("n1").dirty)
+        assertEquals(0, phone.engine.refused.value)
+        assertTrue("n1" in server.records)
+    }
+
+    @Test
+    fun `a record this version can't read is kept and arrives after an update`() = runBlocking {
+        val server = FakeServer()
+        val newer = Phone(server)
+        newer.edit(note("n1", "from a newer app", at = 1))
+        newer.engine.sync()
+        val older = Phone(server).apply { readable = { false } }
+
+        older.engine.sync()
+        assertFalse("n1" in older.rows)
+
+        // The app is updated and can read it now; the server has nothing new to send.
+        older.readable = { true }
+        older.engine.sync()
+
+        assertEquals("\"from a newer app\"", older.text("n1"))
+    }
+
+    @Test
+    fun `pulling a long history back page by page is not mistaken for a restore`() = runBlocking {
+        val server = FakeServer()
+        val phone = Phone(server)
+        repeat(1_234) { phone.edit(note("n$it", "note $it", at = 1)) }
+        phone.engine.sync()
+        val pushed = server.seq
+
+        phone.engine.sync()
+
+        assertEquals(pushed, server.seq)
+        assertTrue(phone.dirty().isEmpty())
     }
 }

@@ -36,6 +36,8 @@ private fun Boolean.toLong() = if (this) 1L else 0L
 
 private class GroupTable(private val database: RoutineDatabase) : LocalSyncTable {
     private val queries = database.routineGroupQueries
+
+    override fun <T> inTransaction(block: () -> T): T = database.transactionWithResult { block() }
     override val collection = SyncCollections.ROUTINE_GROUPS
 
     override fun dirty() = queries.selectDirty().executeAsList().map { it.toRecord() }
@@ -63,6 +65,8 @@ private class GroupTable(private val database: RoutineDatabase) : LocalSyncTable
 
 private class TaskTable(private val database: RoutineDatabase) : LocalSyncTable {
     private val queries = database.routineTaskQueries
+
+    override fun <T> inTransaction(block: () -> T): T = database.transactionWithResult { block() }
     override val collection = SyncCollections.ROUTINE_TASKS
 
     override fun dirty() = queries.selectDirty().executeAsList().map { it.toRecord() }
@@ -93,6 +97,8 @@ private class TaskTable(private val database: RoutineDatabase) : LocalSyncTable 
 /** Ticks are never deleted: unticking saves done = false. */
 private class CheckTable(private val database: RoutineDatabase) : LocalSyncTable {
     private val queries = database.routineCheckQueries
+
+    override fun <T> inTransaction(block: () -> T): T = database.transactionWithResult { block() }
     override val collection = SyncCollections.ROUTINE_CHECKS
 
     override fun dirty() = queries.selectDirty().executeAsList().map { it.toRecord() }

@@ -191,4 +191,12 @@ class ProgramParserTest {
             ProgramParser.parse(withAlternatives.replace("| bench    | row, plank   |", "| bench    | row          |\n| bench    | plank        |"))
         }
     }
+
+    @Test
+    fun `rejects the same exercise twice in one workout`() {
+        val error = assertFailsWith<ProgramFormatException> {
+            ProgramParser.parse(valid.replace("| plank    | 3    | 30     | 60   |", "| bench    | 3    | 30     | 60   |"))
+        }
+        assertTrue("\"bench\" twice" in error.message!!)
+    }
 }

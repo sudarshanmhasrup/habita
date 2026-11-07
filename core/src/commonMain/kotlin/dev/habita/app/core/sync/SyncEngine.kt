@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.Serializable
 
 sealed interface SyncState {
     data object Idle : SyncState
@@ -32,7 +33,21 @@ interface SyncCheckpoint {
     fun serverId(): String?
 
     fun saveCheckpoint(cursor: Long, serverId: String)
+
+    /** Pulled records this version couldn't read yet, kept to try again after an update. */
+    fun pending(): List<PendingRecord> = emptyList()
+
+    fun savePending(records: List<PendingRecord>) {}
+
+    /** The highest server position this device has seen, its own pushes included. */
+    fun highestSeen(): Long = 0
+
+    fun saveHighestSeen(position: Long) {}
 }
+
+/** A pulled record kept aside: its collection is unknown here, or its data can't be read yet. */
+@Serializable
+data class PendingRecord(val collection: String, val record: SyncRecord)
 
 /**
  * Keeps every feature's data in step with the server. The app works fully offline: edits are saved
@@ -60,6 +75,14 @@ class SyncEngine(
 
     private val _state = MutableStateFlow<SyncState>(SyncState.Idle)
     val state: StateFlow<SyncState> = _state.asStateFlow()
+
+    private val _refused = MutableStateFlow(0)
+
+    /**
+     * How many local changes the server refused on the last push. They stay unsent and are offered
+     * again on every sync, for example until a newer server that understands them is deployed.
+     */
+    val refused: StateFlow<Int> = _refused.asStateFlow()
 
     /** Starts syncing. Call once, after every feature has registered its collections. */
     fun start() {
@@ -116,15 +139,21 @@ class SyncEngine(
     }
 
     private suspend fun pull() {
+        retryPending()
         var since = checkpoint.cursor()
         while (true) {
             val page = transport.pull(since, PULL_PAGE)
             val known = checkpoint.serverId()
-            if (known != null && known != page.serverId) {
+            // A position below one this device has seen means the server's database was restored
+            // from a backup, which keeps its id: it lost what came after, this device's pushes too.
+            // Mid-history pages stop short of the end, so only the last page is compared with pushes.
+            val restored = page.cursor < since || (!page.hasMore && page.cursor < checkpoint.highestSeen())
+            if (known != null && (known != page.serverId || restored)) {
                 // The server's database was replaced, so the cursor means nothing there: start
                 // over, and send everything this device has, in case the server lost it.
                 tables.values.forEach { it.markAllDirty() }
                 checkpoint.saveCheckpoint(0, page.serverId)
+                checkpoint.saveHighestSeen(0)
                 since = 0
                 continue
             }
@@ -136,25 +165,64 @@ class SyncEngine(
     }
 
     private fun apply(page: SyncPull) {
+        val unreadable = mutableListOf<PendingRecord>()
         page.collections.forEach { (collection, records) ->
-            // A collection from a newer app version is left for that version.
-            val table = tables[collection] ?: return@forEach
-            val winners = records.filter { record ->
-                val local = table.local(record.id)
-                local == null || !local.dirty || record.winsOver(local.record)
-            }
-            if (winners.isNotEmpty()) table.applyRemote(winners)
+            unreadable += applyCollection(collection, records)
         }
+        if (unreadable.isNotEmpty()) savePending(checkpoint.pending() + unreadable)
+    }
+
+    /** Saves the records this version reads and returns the ones it can't, to keep aside. */
+    private fun applyCollection(collection: String, records: List<SyncRecord>): List<PendingRecord> {
+        // A collection from a newer app version is kept for when this app is updated.
+        val table = tables[collection] ?: return records.map { PendingRecord(collection, it) }
+        val (readable, unreadable) = records.partition(table::canRead)
+        if (readable.isNotEmpty()) {
+            table.inTransaction {
+                val winners = if (table.mergesItself) readable else readable.filter { record ->
+                    val local = table.local(record.id)
+                    local == null || !local.dirty || record.winsOver(local.record)
+                }
+                if (winners.isNotEmpty()) table.applyRemote(winners)
+            }
+        }
+        return unreadable.map { PendingRecord(collection, it) }
+    }
+
+    /** Offers the records kept aside again: after an update, this version may read them. */
+    private fun retryPending() {
+        val pending = checkpoint.pending()
+        if (pending.isEmpty()) return
+        val still = pending.groupBy({ it.collection }, { it.record }).flatMap { (collection, records) ->
+            applyCollection(collection, records)
+        }
+        checkpoint.savePending(still)
+    }
+
+    /** Keeps one copy per record, the one that wins. */
+    private fun savePending(records: List<PendingRecord>) {
+        checkpoint.savePending(
+            records.groupBy { it.collection to it.record.id }.values.map { copies ->
+                copies.reduce { kept, next -> if (next.record.winsOver(kept.record)) next else kept }
+            },
+        )
     }
 
     private suspend fun push() {
         val dirty = tables.values.flatMap { table -> table.dirty().map { table.collection to it } }
+        var refused = 0
         dirty.chunked(PUSH_BATCH).forEach { batch ->
             val collections: Map<String, List<SyncRecord>> = batch.groupBy({ it.first }, { it.second })
-            // Refused records are cleared too: sending them again unchanged can't succeed.
-            transport.push(SyncPush(collections))
-            collections.forEach { (collection, records) -> tables.getValue(collection).markClean(records) }
+            val result = transport.push(SyncPush(collections))
+            if (result.cursor > checkpoint.highestSeen()) checkpoint.saveHighestSeen(result.cursor)
+            // Refused records stay unsent: a newer server may accept them, so they are offered again.
+            val rejected = result.rejected.map { it.collection to it.id }.toSet()
+            refused += rejected.size
+            collections.forEach { (collection, records) ->
+                tables.getValue(collection).markClean(records.filter { (collection to it.id) !in rejected })
+            }
         }
+        _refused.value = refused
     }
 
     private fun scheduleRetry() {

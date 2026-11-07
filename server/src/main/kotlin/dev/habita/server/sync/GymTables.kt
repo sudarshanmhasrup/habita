@@ -15,6 +15,7 @@ import dev.habita.server.db.Set_log
 import dev.habita.server.db.Warm_up_log
 import dev.habita.server.db.Workout_session
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 
 /**
@@ -39,6 +40,11 @@ private abstract class ModelTable<T>(
     abstract fun store(model: T, record: SyncRecord, seq: Long)
 
     override fun check(record: SyncRecord): String? {
+        // Fields this server doesn't know would be dropped by the typed table, so the record is
+        // refused instead: the app keeps it and sends it again once a newer server is deployed.
+        if (runCatching { strictJson.decodeFromJsonElement(serializer, record.data) }.isFailure) {
+            return if (decode(record) == null) "Unreadable record" else "Has fields this server doesn't know"
+        }
         val model = decode(record) ?: return "Unreadable record"
         return problem(model)
     }
@@ -51,6 +57,9 @@ private abstract class ModelTable<T>(
     private fun decode(record: SyncRecord): T? =
         runCatching { SyncJson.decodeFromJsonElement(serializer, record.data) }.getOrNull()
 }
+
+/** Like [SyncJson], but refuses unknown fields. */
+private val strictJson = Json { ignoreUnknownKeys = false }
 
 private class SessionTable(database: HabitaDatabase) :
     ModelTable<WorkoutSession>(SyncCollections.GYM_SESSIONS, WorkoutSession.serializer()) {

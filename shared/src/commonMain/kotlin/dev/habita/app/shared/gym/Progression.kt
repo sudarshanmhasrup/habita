@@ -128,8 +128,8 @@ object Progression {
 
         val weight = last.workingWeight
         if (now - last.performedAt > LONG_BREAK_MILLIS) {
-            // Two lighter-week drops: about 20%, rounded to whole steps.
-            return result(deload(deload(weight, step), step), slot.target, TargetReason.RETURN_AFTER_LONG_BREAK)
+            // About 20% lighter, in one go, rounded up to whole steps.
+            return result(lighter(weight, step, percent = 20), slot.target, TargetReason.RETURN_AFTER_LONG_BREAK)
         }
         if (now - last.performedAt > BREAK_MILLIS) {
             return result(weight, slot.target, TargetReason.RETURN_AFTER_BREAK)
@@ -145,9 +145,15 @@ object Progression {
             return result(weight + step, slot.target, TargetReason.FELT_EASY)
         }
         val tooHeavy = last.workingResults.any { it < floor(slot.target) }
-        val previousWeight = done.drop(1).firstOrNull { it.workingWeight < weight }?.workingWeight
-        if (tooHeavy && previousWeight != null) {
-            return result(previousWeight, slot.target, TargetReason.DROP_BACK)
+        // Back to a weight that held: a lighter one done well that same day, or the weight from
+        // the session before when last time was a jump up from it.
+        val heldToday = last.sets
+            .filter { !it.isSkipped && it.weightGrams < weight && it.achieved!! >= floor(slot.target) }
+            .maxOfOrNull { it.weightGrams }
+        val beforeJump = done.getOrNull(1)?.workingWeight?.takeIf { it < weight }
+        val dropTo = heldToday ?: beforeJump
+        if (tooHeavy && dropTo != null) {
+            return result(dropTo, slot.target, TargetReason.DROP_BACK)
         }
         if (isStalled(done.take(STALL_SESSIONS), slot)) {
             return result(deload(weight, step), slot.target, TargetReason.DELOAD)
@@ -207,11 +213,18 @@ object Progression {
     /** The fewest reps that still count as the right weight: 8 for a target of 12. */
     fun floor(target: Int): Int = (target * 2 + 2) / 3
 
-    /** Removes about 10% of [weight], rounded up to whole steps. */
-    fun deload(weight: Int, step: Int): Int {
-        if (step <= 0) return weight * 9 / 10
-        val steps = (weight + 10 * step - 1) / (10 * step)
-        return maxOf(weight - steps * step, 0)
+    /** Removes about 10% of [weight], rounded up to whole steps, never below one step. */
+    fun deload(weight: Int, step: Int): Int = lighter(weight, step, percent = 10)
+
+    /**
+     * Removes [percent] of [weight], rounded up to whole steps. It never goes below one step, the
+     * lightest weight there is, so a light exercise is never set to nothing.
+     */
+    fun lighter(weight: Int, step: Int, percent: Int): Int {
+        if (step <= 0) return weight * (100 - percent) / 100
+        if (weight <= step) return weight
+        val steps = (weight.toLong() * percent + 100L * step - 1) / (100L * step)
+        return maxOf(weight - (steps * step).toInt(), step)
     }
 
     private fun isStalled(recent: List<Performance>, slot: WorkoutExercise): Boolean {
