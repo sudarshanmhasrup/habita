@@ -27,6 +27,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +58,7 @@ import dev.habita.app.feature.routine.data.ChecklistGroup
 import dev.habita.app.feature.routine.data.RoutineGroup
 import dev.habita.app.feature.routine.data.RoutineTask
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 /** One line of the editable list: a section's header or one of its tasks. */
 private sealed interface Line {
@@ -82,6 +84,7 @@ private data class Drag(val keys: List<String>, val isSection: Boolean, val offs
 @Composable
 internal fun EditRoutineScreen(
     sections: List<ChecklistGroup>,
+    startAt: String?,
     onDone: () -> Unit,
     onEditTask: (RoutineTask) -> Unit,
     onDeleteTask: (taskId: String) -> Unit,
@@ -103,6 +106,17 @@ internal fun EditRoutineScreen(
     var pendingDelete by remember { mutableStateOf<String?>(null) }
     var viewport by remember { mutableStateOf(0) }
     var listTop by remember { mutableStateOf(0f) }
+
+    // Opened from a section's Edit: scroll to that section once it's laid out. Only the first
+    // time, so coming back from renaming a task keeps the list where it was.
+    var scrolledToStart by remember { mutableStateOf(false) }
+    LaunchedEffect(startAt) {
+        if (startAt == null || scrolledToStart) return@LaunchedEffect
+        val key = "g:$startAt"
+        snapshotFlow { heights[key] to listTop }.first { (height, top) -> height != null && top > 0f }
+        scroll.scrollTo((listTop + (topsOf(lines, heights)[key] ?: 0)).toInt())
+        scrolledToStart = true
+    }
 
     val preview = drag?.let { previewOrder(lines, it, heights) } ?: lines
     val tops = topsOf(lines, heights)
@@ -139,15 +153,18 @@ internal fun EditRoutineScreen(
         onSaveOrder(sectionsOf(order))
     }
 
-    Column(Modifier.fillMaxSize().onSizeChanged { viewport = it.height }) {
+    Column(Modifier.fillMaxSize()) {
+        // Done stays at the top while the list scrolls, so leaving never means scrolling back up.
+        TopBar(null, {}, Modifier.padding(start = Space.screen, end = Space.screen, top = Space.inside)) {
+            TextAction("Done", onDone)
+        }
         Column(
             Modifier
                 .weight(1f)
+                .onSizeChanged { viewport = it.height }
                 .verticalScroll(scroll, enabled = drag == null)
                 .padding(horizontal = Space.screen, vertical = Space.inside),
         ) {
-            TopBar(null, {}) { TextAction("Done", onDone) }
-            Gap(Space.inside)
             HText("Edit routine", type.headline)
             Gap(Space.tiny)
             HText(
