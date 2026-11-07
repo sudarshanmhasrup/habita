@@ -146,8 +146,25 @@ class ExpenseRepository(core: Core) {
         }
     }
 
-    suspend fun archiveCategory(category: Category) = change {
-        categoryQueries.save(category.id, category.name, category.limitPaise, category.position.toLong(), 1, nowMillis(), 1)
+    /** Renames categories ([names]), removes some ([remove]) and brings removed ones back. */
+    internal suspend fun saveCategories(names: Map<String, String>, remove: Set<String>, bringBack: Set<String>) {
+        val ids = names.keys + remove + bringBack
+        if (ids.isEmpty()) return
+        change {
+            database.transaction {
+                val now = nowMillis()
+                ids.forEach { id ->
+                    val row = categoryQueries.byId(id).executeAsOneOrNull() ?: return@forEach
+                    val archived = when (id) {
+                        in remove -> 1L
+                        in bringBack -> 0L
+                        else -> row.archived
+                    }
+                    val name = names[id]?.trim()?.takeIf { it.isNotEmpty() } ?: row.name
+                    categoryQueries.save(id, name, row.limit_paise, row.position, archived, now, 1)
+                }
+            }
+        }
     }
 
     private fun write(expense: Expense) {
