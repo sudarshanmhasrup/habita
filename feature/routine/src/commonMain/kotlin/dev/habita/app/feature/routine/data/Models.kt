@@ -1,12 +1,10 @@
 package dev.habita.app.feature.routine.data
 
 /**
- * A block of the day, such as Morning. [days] holds the weekdays it shows on as bits, Monday
- * first: bit 0 is Monday, bit 6 Sunday.
+ * A section of the routine, named Fixed or Adjustable ([Sections]), shown every day. [days] is
+ * kept from when blocks could be weekday-only, and is always every day now.
  */
-data class RoutineGroup(val id: String, val name: String, val position: Long, val days: Int) {
-    fun isOn(weekday: Int): Boolean = days and (1 shl weekday) != 0
-}
+data class RoutineGroup(val id: String, val name: String, val position: Long, val days: Int)
 
 /** One task in a group. An [adjustable] task can move around the day; the rest are fixed. */
 data class RoutineTask(
@@ -41,8 +39,8 @@ object Days {
  */
 data class Day(val key: String, val weekday: Int, val title: String, val endsAt: Long)
 
-/** Today's checklist: the groups that show today, and the ones that are off, with their tasks. */
-data class Checklist(val day: Day, val groups: List<ChecklistGroup>, val off: List<ChecklistGroup>) {
+/** Today's checklist: every section in order, with its tasks and which are done. */
+data class Checklist(val day: Day, val groups: List<ChecklistGroup>) {
     val total: Int get() = groups.sumOf { it.tasks.size }
     val done: Int get() = groups.sumOf { it.done }
 
@@ -55,21 +53,18 @@ data class Checklist(val day: Day, val groups: List<ChecklistGroup>, val off: Li
         /** Builds the day from every group and task and the ids of the tasks done today. */
         fun of(day: Day, groups: List<RoutineGroup>, tasks: List<RoutineTask>, done: Set<String>): Checklist {
             val byGroup = tasks.groupBy { it.groupId }
-            val (on, off) = groups.sortedWith(compareBy({ it.position }, { it.id })).partition { it.isOn(day.weekday) }
-            fun section(group: RoutineGroup): ChecklistGroup {
+            val sections = groups.sortedWith(compareBy({ it.position }, { it.id })).map { group ->
                 val list = byGroup[group.id].orEmpty().sortedWith(compareBy({ it.position }, { it.id }))
-                return ChecklistGroup(group, list.map { ChecklistTask(it, it.id in done) })
+                ChecklistGroup(group, list.map { ChecklistTask(it, it.id in done) })
             }
-            return Checklist(day = day, groups = on.map(::section), off = off.map(::section))
+            return Checklist(day = day, groups = sections)
         }
     }
 }
 
-/** A group's tasks in order; [fixed] and [adjustable] split them the way the routine is read. */
+/** A section's tasks in order. */
 data class ChecklistGroup(val group: RoutineGroup, val tasks: List<ChecklistTask>) {
     val done: Int get() = tasks.count { it.done }
-    val fixed: List<ChecklistTask> get() = tasks.filter { !it.task.adjustable }
-    val adjustable: List<ChecklistTask> get() = tasks.filter { it.task.adjustable }
 }
 
 data class ChecklistTask(val task: RoutineTask, val done: Boolean)

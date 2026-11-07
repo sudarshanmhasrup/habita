@@ -10,20 +10,20 @@ import androidx.navigationevent.compose.rememberNavigationEventState
 import dev.habita.app.core.ui.HabitaScreen
 import dev.habita.app.core.ui.ScreenTransition
 import dev.habita.app.feature.routine.ui.ChecklistScreen
-import dev.habita.app.feature.routine.ui.EditGroupScreen
+import dev.habita.app.feature.routine.ui.EditRoutineScreen
+import dev.habita.app.feature.routine.ui.EditSectionScreen
 import dev.habita.app.feature.routine.ui.EditTaskScreen
 import dev.habita.app.feature.routine.ui.RoutineRoute
 import dev.habita.app.feature.routine.ui.RoutineViewModel
 
-/** The daily routine: today's checklist, and adding, editing and deleting its groups and tasks. */
+/** The daily routine: today's checklist, and behind Edit, arranging and changing it. */
 @Composable
 fun RoutineScreen(feature: RoutineFeature, onExit: () -> Unit) {
     val viewModel = viewModel { RoutineViewModel(feature.repository, feature.checklist) }
     val route by viewModel.route.collectAsStateWithLifecycle()
     val checklist by viewModel.checklist.collectAsStateWithLifecycle()
-    val groups by viewModel.groups.collectAsStateWithLifecycle()
     val taskDraft by viewModel.taskDraft.collectAsStateWithLifecycle()
-    val groupDraft by viewModel.groupDraft.collectAsStateWithLifecycle()
+    val sectionDraft by viewModel.sectionDraft.collectAsStateWithLifecycle()
 
     NavigationBackHandler(
         state = rememberNavigationEventState(NavigationEventInfo.None),
@@ -31,46 +31,55 @@ fun RoutineScreen(feature: RoutineFeature, onExit: () -> Unit) {
     )
 
     HabitaScreen {
-        // The checklist is the root: a form slides in from the right and back out to the left.
-        ScreenTransition(route, isForward = { from, to -> from == RoutineRoute.Today && to != RoutineRoute.Today }) { screen ->
+        // Deeper screens slide in from the right: checklist, then the edit list, then a form.
+        ScreenTransition(route, isForward = { from, to -> to.depth > from.depth }) { screen ->
             when (screen) {
                 RoutineRoute.Today -> checklist?.let {
-                    ChecklistScreen(
-                        checklist = it,
-                        onBack = onExit,
-                        onToggle = viewModel::toggle,
+                    ChecklistScreen(checklist = it, onBack = onExit, onEdit = viewModel::edit, onToggle = viewModel::toggle)
+                }
+
+                RoutineRoute.Edit -> checklist?.let {
+                    EditRoutineScreen(
+                        sections = it.groups,
+                        onDone = { viewModel.back() },
                         onEditTask = viewModel::editTask,
                         onDeleteTask = viewModel::deleteTask,
                         onAddTask = viewModel::addTask,
-                        onEditGroup = viewModel::editGroup,
-                        onDeleteGroup = viewModel::deleteGroup,
-                        onAddGroup = viewModel::addGroup,
+                        onEditSection = viewModel::editSection,
+                        onDeleteSection = viewModel::deleteSection,
+                        onAddSection = viewModel::addSection,
+                        onSaveOrder = viewModel::saveOrder,
                     )
                 }
 
                 RoutineRoute.EditTask -> taskDraft?.let { draft ->
                     EditTaskScreen(
                         draft = draft,
-                        groups = groups,
                         onBack = { viewModel.back() },
                         onChange = viewModel::update,
                         onSave = { viewModel.save(draft) },
                         onDelete = { draft.id?.let(viewModel::deleteTask) },
-                        onMove = { by -> draft.id?.let { viewModel.moveTask(it, by) } },
                     )
                 }
 
-                RoutineRoute.EditGroup -> groupDraft?.let { draft ->
-                    EditGroupScreen(
+                RoutineRoute.EditSection -> sectionDraft?.let { draft ->
+                    EditSectionScreen(
                         draft = draft,
                         onBack = { viewModel.back() },
                         onChange = viewModel::update,
                         onSave = { viewModel.save(draft) },
-                        onDelete = { draft.id?.let(viewModel::deleteGroup) },
-                        onMove = { by -> draft.id?.let { viewModel.moveGroup(it, by) } },
+                        onDelete = { draft.id?.let(viewModel::deleteSection) },
                     )
                 }
             }
         }
     }
 }
+
+/** How deep a screen is, so transitions know which way to slide. */
+private val RoutineRoute.depth: Int
+    get() = when (this) {
+        RoutineRoute.Today -> 0
+        RoutineRoute.Edit -> 1
+        RoutineRoute.EditTask, RoutineRoute.EditSection -> 2
+    }
