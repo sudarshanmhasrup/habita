@@ -34,6 +34,20 @@ internal sealed interface ExpenseRoute {
     data object Budget : ExpenseRoute
 }
 
+/**
+ * What Save on the budget screen hands over: the income (`null` when the field was emptied, which
+ * keeps it), every shown category's limit, renamed categories, ones to remove and ones to bring
+ * back, and a new category's name and limit.
+ */
+internal data class BudgetEdit(
+    val incomePaise: Long?,
+    val limits: Map<String, Long>,
+    val names: Map<String, String> = emptyMap(),
+    val remove: Set<String> = emptySet(),
+    val bringBack: Set<String> = emptySet(),
+    val newCategory: Pair<String, Long>? = null,
+)
+
 /** The form for adding or editing a payment. */
 internal data class ExpenseDraft(
     val id: String?,
@@ -178,14 +192,15 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
      * Saves the budget for the month on screen and the months after it. Nothing is saved when
      * nothing changed, so a later change to an earlier month still reaches this one.
      */
-    fun saveBudget(incomePaise: Long?, limits: Map<String, Long>, newCategory: Pair<String, Long>?) {
+    fun saveBudget(edit: BudgetEdit) {
         val month = _month.value
         val current = summary.value
-        val income = incomePaise ?: current?.incomePaise ?: 0
-        val unchanged = current != null && newCategory == null && income == current.incomePaise &&
-            limits.all { (id, limit) -> current.categories.firstOrNull { it.category.id == id }?.category?.limitPaise == limit }
+        val income = edit.incomePaise ?: current?.incomePaise ?: 0
+        val shownBefore = current?.categories.orEmpty().filter { !it.category.archived }.associate { it.category.id to it.category.limitPaise }
+        val unchanged = current != null && edit.newCategory == null && income == current.incomePaise && edit.limits == shownBefore
         viewModelScope.launch {
-            if (!unchanged) repository.saveBudget(month, income, limits, newCategory)
+            repository.saveCategories(edit.names, edit.remove, edit.bringBack)
+            if (!unchanged) repository.saveBudget(month, income, edit.limits, edit.newCategory)
             back()
         }
     }

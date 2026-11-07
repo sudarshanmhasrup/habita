@@ -1,14 +1,19 @@
 package dev.habita.app.feature.expense.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -19,24 +24,34 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import dev.habita.app.core.data.nowMillis
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.theme.Space
 import dev.habita.app.core.ui.Chip
 import dev.habita.app.core.ui.Gap
+import dev.habita.app.core.ui.HIcon
 import dev.habita.app.core.ui.HText
+import dev.habita.app.core.ui.HabitaIcons
 import dev.habita.app.core.ui.LabeledField
 import dev.habita.app.core.ui.Overline
 import dev.habita.app.core.ui.PrimaryButton
 import dev.habita.app.core.ui.SecondaryButton
+import dev.habita.app.core.ui.TextAction
 import dev.habita.app.core.ui.TopBar
 import dev.habita.app.feature.expense.data.BankSms
 import dev.habita.app.feature.expense.data.Category
+import dev.habita.app.feature.expense.data.Defaults
 import dev.habita.app.feature.expense.data.ExpenseSource
 import dev.habita.app.feature.expense.data.PaymentMode
 import dev.habita.app.feature.expense.data.YearMonth
@@ -156,7 +171,8 @@ private fun DayStepper(paidAt: Long, onChange: (Long) -> Unit) {
 
 /**
  * [month]'s income and each category's limit, which hold for the months after it too, up to
- * [laterBudget] when a later month has its own. A limit of 0 means no limit.
+ * [laterBudget] when a later month has its own. A limit of 0 means no limit. Categories can be
+ * renamed, removed and brought back here as well; nothing changes until Save.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -165,16 +181,24 @@ internal fun BudgetScreen(
     laterBudget: YearMonth?,
     income: Long,
     categories: List<Category>,
+    removed: List<Category>,
     onBack: () -> Unit,
-    onSave: (incomePaise: Long?, limits: Map<String, Long>, newCategory: Pair<String, Long>?) -> Unit,
+    onSave: (BudgetEdit) -> Unit,
 ) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     var incomeText by remember { mutableStateOf(rupeesText(income)) }
     // Keyed on which categories there are, not the list, so typing survives a sync or a new SMS.
-    val limits = remember(categories.map { it.id }) { categories.associate { it.id to mutableStateOf(rupeesText(it.limitPaise)) } }
+    val everyone = categories + removed
+    val ids = everyone.map { it.id }
+    val limits = remember(ids) { everyone.associate { it.id to mutableStateOf(rupeesText(it.limitPaise)) } }
+    val names = remember(ids) { everyone.associate { it.id to mutableStateOf(it.name) } }
+    var removing by remember { mutableStateOf(emptySet<String>()) }
+    var bringingBack by remember { mutableStateOf(emptySet<String>()) }
     var newName by remember { mutableStateOf("") }
     var newLimit by remember { mutableStateOf("") }
+    val shown = categories.filter { it.id !in removing } + removed.filter { it.id in bringingBack }
+    val hidden = removed.filter { it.id !in bringingBack } + categories.filter { it.id in removing }
     Column(Modifier.fillMaxSize()) {
         Column(
             Modifier
@@ -201,23 +225,63 @@ internal fun BudgetScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             )
             Gap(Space.section)
-            Overline("Limits")
+            Overline("Categories")
             Gap(Space.item)
             Column(verticalArrangement = Arrangement.spacedBy(Space.item)) {
-                categories.forEach { category ->
-                    val state = limits.getValue(category.id)
-                    LabeledField(
-                        label = category.name,
-                        value = state.value,
-                        onValueChange = { state.value = it.filter(Char::isDigit) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    )
+                shown.forEach { category ->
+                    val name = names.getValue(category.id)
+                    val limit = limits.getValue(category.id)
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        LabeledField(
+                            label = "Category",
+                            value = name.value,
+                            onValueChange = { name.value = it },
+                            modifier = Modifier.weight(1.5f),
+                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                        )
+                        Gap(Space.inside)
+                        LabeledField(
+                            label = "Limit",
+                            value = limit.value,
+                            onValueChange = { limit.value = it.filter(Char::isDigit) },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        )
+                        // Other is where everything unsorted can go, so it always stays.
+                        if (category.id == Defaults.OTHER_ID) {
+                            Gap(BIN_SIZE)
+                        } else {
+                            Bin("Remove ${category.name}") {
+                                if (category.id in bringingBack) bringingBack -= category.id else removing += category.id
+                            }
+                        }
+                    }
+                }
+            }
+            if (hidden.isNotEmpty()) {
+                Gap(Space.section)
+                Overline("Removed")
+                Gap(Space.tiny)
+                HText("Old payments keep their category. Bring one back to use it again.", type.caption, color = colors.muted)
+                Gap(Space.inside)
+                hidden.forEach { category ->
+                    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                        HText(names.getValue(category.id).value.ifBlank { category.name }, type.body, modifier = Modifier.weight(1f), maxLines = 1)
+                        TextAction("Bring back", {
+                            if (category.id in removing) removing -= category.id else bringingBack += category.id
+                        })
+                    }
                 }
             }
             Gap(Space.section)
             Overline("New category")
             Gap(Space.item)
-            LabeledField(label = "Name", value = newName, onValueChange = { newName = it })
+            LabeledField(
+                label = "Name",
+                value = newName,
+                onValueChange = { newName = it },
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+            )
             Gap(Space.item)
             LabeledField(
                 label = "Limit",
@@ -230,14 +294,39 @@ internal fun BudgetScreen(
         PrimaryButton(
             text = "Save budget",
             onClick = {
-                val all = categories.associate { category ->
-                    category.id to (limits.getValue(category.id).value.toLongOrNull() ?: 0) * 100
-                }
-                val newCategory = newName.trim().takeIf { it.isNotEmpty() }?.let { it to (newLimit.toLongOrNull() ?: 0) * 100 }
-                onSave(incomeText.toLongOrNull()?.times(100), all, newCategory)
+                val renamed = everyone.mapNotNull { category ->
+                    val name = names.getValue(category.id).value.trim()
+                    (category.id to name).takeIf { name.isNotEmpty() && name != category.name }
+                }.toMap()
+                onSave(
+                    BudgetEdit(
+                        incomePaise = incomeText.toLongOrNull()?.times(100),
+                        limits = shown.associate { it.id to (limits.getValue(it.id).value.toLongOrNull() ?: 0) * 100 },
+                        names = renamed,
+                        remove = removing,
+                        bringBack = bringingBack,
+                        newCategory = newName.trim().takeIf { it.isNotEmpty() }?.let { it to (newLimit.toLongOrNull() ?: 0) * 100 },
+                    ),
+                )
             },
             modifier = Modifier.fillMaxWidth().padding(horizontal = Space.screen, vertical = Space.item),
         )
+    }
+}
+
+private val BIN_SIZE = 48.dp
+
+@Composable
+private fun Bin(label: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(BIN_SIZE)
+            .clip(CircleShape)
+            .clickable(role = Role.Button, onClickLabel = label, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        HIcon(HabitaIcons.Trash, contentDescription = null, modifier = Modifier.size(18.dp), tint = HabitaTheme.colors.muted)
     }
 }
 

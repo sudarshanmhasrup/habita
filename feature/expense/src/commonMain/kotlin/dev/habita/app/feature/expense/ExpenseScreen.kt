@@ -105,6 +105,7 @@ fun ExpenseScreen(feature: ExpenseFeature, onExit: () -> Unit) {
                     income = summary?.incomePaise ?: 0,
                     // The month's own limits, not the ones from before budgets were per month.
                     categories = summary?.categories.orEmpty().map { it.category }.filter { !it.archived },
+                    removed = categories.filter { it.archived },
                     onBack = { viewModel.back() },
                     onSave = viewModel::saveBudget,
                 )
