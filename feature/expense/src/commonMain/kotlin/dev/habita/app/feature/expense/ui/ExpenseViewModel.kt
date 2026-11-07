@@ -12,11 +12,13 @@ import dev.habita.app.feature.expense.data.PaymentMode
 import dev.habita.app.feature.expense.data.SmsOutcome
 import dev.habita.app.feature.expense.data.YearMonth
 import dev.habita.app.feature.expense.data.monthOf
+import dev.habita.app.feature.expense.data.nextOwnBudget
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -168,11 +170,22 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
         viewModelScope.launch { repository.setCategory(expenseId, categoryId) }
     }
 
+    /** The first later month with a budget of its own, where saving this month's stops. */
+    val laterBudget: StateFlow<YearMonth?> = combine(_month, repository.budgets) { month, budgets -> nextOwnBudget(month, budgets) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
+     * Saves the budget for the month on screen and the months after it. Nothing is saved when
+     * nothing changed, so a later change to an earlier month still reaches this one.
+     */
     fun saveBudget(incomePaise: Long?, limits: Map<String, Long>, newCategory: Pair<String, Long>?) {
+        val month = _month.value
+        val current = summary.value
+        val income = incomePaise ?: current?.incomePaise ?: 0
+        val unchanged = current != null && newCategory == null && income == current.incomePaise &&
+            limits.all { (id, limit) -> current.categories.firstOrNull { it.category.id == id }?.category?.limitPaise == limit }
         viewModelScope.launch {
-            incomePaise?.let { repository.setIncome(it) }
-            limits.forEach { (id, limit) -> repository.setLimit(id, limit) }
-            newCategory?.let { (name, limit) -> repository.addCategory(name, limit) }
+            if (!unchanged) repository.saveBudget(month, income, limits, newCategory)
             back()
         }
     }

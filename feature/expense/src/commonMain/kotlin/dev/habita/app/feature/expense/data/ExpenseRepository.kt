@@ -43,12 +43,21 @@ class ExpenseRepository(core: Core) {
     val income: Flow<Long> = values.select(INCOME).asFlow().mapToOneOrNull(Dispatchers.Default)
         .map { it?.toLongOrNull() ?: Defaults.INCOME_PAISE }
 
+    /** Each month's own budget ([MonthBudget]). */
+    internal val budgets: Flow<SavedBudgets> = values.budgets().asFlow().mapToList(Dispatchers.Default).map { rows ->
+        rows.mapNotNull { row ->
+            val month = MonthBudget.monthOfKey(row.key) ?: return@mapNotNull null
+            MonthBudget.decode(row.value_)?.let { month to it }
+        }.toMap()
+    }
+
     fun summary(month: YearMonth): Flow<MonthSummary> {
         val payments = expenses.inRange(startOf(month), startOf(month.next()), ::toExpense)
             .asFlow()
             .mapToList(Dispatchers.Default)
-        return combine(income, categories, payments) { income, categories, list ->
-            MonthSummary.of(month, income, categories, list)
+        return combine(income, categories, budgets, payments) { income, categories, budgets, list ->
+            val (monthIncome, monthCategories) = budgetFor(month, income, categories, budgets)
+            MonthSummary.of(month, monthIncome, monthCategories, list)
         }
     }
 
@@ -119,14 +128,21 @@ class ExpenseRepository(core: Core) {
 
     suspend fun restore(expenseId: String) = change { expenses.restore(nowMillis(), expenseId) }
 
-    suspend fun setLimit(categoryId: String, limitPaise: Long) = change { categoryQueries.setLimit(limitPaise, nowMillis(), categoryId) }
-
-    suspend fun setIncome(paise: Long) = change { values.save(INCOME, paise.toString(), nowMillis(), 1) }
-
-    suspend fun addCategory(name: String, limitPaise: Long) = change {
+    /**
+     * Saves [month]'s budget, which holds from it until a later month with its own. [limits] has
+     * every category shown in the budget; [newCategory] (name and limit) is added with it. The
+     * new category's own limit stays 0, so the months before don't get it.
+     */
+    internal suspend fun saveBudget(month: YearMonth, incomePaise: Long, limits: Map<String, Long>, newCategory: Pair<String, Long>?) = change {
         database.transaction {
-            val position = categoryQueries.nextPosition().executeAsOne()
-            categoryQueries.save(newId(), name.trim(), limitPaise, position, 0, nowMillis(), 1)
+            val now = nowMillis()
+            val all = limits.toMutableMap()
+            newCategory?.let { (name, limit) ->
+                val id = newId()
+                categoryQueries.save(id, name.trim(), 0, categoryQueries.nextPosition().executeAsOne(), 0, now, 1)
+                all[id] = limit
+            }
+            values.save(MonthBudget.key(month), MonthBudget(incomePaise, all.filterValues { it > 0 }).encode(), now, 1)
         }
     }
 

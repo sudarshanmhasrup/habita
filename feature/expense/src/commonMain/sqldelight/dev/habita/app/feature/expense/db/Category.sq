@@ -1,4 +1,5 @@
--- A spending category with its monthly limit in paise. Removed categories are kept, archived, so
+-- A spending category. limit_paise is its monthly limit from before budgets were per month
+-- (MonthBudget), which months before the first saved budget still use. Removed categories are kept, archived, so
 -- old payments still show their name. updated_at and dirty drive syncing: a category the server
 -- doesn't have yet is dirty. The built-in categories start at updated_at 0 and clean, so any real
 -- edit, on any device, wins over them.
@@ -24,9 +25,6 @@ SELECT * FROM category WHERE id = ?;
 save:
 INSERT OR REPLACE INTO category (id, name, limit_paise, position, archived, updated_at, dirty)
 VALUES (?, ?, ?, ?, ?, ?, ?);
-
-setLimit:
-UPDATE category SET limit_paise = ?, updated_at = ?, dirty = 1 WHERE id = ?;
 
 nextPosition:
 SELECT COALESCE(MAX(position), -1) + 1 FROM category;

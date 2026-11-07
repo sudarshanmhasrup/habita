@@ -1,4 +1,5 @@
--- Single values, such as the monthly income. updated_at and dirty drive syncing, as for
+-- Single values, such as the monthly income from before budgets were per month, and each month's
+-- own budget ("budget@2026-11", see MonthBudget). updated_at and dirty drive syncing, as for
 -- categories.
 CREATE TABLE expense_value (
     key TEXT NOT NULL PRIMARY KEY,
@@ -9,6 +10,9 @@ CREATE TABLE expense_value (
 
 select:
 SELECT value FROM expense_value WHERE key = ?;
+
+budgets:
+SELECT * FROM expense_value WHERE key LIKE 'budget@%';
 
 byKey:
 SELECT * FROM expense_value WHERE key = ?;
