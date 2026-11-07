@@ -117,17 +117,31 @@ and diet targets are saved, so they never go into this repository. If it suggest
 replies with tables to paste into [program/PROGRAM.md](program/PROGRAM.md). "Copy check-in for AI"
 under the backup button does the same at any time.
 
+## The expense tracker
+
+On Android, payments come from the bank's debit SMS (sideloaded app only, since Play doesn't allow
+SMS access). Each one is saved as it arrives and a notification offers the two most used
+categories; a payee seen before is sorted on its own, on any phone, because the choice travels
+with the synced payments. "Scan recent SMS" catches up on this month's and last month's inbox
+without adding anything twice or bringing back a payment you deleted. Cash is added by hand.
+
+The budget is kept per month. Saving it sets the income and limits for the month on screen and
+the months after it, until one that has its own, so a raise or a new limit never changes what
+earlier months show. Categories are renamed, removed and brought back on the same screen; a
+removed category stays on its old payments. Export writes the month as markdown, laid out like a
+Notion budget page, to paste into Notion or hand to an AI.
+
 ## The daily routine
 
 The routine is one list of sections, each Fixed or Adjustable, shown every day in the order it's
 written. Ticks stay until you tap Reset on the progress card, which asks once and then unticks
-everything, on every device. The page itself only has the checkboxes and Reset. Edit, at the top
-or on any section's header, opens the list (at that section) with a handle on every task and
-section: drag a task anywhere, into another section too,
-and drag a section's header to move the whole section. Tap a task to rename it or a header to
-switch it between Fixed and Adjustable; the bins and the add buttons live there too. A routine
-from before sections (Morning, Office, Evening, Night, with Office on weekdays only) is turned
-into sections on its own, keeping today's ticks.
+everything, on every device. For a few seconds after, Undo reset brings the ticks back. The page
+itself only has the checkboxes and Reset. Edit, at the top or on any section's header, opens the
+list (at that section) with a handle on every task and section: drag a task anywhere, into another
+section too, and drag a section's header to move the whole section. Tap a task to rename it or a
+header to switch it between Fixed and Adjustable; the bins and the add buttons live there too. A
+routine from before sections (Morning, Office, Evening, Night, with Office on weekdays only) is
+turned into sections on its own, keeping today's ticks.
 
 ## The workout plan
 
@@ -243,7 +257,7 @@ Every set and payment is saved on the phone as it is done, so the app works with
 Android's automatic backup includes it, and the gym screen's "Save a backup file" button writes the
 gym's records to a JSON file you choose. "Restore from a backup file" reads one back, from the app
 or the server's export, keeping whatever is newer on the phone, so it never undoes newer work.
-With the login on, workouts, payments, categories, the income and the daily routine sync in the
+With the login on, workouts, payments, categories, the budget and the daily routine sync in the
 background whenever the server is reachable, including what was saved before the login was turned
 on, and the server's workout plan replaces the built-in one. How syncing works is in the
 [server README](server/README.md#sync).
