@@ -5,11 +5,9 @@ import dev.habita.app.core.data.nowMillis
 import dev.habita.app.feature.expense.data.Category
 import dev.habita.app.feature.expense.data.ExpenseRepository
 import dev.habita.app.feature.expense.data.SmsOutcome
-import dev.habita.app.feature.expense.data.currentMonth
 import dev.habita.app.feature.expense.data.formatRupees
 import dev.habita.app.feature.expense.data.monthLabel
-import dev.habita.app.feature.expense.data.monthOf
-import dev.habita.app.feature.expense.data.startOf
+import dev.habita.app.feature.expense.data.periodStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,7 +41,7 @@ class ExpenseFeature(core: Core) {
      */
     suspend fun quickCategories(count: Int): List<Category> {
         val categories = repository.categories.first().filter { !it.archived }
-        val now = monthOf(nowMillis())
+        val now = repository.thisMonth.first()
         val recent = repository.summary(now).first().expenses + repository.summary(now.previous()).first().expenses
         val used = recent.mapNotNull { it.categoryId }.groupingBy { it }.eachCount()
         val fallback = listOf("food", "commute", "other")
@@ -61,7 +59,7 @@ class ExpenseFeature(core: Core) {
      * income is set), payments waiting for a category, and the latest payments.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val today: Flow<ExpenseToday> = currentMonth
+    val today: Flow<ExpenseToday> = repository.thisMonth
         .flatMapLatest { repository.summary(it) }
         .map { summary ->
             val names = summary.categories.associate { it.category.id to it.category.name }
@@ -93,10 +91,10 @@ class ExpenseFeature(core: Core) {
     }
 
     /**
-     * Where a scan of the inbox starts: the first millisecond of last month, so payments missed
-     * in the last days of a month can still be caught up early in the next.
+     * Where a scan of the inbox starts: the start of last budget month, so payments missed in the
+     * last days of a month can still be caught up early in the next.
      */
-    fun scanFrom(): Long = startOf(monthOf(nowMillis()).previous())
+    suspend fun scanFrom(): Long = periodStart(repository.thisMonth.first().previous(), repository.payDay.first())
 }
 
 /**

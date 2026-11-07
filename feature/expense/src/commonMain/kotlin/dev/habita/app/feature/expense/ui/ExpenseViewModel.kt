@@ -11,8 +11,8 @@ import dev.habita.app.feature.expense.data.MonthSummary
 import dev.habita.app.feature.expense.data.PaymentMode
 import dev.habita.app.feature.expense.data.SmsOutcome
 import dev.habita.app.feature.expense.data.YearMonth
-import dev.habita.app.feature.expense.data.currentMonth
-import dev.habita.app.feature.expense.data.monthOf
+import dev.habita.app.feature.expense.data.MAX_PAY_DAY
+import dev.habita.app.feature.expense.data.periodOf
 import dev.habita.app.feature.expense.data.nextOwnBudget
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,6 +47,8 @@ internal data class BudgetEdit(
     val remove: Set<String> = emptySet(),
     val bringBack: Set<String> = emptySet(),
     val newCategory: Pair<String, Long>? = null,
+    /** The salary day budget months start on, 1 to 28. */
+    val payDay: Int? = null,
 )
 
 /** The form for adding or editing a payment. */
@@ -65,7 +67,10 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
     private val _route = MutableStateFlow<ExpenseRoute>(ExpenseRoute.Month)
     val route: StateFlow<ExpenseRoute> = _route.asStateFlow()
 
-    private val _month = MutableStateFlow(monthOf(nowMillis()))
+    /** The salary day budget months start on. */
+    val payDay: StateFlow<Int> = repository.payDay.stateIn(viewModelScope, SharingStarted.Eagerly, repository.payDayNow())
+
+    private val _month = MutableStateFlow(periodOf(nowMillis(), payDay.value))
     val month: StateFlow<YearMonth> = _month.asStateFlow()
 
     val summary: StateFlow<MonthSummary?> = _month
@@ -86,7 +91,7 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
     private val _deleted = MutableStateFlow<Expense?>(null)
     val deleted: StateFlow<Expense?> = _deleted.asStateFlow()
 
-    private val thisMonth = currentMonth.stateIn(viewModelScope, SharingStarted.Eagerly, monthOf(nowMillis()))
+    private val thisMonth = repository.thisMonth.stateIn(viewModelScope, SharingStarted.Eagerly, _month.value)
 
     private val firstMonth = repository.firstMonth.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
@@ -159,7 +164,7 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
         )
         viewModelScope.launch {
             repository.save(expense)
-            _month.value = monthOf(expense.paidAt)
+            _month.value = periodOf(expense.paidAt, payDay.value)
             back()
         }
     }
@@ -204,6 +209,12 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
         viewModelScope.launch {
             repository.saveCategories(edit.names, edit.remove, edit.bringBack)
             if (!unchanged) repository.saveBudget(month, income, edit.limits, edit.newCategory)
+            val day = edit.payDay?.coerceIn(1, MAX_PAY_DAY)
+            if (day != null && day != payDay.value) {
+                repository.setPayDay(day)
+                // The months shift, so go to the one it is now.
+                _month.value = periodOf(nowMillis(), day)
+            }
             back()
         }
     }

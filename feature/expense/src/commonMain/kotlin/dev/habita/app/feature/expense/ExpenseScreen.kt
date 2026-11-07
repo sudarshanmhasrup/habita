@@ -34,6 +34,7 @@ fun ExpenseScreen(feature: ExpenseFeature, onExit: () -> Unit) {
     val message by viewModel.message.collectAsStateWithLifecycle()
     val deleted by viewModel.deleted.collectAsStateWithLifecycle()
     val laterBudget by viewModel.laterBudget.collectAsStateWithLifecycle()
+    val payDay by viewModel.payDay.collectAsStateWithLifecycle()
     val canGoBack by viewModel.canGoBack.collectAsStateWithLifecycle()
     val canGoForward by viewModel.canGoForward.collectAsStateWithLifecycle()
     val openRequest by feature.openRequest.collectAsStateWithLifecycle()
@@ -104,6 +105,7 @@ fun ExpenseScreen(feature: ExpenseFeature, onExit: () -> Unit) {
                 ExpenseRoute.Budget -> BudgetScreen(
                     month = month,
                     laterBudget = laterBudget,
+                    payDay = payDay,
                     income = summary?.incomePaise ?: 0,
                     // The month's own limits, not the ones from before budgets were per month.
                     categories = summary?.categories.orEmpty().map { it.category }.filter { !it.archived },

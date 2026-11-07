@@ -17,7 +17,16 @@ data class MonthSummary(
     val incomePaise: Long,
     val expenses: List<Expense>,
     val categories: List<CategorySpend>,
+    /** The salary day the month starts on; 1 for a calendar month. */
+    val payDay: Int = 1,
 ) {
+    /** When the month starts and when the next one does. */
+    val startsAt: Long get() = periodStart(month, payDay)
+    val endsAt: Long get() = periodStart(month.next(), payDay)
+
+    /** "5 Nov – 4 Dec" for a month from salary to salary, `null` for a calendar month. */
+    val rangeLabel: String? get() = if (payDay <= 1) null else "${shortDayLabel(startsAt)} – ${shortDayLabel(endsAt - 1)}"
+
     val spentPaise: Long = expenses.sumOf { it.amountPaise }
 
     /** Income minus everything spent. */
@@ -33,14 +42,14 @@ data class MonthSummary(
          * Adds up [expenses] by category. Archived categories only show when something was spent
          * in them; payments in a category that no longer exists count as unsorted.
          */
-        fun of(month: YearMonth, incomePaise: Long, categories: List<Category>, expenses: List<Expense>): MonthSummary {
+        fun of(month: YearMonth, incomePaise: Long, categories: List<Category>, expenses: List<Expense>, payDay: Int = 1): MonthSummary {
             val known = categories.associateBy { it.id }
             val cleaned = expenses.map { if (it.categoryId != null && it.categoryId !in known) it.copy(categoryId = null) else it }
             val byCategory = cleaned.filter { it.categoryId != null }.groupBy { it.categoryId }
             val spends = categories
                 .map { CategorySpend(it, byCategory[it.id].orEmpty().sumOf { expense -> expense.amountPaise }) }
                 .filter { !it.category.archived || it.spentPaise > 0 }
-            return MonthSummary(month, incomePaise, cleaned, spends)
+            return MonthSummary(month, incomePaise, cleaned, spends, payDay)
         }
     }
 }
@@ -55,6 +64,10 @@ fun MonthSummary.toMarkdown(): String = buildString {
     val names = categories.associate { it.category.id to it.category.name.replace("|", "/") }
     appendLine("# ${monthLabel(month)}")
     appendLine()
+    rangeLabel?.let {
+        appendLine("_${it}_")
+        appendLine()
+    }
     appendLine("## Income")
     appendLine()
     appendLine("- **Salary:** ${formatRupees(incomePaise, symbol = false)}")
