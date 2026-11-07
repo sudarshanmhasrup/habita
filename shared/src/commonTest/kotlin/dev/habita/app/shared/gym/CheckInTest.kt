@@ -95,4 +95,22 @@ class CheckInTest {
         assertTrue("- Leg Press is done as Bench" in text)
         assertEquals(testProgram, ProgramParser.parse(text.substringAfter("## Current plan")))
     }
+
+    @Test
+    fun `building back up after a break is not stuck`() {
+        // Best was 30 kg long ago; after time off, back at 24 kg and adding weight.
+        val (old, oldSets) = benchOn(60, weightGrams = 30 * KG)
+        val (recent, recentSets) = benchOn(165, 175, weightGrams = 24 * KG)
+        val (more, moreSets) = benchOn(185, 195, weightGrams = 26 * KG)
+
+        assertTrue(plateaus(old + recent + more, oldSets + recentSets + moreSets).isEmpty())
+    }
+
+    @Test
+    fun `more reps at the same weight count as progress`() {
+        val (old, oldSets) = benchOn(130, weightGrams = 22 * KG, results = intArrayOf(12, 10, 9))
+        val (recent, recentSets) = benchOn(165, 175, 185, 195, weightGrams = 22 * KG, results = intArrayOf(12, 12, 10))
+
+        assertTrue(plateaus(old + recent, oldSets + recentSets).isEmpty())
+    }
 }

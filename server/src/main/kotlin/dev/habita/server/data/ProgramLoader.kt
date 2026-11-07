@@ -13,7 +13,7 @@ class LoadedProgram(val version: Long, val program: Program)
  * Reads and parses the program file. Fails, and so stops the server, if the file is missing or
  * malformed. A changed file becomes a new program version; an unchanged one keeps its version.
  */
-fun loadProgram(path: String, store: Store, now: Long): LoadedProgram {
+fun loadProgram(path: String, store: Store, now: Long, warn: (String) -> Unit = {}): LoadedProgram {
     val file = Path(path)
     check(file.exists()) { "Program file not found: ${file.toAbsolutePath()}" }
     val content = file.readText()
@@ -23,6 +23,10 @@ fun loadProgram(path: String, store: Store, now: Long): LoadedProgram {
     val older = store.programs()
         .filter { it.version != version }
         .sortedByDescending { it.version }
-        .mapNotNull { runCatching { ProgramParser.parse(it.content) }.getOrNull() }
+        .mapNotNull { old ->
+            runCatching { ProgramParser.parse(old.content) }
+                .onFailure { warn("Program version ${old.version} no longer parses, so exercises only it had aren't served: ${it.message}") }
+                .getOrNull()
+        }
     return LoadedProgram(version, program.keepingRetired(older))
 }

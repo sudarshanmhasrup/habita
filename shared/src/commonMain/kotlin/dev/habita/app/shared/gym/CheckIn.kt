@@ -58,22 +58,30 @@ object CheckIns {
     const val QUIET_MILLIS = 28 * DAY
 
     /**
-     * Exercises done at least [MIN_SESSIONS] times in the last six weeks, with history before
-     * that, whose best in those six weeks is no better than before.
+     * Exercises done at least [MIN_SESSIONS] times in the last six weeks that did no better than
+     * in the six weeks before. Comparing with the weeks just before, not the all-time best, means
+     * building back up after a break or a lighter phase counts as progress. More reps at the same
+     * weight count too.
      */
     fun plateaus(program: Program, sessions: List<WorkoutSession>, sets: List<SetLog>, now: Long): List<Plateau> {
         val windowStart = now - WINDOW_MILLIS
-        return sets.map { it.exerciseId }.distinct().mapNotNull { id ->
+        val previousStart = windowStart - WINDOW_MILLIS
+        // Sets grouped once, so years of history are read once rather than once per exercise.
+        return sets.groupBy { it.exerciseId }.mapNotNull { (id, own) ->
             val exercise = program.exercise(id) ?: return@mapNotNull null
-            val done = History.performances(id, sessions, sets).filter { it.hasCompletedSets }
-            val before = done.filter { it.performedAt < windowStart }
+            val done = History.performances(id, sessions, own).filter { it.hasCompletedSets }
+            val before = done.filter { it.performedAt in previousStart until windowStart }
             val recent = done.filter { it.performedAt >= windowStart }
             if (before.isEmpty() || recent.size < MIN_SESSIONS) return@mapNotNull null
-            val bestBefore = before.maxOf { best(it, exercise) }
-            val bestRecent = recent.maxOf { best(it, exercise) }
+            val bestBefore = before.maxOf { score(it, exercise) }
+            val bestRecent = recent.maxOf { score(it, exercise) }
             if (bestRecent > bestBefore) null else Plateau(id, recent.size)
         }
     }
+
+    /** [best] first; at the same best, more reps or seconds at the working weight are better. */
+    private fun score(performance: Performance, exercise: Exercise): Long =
+        best(performance, exercise) * 100_000L + performance.workingResults.sum().coerceAtMost(99_999)
 
     fun due(lastCheckIn: Long?, sessions: List<WorkoutSession>, plateaus: List<Plateau>, now: Long): CheckInReason? {
         val firstWorkout = sessions.filter { !it.deleted && it.endedAt != null }.minOfOrNull { it.startedAt } ?: return null
@@ -107,6 +115,7 @@ object CheckIns {
         val periodIds = periodSessions.map { it.id }.toSet()
         val periodSets = data.sets.filter { it.sessionId in periodIds && !it.deleted && !it.warmUp }
         val weeks = ((data.now - from) / (7 * DAY)).toInt().coerceAtLeast(1)
+        val exactWeeks = ((data.now - from).toDouble() / (7 * DAY)).coerceAtLeast(1.0)
         val plateaus = plateaus(program, data.sessions, data.sets, data.now)
 
         return buildString {
@@ -128,7 +137,7 @@ object CheckIns {
             append("## Summary\n\n")
             val finishedInPeriod = periodSessions.count { it.endedAt != null }
             append("- Period: ${data.formatDate(from)} to ${data.formatDate(data.now)} ($weeks ${if (weeks == 1) "week" else "weeks"})\n")
-            append("- Workouts finished: $finishedInPeriod (${oneDecimal(finishedInPeriod.toDouble() / weeks)} a week)")
+            append("- Workouts finished: $finishedInPeriod (${oneDecimal(finishedInPeriod / exactWeeks)} a week)")
             val unfinished = periodSessions.count { it.endedAt == null }
             if (unfinished > 0) append(", plus $unfinished started and not finished")
             append("\n")
@@ -192,7 +201,7 @@ object CheckIns {
 
     private fun bodyWeeks(logs: List<BodyLog>, today: String, weeks: Int): List<BodyWeek> {
         val todayEpoch = Body.epochDay(today)
-        return logs.filter { !it.deleted }
+        return logs.filter { !it.deleted && Body.epochDay(it.day) <= todayEpoch }
             .groupBy { ((todayEpoch - Body.epochDay(it.day)) / 7).toInt() }
             .filterKeys { it in 0..weeks }
             .entries

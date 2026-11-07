@@ -67,6 +67,7 @@ refuses to start if it is malformed, with the line number of the problem.
 | dumbbell-hip-thrust                 | Dumbbell Hip Thrust                 | dumbbell   | reps    | no       | 2    |
 | machine-calf-raise                  | Machine Calf Raise                  | machine    | reps    | no       | 5    |
 | hanging-knee-raise                  | Hanging Knee Raise                  | bodyweight | reps    | no       | 1    |
+| lying-dumbbell-leg-curl             | Lying Dumbbell Leg Curl             | dumbbell   | reps    | no       | 2    |
 
 ## Alternatives
 
@@ -85,7 +86,7 @@ alternative is an exercise of its own, with its own history and weights.
 | cable-triceps-pushdown           | overhead-dumbbell-triceps-extension, overhead-cable-triceps-extension |
 | leg-press                        | hack-squat, goblet-squat                                              |
 | hip-thrust                       | dumbbell-hip-thrust, cable-pull-through                               |
-| hamstring-curl                   | dumbbell-romanian-deadlift                                            |
+| hamstring-curl                   | dumbbell-romanian-deadlift, lying-dumbbell-leg-curl                   |
 | leg-extension                    | dumbbell-split-squat                                                  |
 | cable-crunch                     | hanging-knee-raise                                                    |
 | dumbbell-standing-calf-raise     | machine-calf-raise, dumbbell-seated-calf-raise                        |

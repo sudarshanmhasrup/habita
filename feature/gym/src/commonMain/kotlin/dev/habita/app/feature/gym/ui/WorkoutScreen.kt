@@ -1,7 +1,6 @@
 package dev.habita.app.feature.gym.ui
 
 import dev.habita.app.core.ui.ContentSwap
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -18,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -83,6 +84,7 @@ internal fun WorkoutScreen(
 ) {
     KeepScreenOn()
     var confirmFinish by remember(active.sessionId) { mutableStateOf(false) }
+    val undoable by viewModel.undoableSet.collectAsStateWithLifecycle()
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         TopBar(
@@ -116,6 +118,9 @@ internal fun WorkoutScreen(
                 rest = rest,
                 onDone = viewModel::endRest,
                 onExtend = { viewModel.extendRest(30) },
+                onUndo = viewModel::undoLastSet.takeIf {
+                    active.loggedSets.lastOrNull()?.let { it.id == undoable && !it.warmUp } == true
+                },
             ) {
                 active.currentSlot?.let { NextUp(active, data, it, label = "Up next") }
             }
@@ -123,15 +128,32 @@ internal fun WorkoutScreen(
         }
         }
     }
-    FinishPanel(
-        visible = confirmFinish,
-        workoutName = active.workout.name,
-        onFinish = {
-            confirmFinish = false
-            viewModel.finish()
-        },
-        onKeepGoing = { confirmFinish = false },
-    )
+    if (active.setsLogged.sum() == 0) {
+        // Nothing logged: finishing would count an empty workout and move the rotation on.
+        ConfirmPanel(
+            visible = confirmFinish,
+            title = "Nothing logged yet",
+            detail = "Finishing now would count an empty ${active.workout.name}. Discard it instead, or keep going.",
+            confirm = "Discard workout",
+            onConfirm = {
+                confirmFinish = false
+                viewModel.discard()
+            },
+            cancel = "Keep going",
+            onCancel = { confirmFinish = false },
+            destructive = true,
+        )
+    } else {
+        FinishPanel(
+            visible = confirmFinish,
+            workoutName = active.workout.name,
+            onFinish = {
+                confirmFinish = false
+                viewModel.finish()
+            },
+            onKeepGoing = { confirmFinish = false },
+        )
+    }
     }
 }
 
@@ -232,6 +254,7 @@ private fun RestContent(
     rest: Rest,
     onDone: () -> Unit,
     onExtend: () -> Unit,
+    onUndo: (() -> Unit)? = null,
     next: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = HabitaTheme.colors
@@ -297,6 +320,10 @@ private fun RestContent(
                     HText(formatTimer(remaining), type.timer)
                     HText("of ${formatTimer(rest.totalMillis)}", type.caption, color = colors.muted)
                 }
+            }
+            if (onUndo != null) {
+                Gap(Space.item)
+                TextAction("Undo last set", onUndo, Modifier.heightIn(min = 48.dp), color = colors.muted)
             }
         }
     }
@@ -401,10 +428,10 @@ private fun WarmUpSetContent(active: ActiveWorkout, data: GymData, viewModel: Gy
             )
             Gap(Space.tiny)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TextAction("Skip warm-up set", { viewModel.logWarmUpSet(0, null) }, color = colors.muted)
+                TextAction("Skip warm-up set", { viewModel.logWarmUpSet(0, null) }, Modifier.heightIn(min = 48.dp), color = colors.muted)
                 Spacer(Modifier.weight(1f))
                 if (active.exerciseQueue.size > 1) {
-                    TextAction("Machine taken", viewModel::exerciseMachineTaken, color = colors.muted)
+                    TextAction("Machine taken", viewModel::exerciseMachineTaken, Modifier.heightIn(min = 48.dp), color = colors.muted)
                 }
             }
         },
@@ -450,15 +477,17 @@ private fun WorkingSetContent(active: ActiveWorkout, data: GymData, viewModel: G
 
     // Prefilled with today's target, adjusted by how the last set felt, so a normal set is one tap.
     // With no target yet (the first time), the warm-up set is about half, so double it.
-    var weightText by remember(active.sessionId, slotIndex, exercise.id, setNumber) {
+    // Refilled when today's target changes too, such as after a step change.
+    var weightText by remember(active.sessionId, slotIndex, exercise.id, setNumber, next.weightGrams) {
         val prefill = next.weightGrams ?: active.warmUpSetFor(slotIndex)?.weightGrams?.let { it * 2 }
         mutableStateOf(prefill?.let(::formatKg) ?: "")
     }
-    var amountText by remember(active.sessionId, slotIndex, exercise.id, setNumber) { mutableStateOf(next.target.toString()) }
+    var amountText by remember(active.sessionId, slotIndex, exercise.id, setNumber, next.target) { mutableStateOf(next.target.toString()) }
     var editingStep by remember(slotIndex) { mutableStateOf(false) }
 
-    val weightGrams = if (exercise.isWeighted) parseKg(weightText) else 0
-    val amount = parseCount(amountText)
+    // A weighted set needs a weight, and a done set needs at least one rep or second.
+    val weightGrams = if (exercise.isWeighted) parseKg(weightText)?.takeIf { it > 0 } else 0
+    val amount = parseCount(amountText)?.takeIf { it > 0 }
     val canLog = weightGrams != null && amount != null
 
     ActionLayout(
@@ -487,10 +516,10 @@ private fun WorkingSetContent(active: ActiveWorkout, data: GymData, viewModel: G
             }
             Gap(Space.tiny)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TextAction("Skip set", { viewModel.logSet(weightGrams ?: 0, null, null) }, color = colors.muted)
+                TextAction("Skip set", { viewModel.logSet(weightGrams ?: 0, null, null) }, Modifier.heightIn(min = 48.dp), color = colors.muted)
                 Spacer(Modifier.weight(1f))
                 if (active.exerciseQueue.size > 1) {
-                    TextAction("Machine taken", viewModel::exerciseMachineTaken, color = colors.muted)
+                    TextAction("Machine taken", viewModel::exerciseMachineTaken, Modifier.heightIn(min = 48.dp), color = colors.muted)
                 }
             }
         },

@@ -28,6 +28,7 @@ import dev.habita.app.shared.gym.WarmUpStatus
 import dev.habita.app.shared.gym.WorkoutSession
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 
@@ -51,9 +52,12 @@ class GymStore(private val database: GymDatabase) {
 
     // Program and the workout in progress
 
-    val program: Flow<ProgramResponse?> = watchValue(PROGRAM) { json.decodeFromString<ProgramResponse>(it) }
+    // Both live in one table, so each save of either wakes both; only real changes go through.
+    val program: Flow<ProgramResponse?> =
+        watchValue(PROGRAM) { json.decodeFromString<ProgramResponse>(it) }.distinctUntilChanged()
 
-    val active: Flow<ActiveWorkout?> = watchValue(ACTIVE) { json.decodeFromString<ActiveWorkout>(it) }
+    val active: Flow<ActiveWorkout?> =
+        watchValue(ACTIVE) { json.decodeFromString<ActiveWorkout>(it) }.distinctUntilChanged()
 
     fun program(): ProgramResponse? = readValue(PROGRAM) { json.decodeFromString<ProgramResponse>(it) }
 
@@ -116,6 +120,7 @@ class GymStore(private val database: GymDatabase) {
 
     internal fun saveBody(log: BodyLog, dirty: Boolean) = body.save(
         log.day, log.weightGrams?.toLong(), log.waistMm?.toLong(), log.updatedAt, log.deleted.toLong(), dirty.toLong(),
+        log.weightAt, log.waistAt,
     )
 
     // Swaps
@@ -198,12 +203,15 @@ class GymStore(private val database: GymDatabase) {
         pushed.steps.forEach { steps.markClean(it.exerciseId, it.updatedAt) }
     }
 
-    /** Saves records from the server as they are, already synced. */
-    fun applyRemote(pulled: SyncChanges) = transaction {
-        pulled.sessions.forEach { save(it, dirty = false) }
-        pulled.sets.forEach { save(it, dirty = false) }
-        pulled.warmUps.forEach { save(it, dirty = false) }
-        pulled.steps.forEach { save(it, dirty = false) }
+    /**
+     * Saves records from the server as they are, already synced. Restored ones are saved [dirty],
+     * so the server gets them too.
+     */
+    fun applyRemote(pulled: SyncChanges, dirty: Boolean = false) = transaction {
+        pulled.sessions.forEach { save(it, dirty) }
+        pulled.sets.forEach { save(it, dirty) }
+        pulled.warmUps.forEach { save(it, dirty) }
+        pulled.steps.forEach { save(it, dirty) }
     }
 
     fun markAllDirty(collection: String) {
@@ -283,6 +291,8 @@ internal fun Body_log.toModel() = BodyLog(
     waistMm = waist_mm?.toInt(),
     updatedAt = updated_at,
     deleted = deleted == 1L,
+    weightAt = weight_at,
+    waistAt = waist_at,
 )
 
 internal fun Exercise_swap.toModel() = ExerciseSwap(exercise_id, replacement_id, updated_at, deleted == 1L)

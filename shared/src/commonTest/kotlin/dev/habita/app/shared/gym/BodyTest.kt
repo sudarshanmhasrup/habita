@@ -171,4 +171,55 @@ class BodyTest {
         assertEquals(BodyGoal.MAINTAIN, Body.trend(emptyList(), today, BodyGoal.MAINTAIN).goal)
         assertEquals(BodyAdvice.NEED_MORE_DATA, advice(BodyGoal.BUILD_MUSCLE, 78.0))
     }
+
+    @Test
+    fun `a waist logged for a future day is not the latest`() {
+        val logs = listOf(waist(20, 85.0), BodyLog("2026-02-02", waistMm = 800, updatedAt = 0))
+
+        assertEquals("2026-01-20", Body.trend(logs, today).latestWaist?.day)
+    }
+
+    @Test
+    fun `a weight from one device and a waist from another both survive`() {
+        val phone = Body.update(null, "2026-11-08", weightGrams = 78_000, waistMm = null, now = 10)
+        val desktop = Body.update(null, "2026-11-08", weightGrams = null, waistMm = 850, now = 20)
+
+        val merged = Body.merge(phone, desktop)
+
+        assertEquals(78_000, merged.weightGrams)
+        assertEquals(850, merged.waistMm)
+        assertTrue(merged.updatedAt > 20)
+        assertEquals(merged, Body.merge(desktop, phone))
+        // Merging again with either side changes nothing, so both devices settle on it.
+        assertEquals(merged, Body.merge(merged, phone))
+        assertEquals(merged, Body.merge(merged, desktop))
+    }
+
+    @Test
+    fun `clearing a value is a change that wins over an older value`() {
+        val logged = Body.update(null, "2026-11-08", weightGrams = 78_000, waistMm = 850, now = 10)
+        val cleared = Body.update(logged, "2026-11-08", weightGrams = null, waistMm = 850, now = 20)
+
+        assertNull(Body.merge(logged, cleared).weightGrams)
+        assertEquals(10, cleared.waistAt)
+    }
+
+    @Test
+    fun `a deletion newer than both wins`() {
+        val logged = Body.update(null, "2026-11-08", weightGrams = 78_000, waistMm = null, now = 10)
+        val deleted = logged.copy(deleted = true, updatedAt = 20)
+
+        assertTrue(Body.merge(logged, deleted).deleted)
+    }
+
+    @Test
+    fun `old records without value times still merge`() {
+        val old = BodyLog("2026-11-08", weightGrams = 78_000, updatedAt = 10)
+        val newer = Body.update(null, "2026-11-08", weightGrams = null, waistMm = 850, now = 20)
+
+        val merged = Body.merge(old, newer)
+
+        assertEquals(78_000, merged.weightGrams)
+        assertEquals(850, merged.waistMm)
+    }
 }

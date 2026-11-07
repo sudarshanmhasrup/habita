@@ -15,6 +15,10 @@ data class BodyLog(
     val waistMm: Int? = null,
     val updatedAt: Long,
     val deleted: Boolean = false,
+    /** When the weight was last set or cleared, so two devices merge it on its own. */
+    val weightAt: Long? = null,
+    /** When the waist was last set or cleared. */
+    val waistAt: Long? = null,
 )
 
 /** A gym choice that syncs, by [key], such as [GOAL_KEY]. */
@@ -137,7 +141,7 @@ object Body {
         return BodyTrend(
             today = live.firstOrNull { it.day == today },
             latestWeight = weights.maxByOrNull { epochDay(it.day) },
-            latestWaist = live.filter { it.waistMm != null }.maxByOrNull { epochDay(it.day) },
+            latestWaist = live.filter { it.waistMm != null && epochDay(it.day) <= todayEpoch }.maxByOrNull { epochDay(it.day) },
             weeks = weeks,
             weeklyChangeGrams = change,
             waistChangeMm = waistChange,
@@ -158,6 +162,51 @@ object Body {
         w2 == null -> if (w0 > w1) BodyAdvice.ON_TRACK else BodyAdvice.TOO_EARLY
         w0 - w2 < MIN_GAIN_GRAMS -> BodyAdvice.NOT_GAINING
         else -> BodyAdvice.ON_TRACK
+    }
+
+    /**
+     * [existing] with [weightGrams] and [waistMm] set at [now]. A value that changed, cleared ones
+     * included, gets [now] as its time; one that didn't keeps its time, and a value that was never
+     * set claims nothing, so it can't wipe one logged on another device.
+     */
+    fun update(existing: BodyLog?, day: String, weightGrams: Int?, waistMm: Int?, now: Long): BodyLog {
+        val live = existing?.takeIf { !it.deleted }
+        fun at(value: Int?, old: Int?, oldAt: Long?): Long? = when {
+            value == old && live != null -> oldAt ?: live.updatedAt.takeIf { old != null }
+            value == null && old == null -> null
+            else -> now
+        }
+        return BodyLog(
+            day = day,
+            weightGrams = weightGrams,
+            waistMm = waistMm,
+            updatedAt = now,
+            weightAt = at(weightGrams, live?.weightGrams, live?.weightAt),
+            waistAt = at(waistMm, live?.waistMm, live?.waistAt),
+        )
+    }
+
+    /**
+     * Two copies of the same day, merged value by value: each of weight and waist comes from the
+     * copy that set it last, so a weight from the phone and a waist from the desktop both survive.
+     * A deletion newer than both wins whole. The result is the same whichever side merges, and it
+     * carries a later time than both when it differs from each, so it spreads to every device.
+     */
+    fun merge(a: BodyLog, b: BodyLog): BodyLog {
+        val (older, newer) = if (b.updatedAt > a.updatedAt || (b.updatedAt == a.updatedAt && b.toString() > a.toString())) a to b else b to a
+        if (newer.deleted || older.deleted) return newer
+        // A value without its own time was set when its record was; a missing one claims nothing.
+        fun weightTime(log: BodyLog) = log.weightAt ?: if (log.weightGrams != null) log.updatedAt else Long.MIN_VALUE
+        fun waistTime(log: BodyLog) = log.waistAt ?: if (log.waistMm != null) log.updatedAt else Long.MIN_VALUE
+        val weightFrom = if (weightTime(older) > weightTime(newer)) older else newer
+        val waistFrom = if (waistTime(older) > waistTime(newer)) older else newer
+        val merged = newer.copy(
+            weightGrams = weightFrom.weightGrams,
+            weightAt = weightTime(weightFrom).takeIf { it != Long.MIN_VALUE },
+            waistMm = waistFrom.waistMm,
+            waistAt = waistTime(waistFrom).takeIf { it != Long.MIN_VALUE },
+        )
+        return if (merged == newer || merged == older) merged else merged.copy(updatedAt = newer.updatedAt + 1)
     }
 
     /** Whether [today] is Sunday and the waist hasn't been measured in the last six days. */

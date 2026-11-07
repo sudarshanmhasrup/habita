@@ -1,0 +1,2 @@
+-- Version 5: pulling one collection after a cursor uses an index instead of reading every record.
+CREATE INDEX sync_record_collection_seq ON sync_record (collection, server_seq);

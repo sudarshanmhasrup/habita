@@ -18,7 +18,7 @@ internal fun formatKg(grams: Int): String {
 
 /** "22.5" or "22,5" → 22500. `null` for anything that is not a weight. */
 internal fun parseKg(text: String): Int? {
-    val value = text.trim().replace(',', '.').toDoubleOrNull() ?: return null
+    val value = text.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() } ?: return null
     if (value < 0 || value > 1000) return null
     return (value * 1000).roundToInt()
 }
@@ -104,7 +104,7 @@ internal fun ExerciseTarget.reasonText(exercise: Exercise, step: Int): String = 
     TargetReason.HOLD_HARD -> "You hit every rep, but it was hard. Same again to own it."
     TargetReason.REPEAT ->
         if (exercise.isWeighted) "Same weight as last time. Beat last time's reps." else "Same target. Hit it on every set."
-    TargetReason.DROP_BACK -> "Reps fell too low after the last jump, so it's back to the previous weight."
+    TargetReason.DROP_BACK -> "Reps fell too low at the heavier weight, so it's back to the weight that held."
     TargetReason.DELOAD -> "No progress for 3 sessions. About 10% lighter, then build back up."
     TargetReason.RETURN_AFTER_BREAK -> "Over 3 weeks since last time. Same as before, no increase."
     TargetReason.RETURN_AFTER_LONG_BREAK ->

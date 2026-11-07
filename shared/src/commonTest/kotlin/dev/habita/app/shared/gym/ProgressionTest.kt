@@ -157,7 +157,8 @@ class ProgressionTest {
     fun `deload rounds to whole steps`() {
         assertEquals(26 * KG, Progression.deload(30 * KG, 2 * KG))
         assertEquals(45 * KG, Progression.deload(50 * KG, 5 * KG))
-        assertEquals(0, Progression.deload(2 * KG, 5 * KG))
+        // Never below one step: a weight at or under one step stays as it is.
+        assertEquals(2 * KG, Progression.deload(2 * KG, 5 * KG))
     }
 
     @Test
@@ -181,5 +182,43 @@ class ProgressionTest {
         assertEquals(TargetReason.RETURN_AFTER_LONG_BREAK, longHold.reason)
         assertEquals(48, longHold.target)
         assertEquals(30, shortHold.target)
+    }
+
+    @Test
+    fun `a lighter week never goes below one step`() {
+        assertEquals(2 * KG, Progression.deload(2 * KG, 2 * KG))
+        assertEquals(2 * KG, Progression.deload(4 * KG, 2 * KG))
+    }
+
+    @Test
+    fun `a long break on a light weight drops one step, not two`() {
+        val target = bench(performance("s1", now - 60 * DAY, 10 * KG, 12, 12, 12, 12))
+
+        assertEquals(8 * KG, target.weightGrams)
+    }
+
+    @Test
+    fun `one bad set long after the last jump repeats instead of dropping back`() {
+        val target = bench(
+            performance("s3", now - 3 * DAY, 20 * KG, 12, 11, 10, 7),
+            performance("s2", now - 6 * DAY, 20 * KG, 12, 12, 12, 11),
+            performance("s1", now - 60 * DAY, 18 * KG, 12, 12, 12, 12),
+        )
+
+        assertEquals(TargetReason.REPEAT, target.reason)
+        assertEquals(20 * KG, target.weightGrams)
+    }
+
+    @Test
+    fun `too heavy after going up mid-session drops back to the weight that held that day`() {
+        val today = sets("s2", "any", now - 3 * DAY, 20 * KG, 12, 12, 12) +
+            sets("s2b", "any", now - 3 * DAY + 10_000, 22 * KG, 12, 7).map { it.copy(sessionId = "s2", setNumber = 3) }
+        val target = bench(
+            Performance("s2", now - 3 * DAY, today),
+            performance("s1", now - 30 * DAY, 18 * KG, 12, 12, 12, 12),
+        )
+
+        assertEquals(TargetReason.DROP_BACK, target.reason)
+        assertEquals(20 * KG, target.weightGrams)
     }
 }

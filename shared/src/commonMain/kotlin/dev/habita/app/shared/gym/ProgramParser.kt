@@ -236,6 +236,9 @@ object ProgramParser {
             if (workout.warmUpId !in warmUpIds) {
                 throw ProgramFormatException(1, "Workout \"${workout.name}\" uses unknown warm-up \"${workout.warmUpId}\"")
             }
+            duplicate(workout.exercises.map { it.exerciseId })?.let {
+                throw ProgramFormatException(1, "Workout \"${workout.name}\" has \"$it\" twice")
+            }
             workout.exercises.forEach {
                 if (it.exerciseId !in exerciseIds) {
                     throw ProgramFormatException(1, "Workout \"${workout.name}\" uses unknown exercise \"${it.exerciseId}\"")

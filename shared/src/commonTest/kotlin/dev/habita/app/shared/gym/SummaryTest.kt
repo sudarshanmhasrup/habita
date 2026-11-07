@@ -2,6 +2,7 @@ package dev.habita.app.shared.gym
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.test.assertNull
 
 class SummaryTest {
@@ -80,5 +81,20 @@ class SummaryTest {
         val result = summary(session = running, sessions = listOf(first, running))
 
         assertEquals(10 * DAY - 5 * DAY, result.totalMillis)
+    }
+
+    @Test
+    fun `a swapped-in exercise gets its next increase too`() {
+        val program = testProgram.copy(
+            exercises = testProgram.exercises.map { if (it.id == "bench") it.copy(alternatives = listOf("leg-press")) else it },
+        )
+        val first = session("s1", "a", 1 * DAY)
+        val second = session("s2", "a", 3 * DAY)
+        val sets = sets("s1", "leg-press", 1 * DAY, 60 * KG, 12, 12, 12, 12) +
+            sets("s2", "leg-press", 3 * DAY, 60 * KG, 12, 12, 12, 12)
+
+        val summary = Summary.of(second, program, listOf(first, second), sets, emptyMap(), now = 4 * DAY)
+
+        assertTrue("leg-press" in summary.nextIncreases)
     }
 }

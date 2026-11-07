@@ -33,9 +33,12 @@ internal object GymRestore {
             tables.forEach { table ->
                 val newer = collections[table.collection].orEmpty().filter { it.winsOver(table.local(it.id)?.record) }
                 if (newer.isEmpty()) return@forEach
-                table.applyRemote(newer)
-                // Saved as from the server, so mark them to send in case the server lacks them.
-                table.markAllDirty()
+                // Saved as unsent, so the server gets them in case it lacks them.
+                when (table) {
+                    is GymSyncTable -> table.restore(newer)
+                    is GymRecordTable<*> -> table.restore(newer)
+                    else -> table.applyRemote(newer)
+                }
                 counts[table.collection] = newer.size
             }
         }

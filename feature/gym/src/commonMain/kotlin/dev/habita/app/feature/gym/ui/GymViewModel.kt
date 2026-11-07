@@ -38,7 +38,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
+import dev.habita.app.core.data.nowMillis
 
 internal sealed interface GymRoute {
     /** How far in the flow the screen is, so transitions know which way to slide. */
@@ -163,10 +165,22 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
         viewModelScope.launch {
             val hasActive = repository.active.first() != null
             val route = _route.value
-            if (hasActive && route is GymRoute.Select) _route.value = GymRoute.Workout
-            if (!hasActive && route == GymRoute.Workout) _route.value = GymRoute.Select
+            // Coming back to the gym goes to the workout in progress, wherever it was left; a
+            // summary from earlier gives way to the list.
+            _route.value = when {
+                hasActive && (route is GymRoute.Select || route is GymRoute.PreStart) -> GymRoute.Workout
+                !hasActive && route == GymRoute.Workout -> GymRoute.Select
+                route is GymRoute.Summary && isOld(route.sessionId) -> GymRoute.Select
+                else -> route
+            }
         }
         repository.sync.request()
+    }
+
+    /** Whether [sessionId] ended over half an hour ago. */
+    private suspend fun isOld(sessionId: String): Boolean {
+        val ended = repository.sessions.first().firstOrNull { it.id == sessionId }?.endedAt ?: return true
+        return nowMillis() - ended > 30 * 60 * 1000
     }
 
     /** Goes back one screen. Returns `false` on the first gym screen, where back leaves the gym. */
@@ -200,28 +214,28 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
         _route.value = GymRoute.Workout
     }
 
-    fun discard() = act { repository.discard() }
+    fun discard() = settled { repository.discard() }
 
-    fun warmUpDone() = act { repository.completeWarmUp(WarmUpStatus.DONE) }
+    fun warmUpDone() = settled { repository.completeWarmUp(WarmUpStatus.DONE) }
 
-    fun warmUpSkip() = act { repository.completeWarmUp(WarmUpStatus.SKIPPED) }
+    fun warmUpSkip() = settled { repository.completeWarmUp(WarmUpStatus.SKIPPED) }
 
-    fun warmUpMachineTaken() = act { repository.warmUpMachineTaken() }
+    fun warmUpMachineTaken() = settled { repository.warmUpMachineTaken() }
 
-    fun endBreak() = act {
+    fun endBreak() = settled {
         if (data.value?.active?.phase == Phase.BREAK) repository.endBreak()
     }
 
-    fun endRest() = act {
+    fun endRest() = settled {
         if (data.value?.active?.rest != null) repository.endRest()
     }
 
-    fun logWarmUpSet(weightGrams: Int, reps: Int?) = act { repository.logWarmUpSet(weightGrams, reps) }
+    fun logWarmUpSet(weightGrams: Int, reps: Int?) = settled { repository.logWarmUpSet(weightGrams, reps) }
 
-    fun extendRest(seconds: Int) = act { repository.extendRest(seconds) }
+    fun extendRest(seconds: Int) = settled { repository.extendRest(seconds) }
 
     /** Logs the current set; [achieved] is `null` for a skipped set. */
-    fun logSet(weightGrams: Int, achieved: Int?, effort: Effort?) = act {
+    fun logSet(weightGrams: Int, achieved: Int?, effort: Effort?) = settled {
         repository.logSet(weightGrams, achieved, effort)?.let { _route.value = GymRoute.Summary(it) }
     }
 
@@ -241,11 +255,11 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
 
     fun newGym() = act { repository.newGym() }
 
-    fun exerciseMachineTaken() = act { repository.exerciseMachineTaken() }
+    fun exerciseMachineTaken() = settled { repository.exerciseMachineTaken() }
 
     fun setStep(exerciseId: String, step: Int) = act { repository.setStep(exerciseId, step) }
 
-    fun finish() = act {
+    fun finish() = settled {
         repository.finish()?.let { _route.value = GymRoute.Summary(it) }
     }
 
@@ -254,12 +268,27 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
     }
 
     /** Runs one action at a time, so a double tap never logs a set twice. */
-    private fun act(block: suspend () -> Unit) {
+    private fun act(block: suspend () -> Unit) = run(settle = false, block)
+
+    /**
+     * A workout step. The next step's buttons appear where the finger just was, so further taps are
+     * ignored until the screen shows the new step and a moment has passed: a double tap never
+     * logs two sets or skips a warm-up item unseen.
+     */
+    private fun settled(block: suspend () -> Unit) = run(settle = true, block)
+
+    /** Runs one action at a time, so a double tap never logs a set twice. */
+    private fun run(settle: Boolean, block: suspend () -> Unit) {
         if (busy) return
         busy = true
+        val before = data.value?.active
         viewModelScope.launch {
             try {
                 block()
+                if (settle) {
+                    withTimeoutOrNull(SETTLE_TIMEOUT_MILLIS) { data.first { it?.active != before } }
+                    delay(TAP_COOLDOWN_MILLIS)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: IllegalStateException) {
@@ -270,5 +299,15 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
                 busy = false
             }
         }
+    }
+
+    fun undoLastSet() = settled { repository.undoLastSet() }
+
+    /** The set "Undo last set" would take back, shown during the rest after it. */
+    val undoableSet: StateFlow<String?> = repository.undoableSet.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    private companion object {
+        const val SETTLE_TIMEOUT_MILLIS = 1_500L
+        const val TAP_COOLDOWN_MILLIS = 350L
     }
 }

@@ -62,7 +62,10 @@ object Summary {
             val history = History.performances(exerciseId, sessions, sets)
             val today = history.firstOrNull { it.sessionId == session.id } ?: return@forEach
             val before = history.filter { it.performedAt < today.performedAt && it.hasCompletedSets }
+            // A swapped-in exercise takes the slot of the planned one it replaces.
             val slot = workout?.exercises?.firstOrNull { it.exerciseId == exerciseId }
+                ?: workout?.exercises?.firstOrNull { exerciseId in program.exercise(it.exerciseId)?.alternatives.orEmpty() }
+                    ?.copy(exerciseId = exerciseId)
 
             before.firstOrNull()?.let { last ->
                 if (isBetter(today, last, exercise)) progressed += exerciseId

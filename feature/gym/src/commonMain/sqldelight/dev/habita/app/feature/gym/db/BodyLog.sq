@@ -5,7 +5,9 @@ CREATE TABLE body_log (
     waist_mm INTEGER,
     updated_at INTEGER NOT NULL,
     deleted INTEGER NOT NULL,
-    dirty INTEGER NOT NULL
+    dirty INTEGER NOT NULL,
+    weight_at INTEGER,
+    waist_at INTEGER
 );
 
 selectAll:
@@ -18,7 +20,7 @@ selectByDay:
 SELECT * FROM body_log WHERE day = ?;
 
 save:
-INSERT OR REPLACE INTO body_log VALUES (?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO body_log VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 markClean:
 UPDATE body_log SET dirty = 0 WHERE day = ? AND updated_at = ?;

@@ -75,7 +75,7 @@ fun Application.module(config: ServerConfig, clock: () -> Long = System::current
     val store = Store(database)
     val records = recordTables(database)
     val sync = SyncEngine(database, gymTables(database) + records)
-    val program = loadProgram(config.programPath, store, clock())
+    val program = loadProgram(config.programPath, store, clock()) { environment.log.warn(it) }
     environment.log.info("Loaded program version ${program.version} from ${config.programPath}")
     val fingerprint = passwordFingerprint(config.passwordHash)
     store.deleteInvalidTokens(clock(), fingerprint)

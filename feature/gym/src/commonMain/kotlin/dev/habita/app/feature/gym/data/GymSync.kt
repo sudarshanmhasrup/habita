@@ -9,6 +9,7 @@ import dev.habita.app.shared.api.SyncCollections
 import dev.habita.app.shared.api.SyncRecord
 import dev.habita.app.shared.api.gymChanges
 import dev.habita.app.shared.api.toCollections
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -25,8 +26,14 @@ class GymSync(private val store: GymStore, private val core: Core) {
     init {
         tables.forEach(core.sync::register)
         core.sync.beforeEachSync {
-            val program: ProgramResponse = core.api.get("program")
-            if (store.program() != program) store.saveProgram(program)
+            // A plan the server can't send never holds back the records: the cached one stays.
+            try {
+                val program: ProgramResponse = core.api.get("program")
+                if (store.program() != program) store.saveProgram(program)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -43,7 +50,7 @@ internal fun gymTypedTables(store: GymStore): List<LocalSyncTable> = listOf(
     SyncCollections.GYM_STEPS,
 ).map { GymSyncTable(it, store) }
 
-private class GymSyncTable(override val collection: String, private val store: GymStore) : LocalSyncTable {
+internal class GymSyncTable(override val collection: String, private val store: GymStore) : LocalSyncTable {
     override fun dirty(): List<SyncRecord> = store.dirty(collection).toCollections()[collection].orEmpty()
 
     override fun markClean(pushed: List<SyncRecord>) = store.markClean(gymChanges(mapOf(collection to pushed)))
@@ -57,4 +64,12 @@ private class GymSyncTable(override val collection: String, private val store: G
     override fun applyRemote(records: List<SyncRecord>) = store.applyRemote(gymChanges(mapOf(collection to records)))
 
     override fun markAllDirty() = store.markAllDirty(collection)
+
+    override fun <T> inTransaction(block: () -> T): T = store.transaction(block)
+
+    /** Saves restored records as unsent, so the server gets them too. */
+    fun restore(records: List<SyncRecord>) = store.applyRemote(gymChanges(mapOf(collection to records)), dirty = true)
+
+    override fun canRead(record: SyncRecord): Boolean =
+        gymChanges(mapOf(collection to listOf(record))).toCollections()[collection].orEmpty().isNotEmpty()
 }

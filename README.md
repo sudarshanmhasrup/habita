@@ -33,6 +33,9 @@ every midnight.
    target, filled in so that a normal set is one tap. Log a set by tapping how it felt: Easy,
    Medium or Hard. The weight can be changed on any set, and the next set is suggested from how
    this one felt. Finishing a set starts its rest timer, and the phone buzzes when it ends.
+   Logged the wrong numbers? "Undo last set" during the rest takes it back. Taps right after a
+   step are ignored until the next step shows, so a double tap never logs twice. Finishing with
+   nothing logged offers to discard instead, so an empty workout never counts.
 4. At the end, see the workout summary: time spent, volume, sets, personal bests and what goes up
    next time, with charts of the time split, how the sets felt, volume over recent sessions, and
    each exercise set by set with its working weight over time.
@@ -43,11 +46,13 @@ Habita uses double progression, the standard method for a fixed rep target like 
 
 - Hit the target on every set, and next time the weight goes up one step.
 - Miss a set, and next time you repeat the weight and try to beat last time's reps.
-- Drop below 8 reps right after a weight jump, and you go back to the previous weight.
+- Drop below 8 reps at a heavier weight, and you go back to the weight that held: a lighter one done
+  well that day, or the one before a jump. One bad set long after a jump just repeats the weight.
 - Make no progress for 3 sessions in a row, and the weight drops by about 10% so you can build back
   up.
 - Come back after more than 3 weeks off, and the weight stays where it was. After more than 8
   weeks off, it comes back about 20% lighter (timed holds a bit shorter) to build back up safely.
+- A lighter week or a comeback never goes below one step, so a light exercise never drops to 0 kg.
 - Bodyweight exercises such as the plank grow their target instead, by 5 seconds at a time.
 
 How each set felt adjusts this:
@@ -102,9 +107,10 @@ the phone, so it needs no server or push service.
 ### Check-ins
 
 There is no coach and no AI inside the app. Instead, about every three months, or sooner when an
-exercise has had no new best for six weeks over at least four sessions, the gym screen asks for a
-check-in. "Copy for AI" copies one text with the period's workouts, every exercise's first, latest
-and best sets, how the sets felt, the weekly bodyweight, the gym's swaps and the full plan in
+exercise did no better in the last six weeks (at least four sessions) than in the six weeks before,
+counting more reps at the same weight as better, the gym screen asks for a check-in. "Copy for AI"
+copies one text with the period's workouts, every exercise's first, latest and best sets, how the
+sets felt, the weekly bodyweight, the gym's swaps and the full plan in
 `PROGRAM.md` format. Paste it into Claude or ChatGPT, ideally in a chat or project where your goal
 and diet targets are saved, so they never go into this repository. If it suggests changes, it
 replies with tables to paste into [program/PROGRAM.md](program/PROGRAM.md). "Copy check-in for AI"

@@ -26,7 +26,7 @@ class ProgramTest {
         assertEquals(1, response.version)
         assertEquals(listOf("upper-a", "lower-a", "upper-b", "lower-b", "full-body"), program.workouts.map { it.id })
         assertEquals(listOf(1, 2, 3, 4, null), program.workouts.map { it.rotation })
-        assertEquals(43, program.exercises.size)
+        assertEquals(44, program.exercises.size)
         assertEquals(Equipment.BODYWEIGHT, program.exercise("plank")!!.equipment)
         assertEquals(2500, program.exercise("cable-triceps-pushdown")!!.defaultStep)
         assertEquals(30, program.workout("lower-b")!!.exercises.last().target)

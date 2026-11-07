@@ -9,6 +9,7 @@ import dev.habita.app.feature.gym.workout.WorkoutEngine
 import dev.habita.app.shared.api.Export
 import dev.habita.app.shared.api.ExportedProgram
 import dev.habita.app.shared.api.ProgramResponse
+import dev.habita.app.shared.gym.Body
 import dev.habita.app.shared.gym.BodyGoal
 import dev.habita.app.shared.gym.BodyLog
 import dev.habita.app.shared.gym.GymSetting
@@ -17,6 +18,7 @@ import dev.habita.app.shared.gym.CheckInData
 import dev.habita.app.shared.gym.CheckInReason
 import dev.habita.app.shared.gym.CheckIns
 import dev.habita.app.shared.gym.Effort
+import dev.habita.app.shared.gym.Exercise
 import dev.habita.app.shared.gym.ExerciseSwap
 import dev.habita.app.shared.gym.Swaps
 import dev.habita.app.shared.gym.ExerciseStep
@@ -31,7 +33,10 @@ import dev.habita.app.shared.gym.WarmUpStatus
 import dev.habita.app.shared.gym.Workout
 import dev.habita.app.shared.gym.WorkoutSession
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -56,6 +61,30 @@ class GymRepository(core: Core) {
 
     init {
         loadBundledProgram()
+        closeAbandonedSessions()
+    }
+
+    /**
+     * Closes workouts left open for over 12 hours that aren't the one in progress, for example
+     * after the app was killed or an update couldn't read the saved workout. One with done sets is
+     * finished at its last set, so it counts; one with none is removed.
+     */
+    private fun closeAbandonedSessions() {
+        val now = nowMillis()
+        val inProgress = store.active()?.sessionId
+        store.transaction {
+            store.sessions()
+                .filter { !it.deleted && it.endedAt == null && it.id != inProgress && now - it.startedAt > ABANDONED_MILLIS }
+                .forEach { session ->
+                    val done = store.setsForSession(session.id).filter { !it.deleted && !it.warmUp && !it.isSkipped }
+                    if (done.isEmpty()) {
+                        store.saveSession(session.copy(deleted = true, updatedAt = now))
+                    } else {
+                        val end = done.maxOf { it.completedAt }
+                        store.saveSession(session.copy(mainStartedAt = session.mainStartedAt ?: session.startedAt, endedAt = end, updatedAt = now))
+                    }
+                }
+        }
     }
 
     /**
@@ -90,15 +119,23 @@ class GymRepository(core: Core) {
         store.saveSetting(GymSetting(GymSetting.GOAL_KEY, goal.name, nowMillis()))
     }
 
-    /** Whether the plan needs a check-in, and which exercises are stuck, as workouts are logged. */
+    /**
+     * Whether the plan needs a check-in, and which exercises are stuck. It reads every set, so a
+     * burst of changes, such as a sync, is worked out once after it settles.
+     */
+    @OptIn(FlowPreview::class)
     val checkIn: Flow<CheckInStatus> =
         combine(store.program, store.allSessions, store.allSets, store.allCheckIns) { program, sessions, sets, checkIns ->
-            val plan = program?.program ?: return@combine CheckInStatus(null, emptyList(), null)
+            Quad(program, sessions, sets, checkIns)
+        }.debounce(CHECK_IN_SETTLE_MILLIS).map { (program, sessions, sets, checkIns) ->
+            val plan = program?.program ?: return@map CheckInStatus(null, emptyList(), null)
             val now = nowMillis()
             val last = checkIns.filter { !it.deleted }.maxOfOrNull { it.at }
             val plateaus = CheckIns.plateaus(plan, sessions, sets, now)
             CheckInStatus(CheckIns.due(last, sessions, plateaus, now), plateaus.mapNotNull { plan.exercise(it.exerciseId)?.name }, last)
         }.flowOn(Dispatchers.Default)
+
+    private data class Quad<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
 
     /** The check-in text to paste into an AI chat. Copying it counts as a check-in. */
     suspend fun checkInText(today: String, formatDate: (Long) -> String): String? = write {
@@ -126,8 +163,8 @@ class GymRepository(core: Core) {
     /** Saves today's weight, keeping a waist already logged today. */
     suspend fun logWeight(day: String, grams: Int) = write {
         store.transaction {
-            val today = store.bodyLog(day)
-            store.saveBody(BodyLog(day, grams, today?.waistMm.takeIf { today?.deleted == false }, nowMillis()))
+            val today = store.bodyLog(day)?.takeIf { !it.deleted }
+            store.saveBody(Body.update(today, day, grams, today?.waistMm, nowMillis()))
         }
     }
 
@@ -140,7 +177,7 @@ class GymRepository(core: Core) {
         store.transaction {
             val existing = store.bodyLog(day)
             when {
-                weightGrams != null || waistMm != null -> store.saveBody(BodyLog(day, weightGrams, waistMm, now))
+                weightGrams != null || waistMm != null -> store.saveBody(Body.update(existing, day, weightGrams, waistMm, now))
                 existing != null && !existing.deleted -> store.saveBody(existing.copy(deleted = true, updatedAt = now))
             }
         }
@@ -149,8 +186,8 @@ class GymRepository(core: Core) {
     /** Saves today's waist, keeping a weight already logged today. */
     suspend fun logWaist(day: String, mm: Int) = write {
         store.transaction {
-            val today = store.bodyLog(day)
-            store.saveBody(BodyLog(day, today?.weightGrams.takeIf { today?.deleted == false }, mm, nowMillis()))
+            val today = store.bodyLog(day)?.takeIf { !it.deleted }
+            store.saveBody(Body.update(today, day, today?.weightGrams, mm, nowMillis()))
         }
     }
 
@@ -222,7 +259,34 @@ class GymRepository(core: Core) {
             store.saveSet(log)
             if (next.isFinished) finishSession(next, now) else store.saveActive(next)
         }
+        // The set can be taken back during the rest that follows, until anything else happens.
+        _undoable.value = if (next.isFinished) null else Undo(active, log.id)
         next.sessionId.takeIf { next.isFinished }
+    }
+
+    private class Undo(val before: ActiveWorkout, val setId: String)
+
+    private val _undoable = MutableStateFlow<Undo?>(null)
+
+    /** The id of the set that "Undo last set" would take back, or `null`. */
+    val undoableSet: Flow<String?> = _undoable.map { it?.setId }
+
+    /**
+     * Takes back the set just logged, by mistake or with the wrong numbers: it is deleted and the
+     * workout goes back to just before it, so the set can be done again.
+     */
+    suspend fun undoLastSet() = write {
+        val undo = _undoable.value ?: return@write
+        _undoable.value = null
+        val active = store.active() ?: return@write
+        // Only while nothing else has been logged since.
+        if (active.sessionId != undo.before.sessionId || active.loggedSets.lastOrNull()?.id != undo.setId) return@write
+        val now = nowMillis()
+        store.transaction {
+            store.setsForSession(active.sessionId).firstOrNull { it.id == undo.setId }
+                ?.let { store.saveSet(it.copy(deleted = true, updatedAt = now)) }
+            store.saveActive(undo.before)
+        }
     }
 
     /** Logs the current exercise's warm-up set, or skips it when [reps] is `null`. */
@@ -252,7 +316,7 @@ class GymRepository(core: Core) {
             val active = store.active() ?: return@transaction
             val program = store.program()?.program ?: return@transaction
             val slots = active.workout.exercises.indices.filter { active.workout.exercises[it].exerciseId == exerciseId }
-            val targets = targetsFor(program, active.workout, now, slots)
+            val targets = targetsFor(program, active.workout, now, slots) { active.exercises[it] }
             store.saveActive(WorkoutEngine.updateTargets(active, slots.zip(targets).toMap()))
         }
     }
@@ -386,6 +450,8 @@ class GymRepository(core: Core) {
         workout: Workout,
         now: Long,
         slots: List<Int> = workout.exercises.indices.toList(),
+        // For a workout in progress: its own copy, when a new plan no longer has the exercise.
+        known: (slot: Int) -> Exercise? = { null },
     ): List<ExerciseTarget> {
         val exerciseIds = slots.map { workout.exercises[it].exerciseId }.distinct()
         val sessions = store.sessions()
@@ -393,7 +459,8 @@ class GymRepository(core: Core) {
         val steps = store.steps()
         return slots.map { index ->
             val slot = workout.exercises[index]
-            val exercise = program.exercise(slot.exerciseId)!!
+            val exercise = program.exercise(slot.exerciseId) ?: known(index)
+                ?: error("Exercise ${slot.exerciseId} is not in the plan")
             Progression.target(
                 exercise = exercise,
                 slot = slot,
@@ -417,6 +484,12 @@ class GymRepository(core: Core) {
         }
     }
 }
+
+/** A workout open this long, not the one in progress, was abandoned. */
+private const val ABANDONED_MILLIS = 12L * 60 * 60 * 1000
+
+/** How long the data must stay still before the check-in is worked out again. */
+private const val CHECK_IN_SETTLE_MILLIS = 1_000L
 
 /** The version of the plan built into the app. Server versions start at 1. */
 internal const val BUNDLED_VERSION = 0L
