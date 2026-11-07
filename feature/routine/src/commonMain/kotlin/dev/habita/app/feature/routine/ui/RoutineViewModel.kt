@@ -60,7 +60,14 @@ internal class RoutineViewModel(private val repository: RoutineRepository, check
         viewModelScope.launch { repository.reset() }
     }
 
-    fun edit() {
+    private val _editFrom = MutableStateFlow<String?>(null)
+
+    /** The section the edit list opens at, or `null` for the top. */
+    val editFrom: StateFlow<String?> = _editFrom.asStateFlow()
+
+    /** Opens the edit list, at section [groupId] when given. */
+    fun edit(groupId: String? = null) {
+        _editFrom.value = groupId
         _route.value = RoutineRoute.Edit
     }
 

@@ -55,7 +55,7 @@ import dev.habita.app.feature.routine.data.dayOf
 internal fun ChecklistScreen(
     checklist: Checklist,
     onBack: () -> Unit,
-    onEdit: () -> Unit,
+    onEdit: (groupId: String?) -> Unit,
     onToggle: (taskId: String, done: Boolean) -> Unit,
     onReset: () -> Unit,
 ) {
@@ -65,7 +65,7 @@ internal fun ChecklistScreen(
     TwoPane(
         Modifier.fillMaxSize(),
         first = {
-            TopBar("Home", onBack) { TextAction("Edit", onEdit) }
+            TopBar("Home", onBack) { TextAction("Edit", { onEdit(null) }) }
             Gap(Space.inside)
             HText("Routine", type.headline)
             Gap(Space.tiny)
@@ -79,7 +79,7 @@ internal fun ChecklistScreen(
                 HText("Nothing on the list. Tap Edit to add a section.", type.body, color = colors.muted)
             }
             checklist.groups.forEachIndexed { index, section ->
-                Section(section, Modifier.appear(index + 1), onToggle)
+                Section(section, Modifier.appear(index + 1), onToggle) { onEdit(section.group.id) }
                 Gap(Space.section)
             }
         },
@@ -125,12 +125,15 @@ private fun Overview(checklist: Checklist, onReset: () -> Unit, modifier: Modifi
 
 /** "Fixed" or "Adjustable" over a card of checkbox rows. */
 @Composable
-private fun Section(section: ChecklistGroup, modifier: Modifier, onToggle: (String, Boolean) -> Unit) {
+private fun Section(section: ChecklistGroup, modifier: Modifier, onToggle: (String, Boolean) -> Unit, onEdit: () -> Unit) {
     val colors = HabitaTheme.colors
     Column(modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Overline(section.group.name, Modifier.weight(1f))
             HText("${section.done} of ${section.tasks.size}", HabitaTheme.typography.caption, color = colors.muted)
+            Gap(Space.item)
+            // Opens the edit list at this section, so a long routine needs no scrolling back up.
+            TextAction("Edit", onEdit, Modifier.heightIn(min = 40.dp))
         }
         Gap(Space.inside)
         if (section.tasks.isEmpty()) {

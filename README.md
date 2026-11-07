@@ -121,8 +121,9 @@ under the backup button does the same at any time.
 
 The routine is one list of sections, each Fixed or Adjustable, shown every day in the order it's
 written. Ticks stay until you tap Reset on the progress card, which asks once and then unticks
-everything, on every device. The page itself only has the checkboxes and Reset. Edit opens
-the list with a handle on every task and section: drag a task anywhere, into another section too,
+everything, on every device. The page itself only has the checkboxes and Reset. Edit, at the top
+or on any section's header, opens the list (at that section) with a handle on every task and
+section: drag a task anywhere, into another section too,
 and drag a section's header to move the whole section. Tap a task to rename it or a header to
 switch it between Fixed and Adjustable; the bins and the add buttons live there too. A routine
 from before sections (Morning, Office, Evening, Night, with Office on weekdays only) is turned
