@@ -4,7 +4,11 @@ import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import dev.habita.app.feature.routine.db.RoutineDatabase
 import dev.habita.app.shared.api.SyncCollections
 import kotlin.test.Test
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class RoutineSyncTest {
     private fun database() = RoutineDatabase(JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).also { RoutineDatabase.Schema.create(it) })
@@ -68,5 +72,17 @@ class RoutineSyncTest {
         receiver.table(SyncCollections.ROUTINE_SETTINGS).applyRemote(listOf(record))
 
         assertEquals(round, Period.decode(receiver.routineValueQueries.byKey("period").executeAsOne().value_))
+    }
+
+    @Test
+    fun `a task with fields from a newer app waits for an update instead of losing them`() {
+        val sender = database()
+        sender.routineTaskQueries.save("t1", "fixed-1", "Clean shoes", 0, 2, 0, 1_000, 1)
+        val record = sender.table(SyncCollections.ROUTINE_TASKS).dirty().single()
+        val newer = record.copy(data = JsonObject(record.data + ("note" to JsonPrimitive("x"))))
+        val table = database().table(SyncCollections.ROUTINE_TASKS)
+
+        assertTrue(table.canRead(record))
+        assertFalse(table.canRead(newer))
     }
 }
