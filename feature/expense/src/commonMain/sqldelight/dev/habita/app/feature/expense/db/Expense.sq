@@ -38,22 +38,13 @@ SELECT * FROM expense
 WHERE amount_paise = ? AND paid_at BETWEEN ? AND ? AND (deleted = 0 OR source = 'SMS')
 LIMIT 1;
 
--- A payment in one category.
+-- A payment, split or not: parts is null for one in a single category.
 save:
-INSERT OR REPLACE INTO expense (id, amount_paise, description, payee, category_id, mode, source, sms_ref, paid_at, updated_at, deleted, dirty)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1);
-
--- A payment that may be split.
-saveWithParts:
 INSERT OR REPLACE INTO expense VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?);
 
 -- Sorting the whole payment into one category ends any split.
 setCategory:
 UPDATE expense SET category_id = ?, parts = NULL, updated_at = ?, dirty = 1 WHERE id = ?;
-
--- Splits a payment: category_id is the biggest part's, for screens that show one category.
-setParts:
-UPDATE expense SET parts = ?, category_id = ?, updated_at = ?, dirty = 1 WHERE id = ?;
 
 -- An unsplit payment of exactly this amount in the window, newest first, for an order whose
 -- bank SMS came before it was logged.
@@ -70,10 +61,11 @@ restore:
 UPDATE expense SET deleted = 0, updated_at = ?, dirty = 1 WHERE id = ?;
 
 -- The category of the payee's most recently sorted payment, from any device, so a new phone
--- sorts repeat payees on its own as well.
+-- sorts repeat payees on its own as well. A split, such as a grocery order with a kettle in it,
+-- says nothing about the payee's usual category, so it is left out.
 lastCategoryForPayee:
 SELECT category_id FROM expense
-WHERE payee = ? AND category_id IS NOT NULL AND deleted = 0
+WHERE payee = ? AND category_id IS NOT NULL AND parts IS NULL AND deleted = 0
 ORDER BY updated_at DESC
 LIMIT 1;
 
@@ -83,10 +75,6 @@ SELECT MIN(paid_at) FROM expense WHERE deleted = 0;
 
 -- A payment from the server, already synced.
 saveSynced:
-INSERT OR REPLACE INTO expense (id, amount_paise, description, payee, category_id, mode, source, sms_ref, paid_at, updated_at, deleted, dirty)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);
-
-saveSyncedWithParts:
 INSERT OR REPLACE INTO expense VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?);
 
 selectDirty:

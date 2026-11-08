@@ -27,6 +27,7 @@ class ExpenseRepository(core: Core) {
     private val categoryQueries = database.categoryQueries
     private val rules = database.payeeRuleQueries
     private val values = database.expenseValueQueries
+    private val syncTables = expenseSyncTables(database)
 
     init {
         // A new install starts with the default categories, so the screen is useful from the first
@@ -42,7 +43,10 @@ class ExpenseRepository(core: Core) {
                 categoryQueries.save(Defaults.HOUSEHOLD_ID, "Household", 0, categoryQueries.nextPosition().executeAsOne(), 0, 0, 0)
             }
         }
-        expenseSyncTables(database).forEach(sync::register)
+        syncTables.forEach(sync::register)
+        // Orders that expired while the app was closed go now. Sync checks again whenever
+        // payments or orders come in from another device (see ExpenseSync).
+        settlePendingOrders(database, nowMillis())
     }
 
     val categories: Flow<List<Category>> =
@@ -150,18 +154,6 @@ class ExpenseRepository(core: Core) {
         }
     }
 
-    /** Splits a payment into [parts], or makes it whole again when [parts] is empty. */
-    suspend fun setParts(expenseId: String, parts: List<ExpensePart>) = change {
-        database.transaction {
-            if (parts.isEmpty()) {
-                val current = expenses.byId(expenseId, ::toExpense).executeAsOneOrNull() ?: return@transaction
-                expenses.setCategory(current.categoryId, nowMillis(), expenseId)
-            } else {
-                expenses.setParts(encodeParts(parts), mainCategory(parts), nowMillis(), expenseId)
-            }
-        }
-    }
-
     /**
      * Logs a paid order, such as groceries, split by category. Paid from a wallet or in cash,
      * there's no bank SMS, so it is saved now. Otherwise its bank payment is split: one already in
@@ -195,6 +187,12 @@ class ExpenseRepository(core: Core) {
             }
         }.also { sync.request() }
     }
+
+    /** This repository's sync table for [collection], for tests. */
+    internal fun syncTable(collection: String) = syncTables.single { it.collection == collection }
+
+    /** Splits payments already in for waiting orders and drops expired ones; see [settlePendingOrders]. */
+    internal fun settlePendingOrders(now: Long): Boolean = settlePendingOrders(database, now)
 
     /** The order waiting for a bank payment of [amountPaise] at [at], taken off the list. */
     private fun takePendingOrder(amountPaise: Long, at: Long): PaidOrder? {
@@ -254,22 +252,7 @@ class ExpenseRepository(core: Core) {
         }
     }
 
-    private fun write(expense: Expense) {
-        expenses.saveWithParts(
-            expense.id,
-            expense.amountPaise,
-            expense.description,
-            expense.payee,
-            expense.categoryId,
-            expense.mode.name,
-            expense.source.name,
-            expense.smsRef,
-            expense.paidAt,
-            nowMillis(),
-            0,
-            encodeParts(expense.parts),
-        )
-    }
+    private fun write(expense: Expense) = writeExpense(database, expense)
 
     private fun remember(expense: Expense) {
         // A split, such as one grocery order, says nothing about the payee's usual category.
@@ -287,7 +270,7 @@ class ExpenseRepository(core: Core) {
         sync.request()
     }
 
-    private companion object {
+    internal companion object {
         const val INCOME = "income_paise"
         const val PAY_DAY = "pay_day"
 
@@ -302,6 +285,9 @@ class ExpenseRepository(core: Core) {
 
         /** How long after an order is logged its bank SMS may still come. */
         const val SMS_DELAY = 60 * 60 * 1000L
+
+        /** After this many days a waiting order is dropped: its payment isn't coming. */
+        const val PENDING_DAYS = 7
 
         fun toCategory(
             id: String,
@@ -340,4 +326,48 @@ class ExpenseRepository(core: Core) {
             parts = decodeParts(parts),
         )
     }
+}
+
+/** Saves a payment as a local edit: dirty, so it syncs. */
+internal fun writeExpense(database: ExpenseDatabase, expense: Expense) {
+    database.expenseQueries.save(
+        expense.id,
+        expense.amountPaise,
+        expense.description,
+        expense.payee,
+        expense.categoryId,
+        expense.mode.name,
+        expense.source.name,
+        expense.smsRef,
+        expense.paidAt,
+        nowMillis(),
+        0,
+        encodeParts(expense.parts),
+    )
+}
+
+/**
+ * Orders waiting for their bank payment also match one that came in some other way than a new
+ * SMS, such as by sync from the phone that read it. Each waiting order splits an unsplit payment
+ * of its amount within a day of it; orders waiting longer than a week are dropped, since their
+ * payment isn't coming. Runs in one transaction with whatever called it. Returns whether anything
+ * changed.
+ */
+internal fun settlePendingOrders(database: ExpenseDatabase, now: Long): Boolean = database.transactionWithResult {
+    val values = database.expenseValueQueries
+    var changed = false
+    values.withPrefix(ExpenseRepository.ORDER_PREFIX + "%").executeAsList().forEach { row ->
+        val order = runCatching { PendingJson.decodeFromString(PaidOrder.serializer(), row.value_) }.getOrNull()
+        val window = ExpenseRepository.ORDER_WINDOW
+        val payment = order?.let {
+            database.expenseQueries.unsplitNear(it.amountPaise, it.at - window, it.at + window, ExpenseRepository::toExpense).executeAsOneOrNull()
+        }
+        when {
+            order != null && payment != null -> writeExpense(database, payment.withOrder(order))
+            order != null && now - order.at < ExpenseRepository.PENDING_DAYS * window -> return@forEach
+        }
+        values.save(row.key, "", now, 1)
+        changed = true
+    }
+    changed
 }

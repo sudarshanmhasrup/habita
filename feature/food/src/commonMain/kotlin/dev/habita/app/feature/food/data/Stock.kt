@@ -42,8 +42,9 @@ data class ItemStock(
 /**
  * The pantry, worked out from the plan and what happened since: the plan eats its daily amount
  * every day, so nothing has to be logged meal by meal. Each item starts from its latest count
- * (or, never counted, from its first purchase), adds what came in after, and takes off a day's use
- * for each day since. A purchase on the day of a count that came before it is added too.
+ * (or, never counted, from its first event) and walks forward day by day: a day's use comes off
+ * for each day passed, never below nothing, so days with an empty pantry don't eat into the next
+ * purchase. A purchase on the day of a count that came before it is added too.
  */
 object Pantry {
     fun of(plan: FoodPlan, events: List<StockEvent>, today: Int): List<ItemStock> {
@@ -53,11 +54,14 @@ object Pantry {
             val list = byItem[item.id].orEmpty().sortedWith(compareBy({ it.day }, { it.at }))
             val count = list.lastOrNull { it.kind == StockEvent.Kind.COUNT }
             val since = if (count != null) list.dropWhile { it !== count }.drop(1) else list
-            val start = count ?: since.firstOrNull()
-            val left = start?.let {
-                val added = since.filter { it.kind == StockEvent.Kind.ADD }.sumOf { event -> event.quantity }
-                val days = max(0, today - it.day)
-                max(0.0, (count?.quantity ?: 0.0) + added - use * days)
+            val left = (count ?: since.firstOrNull())?.let { start ->
+                var amount = count?.quantity ?: 0.0
+                var day = start.day
+                since.filter { it.kind == StockEvent.Kind.ADD }.forEach { event ->
+                    amount = max(0.0, amount - use * max(0, event.day - day)) + event.quantity
+                    day = max(day, event.day)
+                }
+                max(0.0, amount - use * max(0, today - day))
             }
             val daysLeft = if (left != null && use > 0) floor(left / use).toInt() else null
             val bought = list.lastOrNull { it.kind == StockEvent.Kind.ADD && it.pricePaise != null }
