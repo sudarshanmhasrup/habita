@@ -53,6 +53,12 @@
             android:name="dev.habita.app.feature.gym.android.WaistReminderReceiver"
             android:exported="false" />
         <receiver
+            android:name="dev.habita.app.feature.food.android.RefillReminderReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="dev.habita.app.feature.food.android.RefillSnoozeReceiver"
+            android:exported="false" />
+        <receiver
             android:name="dev.habita.app.feature.gym.android.ReminderRestoreReceiver"
             android:exported="false">
             <intent-filter>

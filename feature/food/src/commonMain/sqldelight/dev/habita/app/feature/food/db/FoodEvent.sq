@@ -1,0 +1,42 @@
+-- What happened to the stock of one pantry item, so how much is left can be worked out from the
+-- plan: a count of what's left ("count", quantity is the amount left), or something added
+-- ("add": a purchase, or a skipped meal's ingredients coming back). Quantities are in the item's
+-- unit (g, ml or pieces); day is the local day (days since 1970-01-01). A purchase carries its
+-- price and shop. Removed events are kept, deleted, so the removal syncs.
+CREATE TABLE food_event (
+    id TEXT NOT NULL PRIMARY KEY,
+    item_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    quantity REAL NOT NULL,
+    day INTEGER NOT NULL,
+    at INTEGER NOT NULL,
+    price_paise INTEGER,
+    shop TEXT,
+    note TEXT NOT NULL DEFAULT '',
+    deleted INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL,
+    dirty INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX food_event_item ON food_event(item_id);
+
+active:
+SELECT * FROM food_event WHERE deleted = 0 ORDER BY day, at;
+
+byId:
+SELECT * FROM food_event WHERE id = ?;
+
+save:
+INSERT OR REPLACE INTO food_event VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+remove:
+UPDATE food_event SET deleted = 1, updated_at = ?, dirty = 1 WHERE id = ?;
+
+selectDirty:
+SELECT * FROM food_event WHERE dirty = 1;
+
+markClean:
+UPDATE food_event SET dirty = 0 WHERE id = ? AND updated_at = ?;
+
+markAllDirty:
+UPDATE food_event SET dirty = 1;

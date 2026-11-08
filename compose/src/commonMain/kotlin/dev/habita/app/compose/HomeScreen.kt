@@ -45,6 +45,7 @@ import dev.habita.app.core.ui.appear
 import dev.habita.app.feature.expense.ExpenseToday
 import dev.habita.app.feature.expense.data.formatRupees
 import dev.habita.app.feature.gym.GymToday
+import dev.habita.app.feature.food.FoodToday
 import dev.habita.app.feature.routine.RoutineToday
 
 /**
@@ -62,6 +63,7 @@ internal fun HomeScreen(
     gym: GymToday?,
     expense: ExpenseToday?,
     routine: RoutineToday?,
+    food: FoodToday?,
     update: UpdateState,
     onInstallUpdate: () -> Unit,
     onDarkTheme: (Boolean) -> Unit,
@@ -69,6 +71,8 @@ internal fun HomeScreen(
     onStartWorkout: (workoutId: String) -> Unit,
     onOpenGym: () -> Unit,
     onOpenRoutine: () -> Unit,
+    onOpenFood: () -> Unit,
+    onFoodRefill: () -> Unit,
     onRoutineDone: (taskId: String) -> Unit,
     onOpenExpense: () -> Unit,
     onAddExpense: () -> Unit,
@@ -112,6 +116,8 @@ internal fun HomeScreen(
                     RoutineCard(routine, onOpenRoutine, onRoutineDone, Modifier.appear(1))
                     Gap(Space.item)
                 }
+                FoodCard(food, onOpenFood, onFoodRefill, Modifier.appear(2))
+                Gap(Space.item)
                 if (gym != null) {
                     GymCard(gym, onStartWorkout, onOpenGym, Modifier.appear(2))
                     Gap(Space.item)
@@ -166,6 +172,46 @@ private fun UpdateCard(update: UpdateState, onInstall: () -> Unit, modifier: Mod
             is UpdateState.Downloading -> ProgressBar(update.progress, height = 6.dp)
             is UpdateState.Installing -> Unit
             else -> PrimaryButton(if (update is UpdateState.Failed) "Try again" else "Install", onInstall, Modifier.fillMaxWidth())
+        }
+    }
+}
+
+/**
+ * Food: the next meal and the day's protein, and the refill question while it stands. Before
+ * there's a plan, a nudge to add one.
+ */
+@Composable
+private fun FoodCard(food: FoodToday?, onOpen: () -> Unit, onRefill: () -> Unit, modifier: Modifier) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
+    HabitaCard(modifier.fillMaxWidth(), onClick = onOpen) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Overline(food?.nextMealTime?.let { "Food · $it" } ?: "Food", Modifier.weight(1f), color = colors.accent)
+            if (food != null) HText("${food.proteinGrams} g protein a day", type.caption, color = colors.muted)
+        }
+        Gap(Space.inside)
+        HText(food?.nextMeal ?: "Add your meal plan", type.headline)
+        Gap(2.dp)
+        HText(
+            when {
+                food == null -> "Recipes for every meal, a pantry that counts itself, and refills that ask first."
+                food.nextMealProtein != null -> "Up next · ${food.nextMealProtein} g protein"
+                else -> "Up next"
+            },
+            type.body,
+            color = colors.muted,
+        )
+        val question = food?.refillQuestion
+        Gap(Space.card)
+        if (question != null) {
+            HText(question, type.label)
+            Gap(Space.item)
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.inside)) {
+                SecondaryButton("Meals", onOpen, Modifier.weight(1f))
+                PrimaryButton("Refill", onRefill, Modifier.weight(1f))
+            }
+        } else {
+            SecondaryButton(if (food == null) "Set it up" else "See the recipe", onOpen, Modifier.fillMaxWidth())
         }
     }
 }

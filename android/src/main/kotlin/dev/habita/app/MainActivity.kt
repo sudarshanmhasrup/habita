@@ -10,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dev.habita.app.compose.ComposeApp
 import dev.habita.app.feature.expense.android.OPEN_EXPENSE_EXTRA
+import dev.habita.app.feature.food.android.OPEN_REFILL_EXTRA
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,8 +29,13 @@ class MainActivity : ComponentActivity() {
         openFromNotification(intent)
     }
 
-    /** Opened from a payment notification: show that payment. */
+    /** Opened from a notification: show that payment, or the refill. */
     private fun openFromNotification(intent: Intent?) {
+        if (intent?.getBooleanExtra(OPEN_REFILL_EXTRA, false) == true) {
+            intent.removeExtra(OPEN_REFILL_EXTRA)
+            (application as HabitaApplication).app.food.requestOpen(refill = true)
+            return
+        }
         val expenseId = intent?.getStringExtra(OPEN_EXPENSE_EXTRA) ?: return
         intent.removeExtra(OPEN_EXPENSE_EXTRA)
         (application as HabitaApplication).app.expense.requestOpen(expenseId)
