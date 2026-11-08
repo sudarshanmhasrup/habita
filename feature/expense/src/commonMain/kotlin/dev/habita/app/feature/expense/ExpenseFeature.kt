@@ -8,6 +8,12 @@ import dev.habita.app.feature.expense.data.SmsOutcome
 import dev.habita.app.feature.expense.data.formatRupees
 import dev.habita.app.feature.expense.data.monthLabel
 import dev.habita.app.feature.expense.data.periodStart
+import dev.habita.app.feature.expense.data.CategorySpend
+import dev.habita.app.feature.expense.data.Defaults
+import dev.habita.app.feature.expense.data.ExpensePart
+import dev.habita.app.feature.expense.data.OrderOutcome
+import dev.habita.app.feature.expense.data.PaidOrder
+import dev.habita.app.feature.expense.ui.splitLabel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,10 +77,40 @@ class ExpenseFeature(core: Core) {
                 leftPaise = summary.leftPaise,
                 toSort = summary.unsorted.size,
                 recent = summary.expenses.sortedByDescending { it.paidAt }.take(3).map {
-                    RecentPayment(it.description, it.categoryId?.let(names::get) ?: "To sort", it.amountPaise)
+                    RecentPayment(it.description, splitLabel(it, names) ?: it.categoryId?.let(names::get) ?: "To sort", it.amountPaise)
                 },
             )
         }
+
+    /**
+     * Logs a paid order split by category, such as groceries with a kettle in them. Each part
+     * names its category ("Food", "Household"); an unknown name goes to Other. Parts in the same
+     * category are joined. Paid by bank (UPI, card), the bank SMS payment is split, whether it is
+     * already in or still to come; from a wallet or in cash, it is saved now.
+     */
+    suspend fun recordOrder(description: String, at: Long, parts: List<OrderPart>, paidBy: PaidBy): OrderOutcome {
+        val categories = repository.categories.first().filter { !it.archived }
+        fun idOf(name: String): String = categories.firstOrNull { it.name.equals(name.trim(), ignoreCase = true) || it.id == name.trim().lowercase() }?.id
+            ?: Defaults.OTHER_ID
+        val split = parts.groupBy { idOf(it.category) }.map { (id, list) ->
+            ExpensePart(id, list.sumOf { it.amountPaise }, list.map { it.note }.filter { it.isNotBlank() }.joinToString(", "))
+        }
+        val order = PaidOrder(
+            description = description,
+            amountPaise = parts.sumOf { it.amountPaise },
+            at = at,
+            parts = split,
+            bankSms = paidBy == PaidBy.BANK,
+            cash = paidBy == PaidBy.CASH,
+        )
+        return repository.recordOrder(order)
+    }
+
+    /** What went to [categoryId] this budget month against its limit, such as Food. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun spend(categoryId: String): Flow<CategorySpend?> = repository.thisMonth
+        .flatMapLatest { repository.summary(it) }
+        .map { summary -> summary.categories.firstOrNull { it.category.id == categoryId } }
 
     /** Shows the expense screen next time the app is in front, on [expenseId] when it's set. */
     fun requestOpen(expenseId: String?) {
@@ -113,5 +149,11 @@ data class ExpenseToday(
     val toSort: Int,
     val recent: List<RecentPayment>,
 )
+
+/** One part of an order: how much went to which category, and what it was. */
+data class OrderPart(val category: String, val amountPaise: Long, val note: String = "")
+
+/** How an order was paid: by bank (an SMS comes), from an app wallet, or in cash. */
+enum class PaidBy { BANK, WALLET, CASH }
 
 data class RecentPayment(val description: String, val category: String, val amountPaise: Long)

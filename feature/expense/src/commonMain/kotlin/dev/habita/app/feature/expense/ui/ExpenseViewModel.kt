@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.habita.app.core.data.newId
 import dev.habita.app.core.data.nowMillis
 import dev.habita.app.feature.expense.data.Expense
+import dev.habita.app.feature.expense.data.ExpensePart
 import dev.habita.app.feature.expense.data.ExpenseRepository
 import dev.habita.app.feature.expense.data.ExpenseSource
 import dev.habita.app.feature.expense.data.MonthSummary
@@ -13,6 +14,8 @@ import dev.habita.app.feature.expense.data.SmsOutcome
 import dev.habita.app.feature.expense.data.YearMonth
 import dev.habita.app.feature.expense.data.MAX_PAY_DAY
 import dev.habita.app.feature.expense.data.periodOf
+import dev.habita.app.feature.expense.data.mainCategory
+import dev.habita.app.feature.expense.data.parseRupees
 import dev.habita.app.feature.expense.data.nextOwnBudget
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -60,7 +63,18 @@ internal data class ExpenseDraft(
     val mode: PaymentMode = PaymentMode.ONLINE,
     val paidAt: Long = nowMillis(),
     val original: Expense? = null,
-)
+    /** Parts of a split payment; empty for one in a single category. */
+    val parts: List<PartDraft> = emptyList(),
+) {
+    /** The parts as saved, or `null` while one has no category or amount. */
+    fun savedParts(): List<ExpensePart>? = parts.map { part ->
+        val amount = parseRupees(part.amountText) ?: return null
+        ExpensePart(part.categoryId ?: return null, amount, part.note.trim())
+    }
+}
+
+/** One part of a split in the form. */
+internal data class PartDraft(val categoryId: String? = null, val amountText: String = "", val note: String = "")
 
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class ExpenseViewModel(private val repository: ExpenseRepository) : ViewModel() {
@@ -138,6 +152,7 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
                     mode = existing.mode,
                     paidAt = existing.paidAt,
                     original = existing,
+                    parts = existing.parts.map { PartDraft(it.categoryId, amountText(it.amountPaise), it.note) },
                 )
             }
             _route.value = ExpenseRoute.Edit(existing?.id)
@@ -151,16 +166,18 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
     fun saveDraft(amountPaise: Long) {
         val draft = _draft.value ?: return
         val original = draft.original
+        val parts = draft.savedParts() ?: return
         val expense = Expense(
             id = draft.id ?: newId(),
             amountPaise = amountPaise,
             description = draft.description.trim().ifEmpty { "Payment" },
             payee = original?.payee,
-            categoryId = draft.categoryId,
+            categoryId = if (parts.isEmpty()) draft.categoryId else mainCategory(parts),
             mode = draft.mode,
             source = original?.source ?: ExpenseSource.MANUAL,
             smsRef = original?.smsRef,
             paidAt = draft.paidAt,
+            parts = parts,
         )
         viewModelScope.launch {
             repository.save(expense)

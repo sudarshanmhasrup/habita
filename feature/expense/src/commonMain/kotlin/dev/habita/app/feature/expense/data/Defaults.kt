@@ -10,6 +10,9 @@ internal object Defaults {
 
     const val OTHER_ID = "other"
 
+    /** One-time things for the home, such as a kettle or bowls, kept out of Food. */
+    const val HOUSEHOLD_ID = "household"
+
     val categories: List<Category> = listOf(
         "home-transfer" to "Home transfer",
         "rent" to "Rent",
@@ -21,6 +24,7 @@ internal object Defaults {
         "recharge" to "Recharge & subscriptions",
         "workstation" to "Workstation",
         "commute" to "Commute",
+        HOUSEHOLD_ID to "Household",
         OTHER_ID to "Other",
     ).mapIndexed { index, (id, name) -> Category(id, name, 0L, index) }
 }

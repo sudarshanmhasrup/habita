@@ -29,6 +29,8 @@ internal data class ExpenseData(
     val source: String,
     val smsRef: String? = null,
     val paidAt: Long,
+    /** A split payment's parts; left out for one in a single category, as before splits. */
+    val parts: List<ExpensePart>? = null,
 )
 
 @Serializable
@@ -78,9 +80,9 @@ private class ExpenseTable(private val database: ExpenseDatabase) : LocalSyncTab
     override fun applyRemote(records: List<SyncRecord>) = database.transaction {
         records.forEach { record ->
             val data = decode(ExpenseData.serializer(), record) ?: return@forEach
-            queries.saveSynced(
+            queries.saveSyncedWithParts(
                 record.id, data.amountPaise, data.description, data.payee, data.categoryId, data.mode, data.source,
-                data.smsRef, data.paidAt, record.updatedAt, if (record.deleted) 1L else 0L,
+                data.smsRef, data.paidAt, record.updatedAt, if (record.deleted) 1L else 0L, encodeParts(data.parts.orEmpty()),
             )
         }
     }
@@ -91,7 +93,7 @@ private class ExpenseTable(private val database: ExpenseDatabase) : LocalSyncTab
 
     private fun ExpenseRow.toRecord() = encode(
         ExpenseData.serializer(),
-        ExpenseData(amount_paise, description, payee, category_id, mode, source, sms_ref, paid_at),
+        ExpenseData(amount_paise, description, payee, category_id, mode, source, sms_ref, paid_at, decodeParts(parts).ifEmpty { null }),
         id,
         updated_at,
         deleted == 1L,

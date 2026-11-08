@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -77,6 +78,8 @@ internal fun EditExpenseScreen(
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     val amount = parseRupees(draft.amountText)
+    // A split saves only when every part is filled in and they add up to the amount.
+    val partsOk = draft.parts.isEmpty() || draft.savedParts()?.sumOf { it.amountPaise } == amount
     val fromSms = draft.original?.source == ExpenseSource.SMS
     var confirmDelete by remember(draft.id) { mutableStateOf(false) }
     // A new payment starts with the keyboard up on the amount.
@@ -112,14 +115,20 @@ internal fun EditExpenseScreen(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             )
             Gap(Space.section)
-            Overline("Category")
-            Gap(Space.item)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.inside), verticalArrangement = Arrangement.spacedBy(Space.inside)) {
-                categories.forEach { category ->
-                    SmallPill(category.name, selected = category.id == draft.categoryId) {
-                        onChange { it.copy(categoryId = category.id) }
-                    }
+            if (draft.parts.isEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Overline("Category", Modifier.weight(1f))
+                    // A grocery order with a kettle in it: each part in its own category.
+                    TextAction("Split", {
+                        onChange {
+                            it.copy(parts = listOf(PartDraft(it.categoryId, it.amountText), PartDraft()))
+                        }
+                    })
                 }
+                Gap(Space.item)
+                CategoryPills(categories, draft.categoryId) { id -> onChange { it.copy(categoryId = id) } }
+            } else {
+                SplitParts(draft, categories, amount, onChange)
             }
             Gap(Space.section)
             Overline("Paid by")
@@ -145,11 +154,84 @@ internal fun EditExpenseScreen(
             Gap(Space.card)
         }
         PrimaryButton(
-            text = if (amount == null) "Enter an amount" else "Save",
+            text = when {
+                amount == null -> "Enter an amount"
+                !partsOk -> "Parts must add up"
+                else -> "Save"
+            },
             onClick = { amount?.let(onSave) },
-            enabled = amount != null,
+            enabled = amount != null && partsOk,
             modifier = Modifier.fillMaxWidth().padding(horizontal = Space.screen, vertical = Space.item),
         )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CategoryPills(categories: List<Category>, selected: String?, onSelect: (String) -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.inside), verticalArrangement = Arrangement.spacedBy(Space.inside)) {
+        categories.forEach { category ->
+            SmallPill(category.name, selected = category.id == selected) { onSelect(category.id) }
+        }
+    }
+}
+
+/**
+ * A split payment's parts, each with an amount, what it was and a category, and what they add up
+ * to against the payment. "One category" goes back to an unsplit payment.
+ */
+@Composable
+private fun ColumnScope.SplitParts(
+    draft: ExpenseDraft,
+    categories: List<Category>,
+    amount: Long?,
+    onChange: ((ExpenseDraft) -> ExpenseDraft) -> Unit,
+) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
+    fun update(index: Int, change: (PartDraft) -> PartDraft) = onChange { draft ->
+        draft.copy(parts = draft.parts.mapIndexed { i, part -> if (i == index) change(part) else part })
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Overline("Split", Modifier.weight(1f))
+        TextAction("One category", {
+            onChange { it.copy(parts = emptyList(), categoryId = it.parts.firstOrNull()?.categoryId ?: it.categoryId) }
+        })
+    }
+    draft.parts.forEachIndexed { index, part ->
+        Gap(Space.item)
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.item)) {
+            LabeledField(
+                label = "Part ${index + 1} (₹)",
+                value = part.amountText,
+                onValueChange = { text -> update(index) { it.copy(amountText = text.filter { c -> c.isDigit() || c == '.' }) } },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+                modifier = Modifier.weight(1f),
+            )
+            LabeledField(
+                label = "What",
+                value = part.note,
+                onValueChange = { text -> update(index) { it.copy(note = text) } },
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                modifier = Modifier.weight(1.4f),
+            )
+        }
+        Gap(Space.inside)
+        CategoryPills(categories, part.categoryId) { id -> update(index) { it.copy(categoryId = id) } }
+        if (draft.parts.size > 2) {
+            TextAction("Remove part ${index + 1}", { onChange { it.copy(parts = it.parts.filterIndexed { i, _ -> i != index }) } }, color = colors.muted)
+        }
+    }
+    Gap(Space.item)
+    val total = draft.parts.sumOf { parseRupees(it.amountText) ?: 0L }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        HText(
+            "Parts ₹${amountText(total)} of ₹${amount?.let(::amountText) ?: "0"}",
+            type.caption,
+            color = if (amount != null && total == amount) colors.muted else colors.error,
+            modifier = Modifier.weight(1f),
+        )
+        TextAction("Add part", { onChange { it.copy(parts = it.parts + PartDraft()) } })
     }
 }
 

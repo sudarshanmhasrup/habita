@@ -1,0 +1,3 @@
+-- Version 3: a payment can be split into parts, each in its own category, such as a grocery order
+-- with a kettle in it. parts is JSON; null for a payment in one category.
+ALTER TABLE expense ADD COLUMN parts TEXT;
