@@ -36,6 +36,11 @@ class ExpenseRepository(core: Core) {
                 Defaults.categories.forEach { categoryQueries.save(it.id, it.name, it.limitPaise, it.position.toLong(), 0, 0, 0) }
             }
             if (values.select(INCOME).executeAsOneOrNull() == null) values.save(INCOME, Defaults.INCOME_PAISE.toString(), 0, 0)
+            // Household came later: installs from before get it at the end, unedited, so a synced
+            // one from another device wins.
+            if (categoryQueries.byId(Defaults.HOUSEHOLD_ID).executeAsOneOrNull() == null) {
+                categoryQueries.save(Defaults.HOUSEHOLD_ID, "Household", 0, categoryQueries.nextPosition().executeAsOne(), 0, 0, 0)
+            }
         }
         expenseSyncTables(database).forEach(sync::register)
     }
@@ -121,8 +126,11 @@ class ExpenseRepository(core: Core) {
                 smsRef = debit.reference,
                 paidAt = receivedAt,
             )
-            write(expense)
-            SmsOutcome.Recorded(expense, category)
+            // An order logged before its bank SMS came: the payment takes the order's split.
+            val order = takePendingOrder(debit.amountPaise, receivedAt)
+            val saved = if (order != null) expense.withOrder(order) else expense
+            write(saved)
+            SmsOutcome.Recorded(saved, if (order != null) null else category)
         }.also { if (it is SmsOutcome.Recorded) sync.request() }
     }
 
@@ -140,6 +148,62 @@ class ExpenseRepository(core: Core) {
             expenses.setCategory(categoryId, nowMillis(), expenseId)
             expenses.byId(expenseId, ::toExpense).executeAsOneOrNull()?.let(::remember)
         }
+    }
+
+    /** Splits a payment into [parts], or makes it whole again when [parts] is empty. */
+    suspend fun setParts(expenseId: String, parts: List<ExpensePart>) = change {
+        database.transaction {
+            if (parts.isEmpty()) {
+                val current = expenses.byId(expenseId, ::toExpense).executeAsOneOrNull() ?: return@transaction
+                expenses.setCategory(current.categoryId, nowMillis(), expenseId)
+            } else {
+                expenses.setParts(encodeParts(parts), mainCategory(parts), nowMillis(), expenseId)
+            }
+        }
+    }
+
+    /**
+     * Logs a paid order, such as groceries, split by category. Paid from a wallet or in cash,
+     * there's no bank SMS, so it is saved now. Otherwise its bank payment is split: one already in
+     * from up to a day before, or the next to come in within a day.
+     */
+    suspend fun recordOrder(order: PaidOrder): OrderOutcome = io {
+        database.transactionWithResult {
+            if (!order.bankSms) {
+                val expense = Expense(
+                    id = newId(),
+                    amountPaise = order.amountPaise,
+                    description = order.description,
+                    payee = null,
+                    categoryId = null,
+                    mode = if (order.cash) PaymentMode.CASH else PaymentMode.ONLINE,
+                    source = ExpenseSource.MANUAL,
+                    smsRef = null,
+                    paidAt = order.at,
+                ).withOrder(order)
+                write(expense)
+                return@transactionWithResult OrderOutcome.Added(expense)
+            }
+            val payment = expenses.unsplitNear(order.amountPaise, order.at - ORDER_WINDOW, order.at + SMS_DELAY, ::toExpense)
+                .executeAsOneOrNull()
+            if (payment != null) {
+                write(payment.withOrder(order))
+                OrderOutcome.Matched(payment)
+            } else {
+                values.save(ORDER_PREFIX + newId(), PendingJson.encodeToString(PaidOrder.serializer(), order), nowMillis(), 1)
+                OrderOutcome.Waiting
+            }
+        }.also { sync.request() }
+    }
+
+    /** The order waiting for a bank payment of [amountPaise] at [at], taken off the list. */
+    private fun takePendingOrder(amountPaise: Long, at: Long): PaidOrder? {
+        val match = values.withPrefix(ORDER_PREFIX + "%").executeAsList().firstNotNullOfOrNull { row ->
+            val order = runCatching { PendingJson.decodeFromString(PaidOrder.serializer(), row.value_) }.getOrNull()
+            order?.takeIf { it.amountPaise == amountPaise && at in it.at - SMS_DELAY..it.at + ORDER_WINDOW }?.let { row.key to it }
+        } ?: return null
+        values.save(match.first, "", nowMillis(), 1)
+        return match.second
     }
 
     suspend fun delete(expenseId: String) = change { expenses.remove(nowMillis(), expenseId) }
@@ -191,7 +255,7 @@ class ExpenseRepository(core: Core) {
     }
 
     private fun write(expense: Expense) {
-        expenses.save(
+        expenses.saveWithParts(
             expense.id,
             expense.amountPaise,
             expense.description,
@@ -203,10 +267,13 @@ class ExpenseRepository(core: Core) {
             expense.paidAt,
             nowMillis(),
             0,
+            encodeParts(expense.parts),
         )
     }
 
     private fun remember(expense: Expense) {
+        // A split, such as one grocery order, says nothing about the payee's usual category.
+        if (expense.isSplit) return
         val payee = expense.payee ?: return
         val categoryId = expense.categoryId ?: return
         rules.save(BankSms.payeeKey(payee), categoryId)
@@ -226,6 +293,15 @@ class ExpenseRepository(core: Core) {
 
         fun toPayDay(value: String?): Int = value?.toIntOrNull()?.coerceIn(1, MAX_PAY_DAY) ?: 1
         const val DUPLICATE_WINDOW = 2 * 60 * 1000L
+
+        /** Orders waiting for their bank SMS, saved as values so every device knows them. */
+        const val ORDER_PREFIX = "order@"
+
+        /** How far apart an order and its bank payment can be. */
+        const val ORDER_WINDOW = 24 * 60 * 60 * 1000L
+
+        /** How long after an order is logged its bank SMS may still come. */
+        const val SMS_DELAY = 60 * 60 * 1000L
 
         fun toCategory(
             id: String,
@@ -250,6 +326,7 @@ class ExpenseRepository(core: Core) {
             @Suppress("UNUSED_PARAMETER") updatedAt: Long,
             @Suppress("UNUSED_PARAMETER") deleted: Long,
             @Suppress("UNUSED_PARAMETER") dirty: Long,
+            parts: String?,
         ) = Expense(
             id = id,
             amountPaise = amount,
@@ -260,6 +337,7 @@ class ExpenseRepository(core: Core) {
             source = runCatching { ExpenseSource.valueOf(source) }.getOrDefault(ExpenseSource.MANUAL),
             smsRef = smsRef,
             paidAt = paidAt,
+            parts = decodeParts(parts),
         )
     }
 }

@@ -14,6 +14,10 @@ SELECT value FROM expense_value WHERE key = ?;
 budgets:
 SELECT * FROM expense_value WHERE key LIKE 'budget@%';
 
+-- Values whose key starts a certain way, such as orders waiting for their bank SMS ("order@%").
+withPrefix:
+SELECT * FROM expense_value WHERE key LIKE ? AND value != '';
+
 byKey:
 SELECT * FROM expense_value WHERE key = ?;
 

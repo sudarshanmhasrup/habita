@@ -392,7 +392,7 @@ private fun ColumnScope.Payments(summary: MonthSummary, onOpen: (String) -> Unit
         HabitaCard(Modifier.fillMaxWidth().appear(2), contentPadding = PaddingValues(0.dp)) {
             payments.forEachIndexed { index, expense ->
                 if (index > 0) Divider(Modifier.padding(start = Space.card))
-                PaymentRow(expense, expense.categoryId?.let { names[it] }, onOpen)
+                PaymentRow(expense, splitLabel(expense, names) ?: expense.categoryId?.let { names[it] }, onOpen)
             }
         }
         Gap(Space.item)
@@ -424,3 +424,7 @@ private fun PaymentRow(expense: Expense, categoryName: String?, onOpen: (String)
         HText(formatRupees(expense.amountPaise), type.bodyStrong)
     }
 }
+
+/** "Food + Household" for a split payment, `null` for one in a single category. */
+internal fun splitLabel(expense: Expense, names: Map<String, String>): String? =
+    if (expense.isSplit) expense.parts.map { names[it.categoryId] ?: "Other" }.distinct().joinToString(" + ") else null

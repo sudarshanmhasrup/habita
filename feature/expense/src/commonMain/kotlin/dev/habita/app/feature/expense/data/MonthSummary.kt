@@ -35,19 +35,22 @@ data class MonthSummary(
     /** The sum of all limits: what the month was planned to cost. */
     val plannedPaise: Long = categories.sumOf { it.category.limitPaise }
 
-    val unsorted: List<Expense> = expenses.filter { it.categoryId == null }
+    /** Payments not sorted yet. A split payment counts as sorted. */
+    val unsorted: List<Expense> = expenses.filter { !it.isSplit && it.categoryId == null }
 
     companion object {
         /**
-         * Adds up [expenses] by category. Archived categories only show when something was spent
-         * in them; payments in a category that no longer exists count as unsorted.
+         * Adds up [expenses] by category, a split payment part by part. Archived categories only
+         * show when something was spent in them; payments in a category that no longer exists
+         * count as unsorted.
          */
         fun of(month: YearMonth, incomePaise: Long, categories: List<Category>, expenses: List<Expense>, payDay: Int = 1): MonthSummary {
             val known = categories.associateBy { it.id }
-            val cleaned = expenses.map { if (it.categoryId != null && it.categoryId !in known) it.copy(categoryId = null) else it }
-            val byCategory = cleaned.filter { it.categoryId != null }.groupBy { it.categoryId }
+            val cleaned = expenses.map {
+                if (!it.isSplit && it.categoryId != null && it.categoryId !in known) it.copy(categoryId = null) else it
+            }
             val spends = categories
-                .map { CategorySpend(it, byCategory[it.id].orEmpty().sumOf { expense -> expense.amountPaise }) }
+                .map { category -> CategorySpend(category, cleaned.sumOf { expense -> expense.byCategory[category.id] ?: 0L }) }
                 .filter { !it.category.archived || it.spentPaise > 0 }
             return MonthSummary(month, incomePaise, cleaned, spends, payDay)
         }
@@ -99,7 +102,11 @@ fun MonthSummary.toMarkdown(): String = buildString {
     appendLine("| --- | --- | --- | --- | --- | --- |")
     expenses.sortedBy { it.paidAt }.forEachIndexed { index, expense ->
         val description = expense.description.replace("|", "/")
-        val category = expense.categoryId?.let { names[it] } ?: "Not sorted"
+        val category = if (expense.isSplit) {
+            expense.parts.joinToString(" + ") { part -> "${names[part.categoryId] ?: "Other"} ${formatRupees(part.amountPaise, symbol = false)}" }
+        } else {
+            expense.categoryId?.let { names[it] } ?: "Not sorted"
+        }
         append("| ${index + 1} | ${shortDayLabel(expense.paidAt)} | ${formatRupees(expense.amountPaise, symbol = false)} ")
         appendLine("| $description | $category | ${expense.mode.label} |")
     }
