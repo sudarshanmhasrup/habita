@@ -76,6 +76,7 @@ kotlin {
             api(projects.feature.gym)
             api(projects.feature.expense)
             implementation(projects.feature.routine)
+            api(projects.feature.food)
         }
 
         iosMain {

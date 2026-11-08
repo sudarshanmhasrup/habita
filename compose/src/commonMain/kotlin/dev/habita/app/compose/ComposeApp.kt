@@ -15,6 +15,7 @@ import dev.habita.app.core.ui.ScreenTransition
 import dev.habita.app.core.update.UpdateState
 import dev.habita.app.feature.auth.LoginScreen
 import dev.habita.app.feature.expense.ExpenseScreen
+import dev.habita.app.feature.food.FoodScreen
 import dev.habita.app.feature.gym.GymScreen
 import dev.habita.app.feature.routine.RoutineScreen
 import kotlinx.coroutines.delay
@@ -37,6 +38,8 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
     val gymToday by app.gym.today.collectAsStateWithLifecycle(null)
     val expenseToday by app.expense.today.collectAsStateWithLifecycle(null)
     val routineToday by app.routine.today.collectAsStateWithLifecycle(null)
+    val foodToday by app.food.today.collectAsStateWithLifecycle(null)
+    val foodRequest by app.food.openRequest.collectAsStateWithLifecycle()
     val expenseRequest by app.expense.openRequest.collectAsStateWithLifecycle()
     var screen by rememberSaveable { mutableStateOf(Screen.Home) }
     // The greeting and date, checked every minute so an app left open moves on after midnight.
@@ -53,6 +56,8 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
     LaunchedEffect(loggedOut) { if (loggedOut) screen = Screen.Home }
     // A payment notification was tapped: the expense screen takes the request from here.
     LaunchedEffect(expenseRequest) { if (expenseRequest != null) screen = Screen.Expense }
+    // The refill notification was tapped: food takes the request from here.
+    LaunchedEffect(foodRequest) { if (foodRequest != null) screen = Screen.Food }
 
     HabitaTheme(darkTheme, accent) {
         // Home is the root: opening a feature slides forward, leaving it slides back.
@@ -72,6 +77,7 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
                         gym = gymToday,
                         expense = expenseToday,
                         routine = routineToday,
+                        food = foodToday,
                         update = update,
                         onInstallUpdate = { app.updates?.install() },
                         onDarkTheme = settings::setDarkTheme,
@@ -82,6 +88,11 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
                         },
                         onOpenGym = { screen = Screen.Gym },
                         onOpenRoutine = { screen = Screen.Routine },
+                        onOpenFood = { screen = Screen.Food },
+                        onFoodRefill = {
+                            app.food.requestOpen(refill = true)
+                            screen = Screen.Food
+                        },
                         onRoutineDone = { taskId -> scope.launch { app.routine.markDone(taskId) } },
                         onOpenExpense = { screen = Screen.Expense },
                         onAddExpense = {
@@ -93,12 +104,13 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
                 Screen.Gym -> GymScreen(app.gym, onExit = { screen = Screen.Home })
                 Screen.Expense -> ExpenseScreen(app.expense, onExit = { screen = Screen.Home })
                 Screen.Routine -> RoutineScreen(app.routine, onExit = { screen = Screen.Home })
+                Screen.Food -> FoodScreen(app.food, onExit = { screen = Screen.Home })
             }
         }
     }
 }
 
-private enum class Screen { Home, Gym, Expense, Routine }
+private enum class Screen { Home, Gym, Expense, Routine, Food }
 
 /** Platforms without an installer (iOS, desktop) never have an update to show. */
 private val noUpdates: StateFlow<UpdateState> = MutableStateFlow(UpdateState.None)

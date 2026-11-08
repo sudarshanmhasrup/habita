@@ -1,0 +1,26 @@
+-- Single food values that sync, by key: the plan as written ("plan", markdown, see PlanText) and
+-- until which day a refill question waits ("snooze").
+CREATE TABLE food_value (
+    key TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    dirty INTEGER NOT NULL DEFAULT 0
+);
+
+all:
+SELECT * FROM food_value;
+
+byKey:
+SELECT * FROM food_value WHERE key = ?;
+
+save:
+INSERT OR REPLACE INTO food_value (key, value, updated_at, dirty) VALUES (?, ?, ?, ?);
+
+selectDirty:
+SELECT * FROM food_value WHERE dirty = 1;
+
+markClean:
+UPDATE food_value SET dirty = 0 WHERE key = ? AND updated_at = ?;
+
+markAllDirty:
+UPDATE food_value SET dirty = 1;
