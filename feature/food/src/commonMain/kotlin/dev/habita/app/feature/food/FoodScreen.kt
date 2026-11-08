@@ -49,6 +49,7 @@ fun FoodScreen(feature: FoodFeature, onExit: () -> Unit) {
     val copied by viewModel.copied.collectAsStateWithLifecycle()
     val planProblems by viewModel.planProblems.collectAsStateWithLifecycle()
     val orderResult by viewModel.orderResult.collectAsStateWithLifecycle()
+    val logging by viewModel.logging.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val openRequest by feature.openRequest.collectAsStateWithLifecycle()
     val copy = rememberTextCopier()
@@ -127,7 +128,7 @@ fun FoodScreen(feature: FoodFeature, onExit: () -> Unit) {
 
                 FoodRoute.Plan -> PlanScreen(planText, planProblems, onBack = { viewModel.back() }, onSave = viewModel::savePlan)
 
-                FoodRoute.Order -> OrderScreen(orderResult, onBack = { viewModel.back() }, onRead = viewModel::readOrder, onLog = viewModel::logOrder)
+                FoodRoute.Order -> OrderScreen(orderResult, logging, onBack = { viewModel.back() }, onRead = viewModel::readOrder, onLog = viewModel::logOrder)
             }
         }
         message?.let { text -> MessageCard(text, Modifier.align(Alignment.BottomCenter)) { viewModel.showMessage(null) } }

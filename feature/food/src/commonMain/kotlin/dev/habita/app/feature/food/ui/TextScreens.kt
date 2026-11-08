@@ -119,7 +119,7 @@ internal fun PlanScreen(text: String?, problems: List<String>, onBack: () -> Uni
  * category, matched to the bank SMS when there is one.
  */
 @Composable
-internal fun OrderScreen(result: OrderResult?, onBack: () -> Unit, onRead: (String) -> Unit, onLog: (Order) -> Unit) {
+internal fun OrderScreen(result: OrderResult?, logging: Boolean, onBack: () -> Unit, onRead: (String) -> Unit, onLog: (Order) -> Unit) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     var draft by remember { mutableStateOf("") }
@@ -157,10 +157,14 @@ internal fun OrderScreen(result: OrderResult?, onBack: () -> Unit, onRead: (Stri
             Gap(Space.card)
         }
         PrimaryButton(
-            if (order == null) "Paste an order" else "Log order",
+            when {
+                order == null -> "Paste an order"
+                logging -> "Logging…"
+                else -> "Log order"
+            },
             { order?.let(onLog) },
             Modifier.fillMaxWidth().padding(horizontal = Space.screen, vertical = Space.item),
-            enabled = order != null,
+            enabled = order != null && !logging,
         )
     }
 }

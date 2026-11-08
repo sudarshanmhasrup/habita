@@ -96,4 +96,23 @@ class PantryTest {
         assertEquals("tomorrow", whenLabel(day + 1, day))
         assertEquals("today", whenLabel(day - 1, day))
     }
+
+    @Test
+    fun `days with nothing left don't eat into the next purchase`() {
+        // 480 g of oats lasts 6 days; the refill comes 10 days later, 4 empty days after.
+        val events = listOf(buy("oats", 480.0, day), buy("oats", 1000.0, day + 10))
+        val stock = Pantry.of(plan, events, today = day + 10).first { it.item.id == "oats" }
+
+        assertEquals(1000.0, stock.left)
+        assertEquals(12, stock.daysLeft)
+    }
+
+    @Test
+    fun `over budget reads as over, not as a broken amount`() {
+        val pantry = Pantry.of(plan, listOf(buy("milk", 800.0, day)), today = day)
+        val text = Refill.request(Refill.lines(pantry), FoodSpend(5_500_00, 5_000_00), day)
+
+        assertTrue("(₹500 over)" in text, text)
+        assertEquals("-₹1,259.50", Refill.rupees(-1_259_50))
+    }
 }

@@ -14,6 +14,7 @@ import dev.habita.app.feature.food.data.utcOffsetMillis
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 
 /**
  * How food reaches the expense tracker without the two features knowing each other: the app
@@ -47,6 +49,12 @@ interface FoodMoney {
 class FoodFeature(core: Core, internal val money: FoodMoney? = null) {
     internal val repository = FoodRepository(core)
 
+    /**
+     * Every screen shares one copy of each flow below: the pantry is worked out once per change,
+     * not once per collector. They stop a few seconds after the last collector leaves.
+     */
+    private val sharing = SharingStarted.WhileSubscribed(5_000)
+
     /** The local day and minute of the day, moving on while the app is open. */
     private val clock: Flow<Pair<Int, Int>> = flow {
         while (true) {
@@ -54,20 +62,20 @@ class FoodFeature(core: Core, internal val money: FoodMoney? = null) {
             emit(dayOf(now) to minuteOfDay(now))
             delay(60_000)
         }
-    }.distinctUntilChanged()
+    }.distinctUntilChanged().shareIn(core.scope, sharing, replay = 1)
 
-    internal val day: Flow<Int> = clock.map { it.first }.distinctUntilChanged()
+    internal val day: Flow<Int> = clock.map { it.first }.distinctUntilChanged().shareIn(core.scope, sharing, replay = 1)
 
     /** The pantry as of today, or `null` before there is a plan. */
     internal val pantry: Flow<List<ItemStock>?> = combine(repository.plan, repository.stockEvents, day) { plan, events, day ->
         plan?.let { Pantry.of(it, events, day) }
-    }
+    }.shareIn(core.scope, sharing, replay = 1)
 
     /** The refill question while it should be asked: app items about to run out, not snoozed. */
     internal val refillQuestion: Flow<String?> = combine(pantry, repository.snoozedThrough, day) { pantry, snoozed, day ->
         val due = pantry?.let(Refill::due).orEmpty()
         if (due.isEmpty() || day <= snoozed) null else Refill.question(due, day)
-    }
+    }.shareIn(core.scope, sharing, replay = 1)
 
     internal val foodSpend: Flow<FoodSpend?> = money?.foodSpend ?: flowOf(null)
 
@@ -76,12 +84,12 @@ class FoodFeature(core: Core, internal val money: FoodMoney? = null) {
     /** A request from outside the app, such as a notification, to show food. */
     val openRequest: StateFlow<FoodOpen?> = _openRequest.asStateFlow()
 
-    /** Food at a glance, for the home screen, or `null` before there is a plan. */
-    val today: Flow<FoodToday?>
-        get() = combine(repository.plan, pantry, refillQuestion, clock) { plan, pantry, question, (_, minute) ->
-            plan ?: return@combine null
+    /** Food at a glance, for the home screen; [FoodToday.hasPlan] is false before there is a plan. */
+    val today: Flow<FoodToday> = combine(repository.plan, pantry, refillQuestion, clock) { plan, pantry, question, (_, minute) ->
+            plan ?: return@combine FoodToday.NO_PLAN
             val next = nextMeal(plan.meals, minute)
             FoodToday(
+                hasPlan = true,
                 nextMeal = next?.name,
                 nextMealTime = next?.time,
                 nextMealProtein = next?.proteinGrams,
@@ -90,7 +98,7 @@ class FoodFeature(core: Core, internal val money: FoodMoney? = null) {
                 refillQuestion = question,
                 runningLow = pantry?.let(Refill::lines)?.size ?: 0,
             )
-        }
+        }.shareIn(core.scope, sharing, replay = 1)
 
     /** The refill question if it should be asked now, for a notification. */
     suspend fun refillQuestionNow(): String? = refillQuestion.first()
@@ -159,8 +167,12 @@ class FoodFeature(core: Core, internal val money: FoodMoney? = null) {
 /** Open food: on the refill when [refill] is set. [at] tells repeats apart. */
 data class FoodOpen(val refill: Boolean, val at: Long)
 
-/** Food at a glance: the next meal, the day's totals, and the refill question while it stands. */
+/**
+ * Food at a glance: the next meal, the day's totals, and the refill question while it stands.
+ * [hasPlan] is false until a plan is saved.
+ */
 data class FoodToday(
+    val hasPlan: Boolean,
     val nextMeal: String?,
     val nextMealTime: String?,
     val nextMealProtein: Int?,
@@ -168,4 +180,8 @@ data class FoodToday(
     val calories: Int,
     val refillQuestion: String?,
     val runningLow: Int,
-)
+) {
+    internal companion object {
+        val NO_PLAN = FoodToday(false, null, null, null, 0, 0, null, 0)
+    }
+}

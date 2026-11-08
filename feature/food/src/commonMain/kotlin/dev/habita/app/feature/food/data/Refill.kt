@@ -72,7 +72,12 @@ object Refill {
         appendLine("1. Health first: the same product or an equal one. No sweetened, flavoured, masala or lower-protein swaps.")
         appendLine("2. Then budget: the cheapest total including delivery, handling and surge fees. One app beats two when fees make it cheaper.")
         if (spend != null) {
-            val left = if (spend.limitPaise > 0) " (${rupees(spend.limitPaise - spend.spentPaise)} left)" else ""
+            val remaining = spend.limitPaise - spend.spentPaise
+            val left = when {
+                spend.limitPaise <= 0 -> ""
+                remaining >= 0 -> " (${rupees(remaining)} left)"
+                else -> " (${rupees(-remaining)} over)"
+            }
             val limit = if (spend.limitPaise > 0) " of ${rupees(spend.limitPaise)}" else ""
             appendLine("3. Food so far this month: ${rupees(spend.spentPaise)}$limit$left. Tell me if the cart would go over.")
         }
@@ -91,8 +96,9 @@ object Refill {
         appendLine(OrderText.TEMPLATE)
     }.trimEnd()
 
-    /** ₹1,259 or ₹1,259.50. */
+    /** ₹1,259, ₹1,259.50 or -₹500. */
     fun rupees(paise: Long): String {
+        if (paise < 0) return "-" + rupees(-paise)
         val rupees = paise / 100
         val grouped = rupees.toString().reversed().chunked(3).joinToString(",").reversed()
         val rest = paise % 100

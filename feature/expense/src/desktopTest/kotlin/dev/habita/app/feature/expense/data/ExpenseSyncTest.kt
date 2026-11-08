@@ -41,7 +41,7 @@ class ExpenseSyncTest {
             val database = ExpenseDatabase(driver)
             val table = expenseSyncTables(database).single { it.collection == SyncCollections.EXPENSES }
             val sender = ExpenseDatabase(JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).also { ExpenseDatabase.Schema.create(it) })
-            sender.expenseQueries.save("e1", 25_000, "Lunch", "cafe@ybl", "food", "ONLINE", "SMS", "123456", 1_000, 2_000, 0)
+            sender.expenseQueries.save("e1", 25_000, "Lunch", "cafe@ybl", "food", "ONLINE", "SMS", "123456", 1_000, 2_000, 0, null)
             val record = expenseSyncTables(sender).single { it.collection == SyncCollections.EXPENSES }.dirty().single()
 
             table.applyRemote(listOf(record))
@@ -57,7 +57,7 @@ class ExpenseSyncTest {
         JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).use { driver ->
             ExpenseDatabase.Schema.create(driver)
             val database = ExpenseDatabase(driver)
-            database.expenseQueries.save("e1", 25_000, "Lunch", null, "food", "CASH", "MANUAL", null, 1_000, 2_000, 0)
+            database.expenseQueries.save("e1", 25_000, "Lunch", null, "food", "CASH", "MANUAL", null, 1_000, 2_000, 0, null)
             val tables = expenseSyncTables(database).associateBy { it.collection }
             val table = tables.getValue(SyncCollections.EXPENSES)
             val record = table.dirty().single()

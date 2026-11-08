@@ -166,12 +166,23 @@ internal class FoodViewModel(private val feature: FoodFeature) : ViewModel() {
         _orderResult.value = if (text.isBlank()) null else OrderText.parse(text, plan.value)
     }
 
+    private val _logging = MutableStateFlow(false)
+
+    /** Whether an order is being logged, so a second tap can't log it twice. */
+    val logging: StateFlow<Boolean> = _logging.asStateFlow()
+
     fun logOrder(order: Order) {
+        if (_logging.value) return
+        _logging.value = true
         viewModelScope.launch {
-            _message.value = feature.logOrder(order)
-            _orderResult.value = null
-            _copied.value = false
-            _route.value = FoodRoute.Pantry
+            try {
+                _message.value = feature.logOrder(order)
+                _orderResult.value = null
+                _copied.value = false
+                _route.value = FoodRoute.Pantry
+            } finally {
+                _logging.value = false
+            }
         }
     }
 }

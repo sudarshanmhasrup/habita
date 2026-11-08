@@ -1,6 +1,7 @@
 package dev.habita.app.feature.expense.data
 
 import dev.habita.app.core.sync.LocalRecord
+import dev.habita.app.core.data.nowMillis
 import dev.habita.app.core.sync.LocalSyncTable
 import dev.habita.app.shared.api.SyncCollections
 import dev.habita.app.shared.api.SyncJson
@@ -80,11 +81,13 @@ private class ExpenseTable(private val database: ExpenseDatabase) : LocalSyncTab
     override fun applyRemote(records: List<SyncRecord>) = database.transaction {
         records.forEach { record ->
             val data = decode(ExpenseData.serializer(), record) ?: return@forEach
-            queries.saveSyncedWithParts(
+            queries.saveSynced(
                 record.id, data.amountPaise, data.description, data.payee, data.categoryId, data.mode, data.source,
                 data.smsRef, data.paidAt, record.updatedAt, if (record.deleted) 1L else 0L, encodeParts(data.parts.orEmpty()),
             )
         }
+        // A payment from another device may be the one an order here was waiting for.
+        settlePendingOrders(database, nowMillis())
     }
 
     override fun markAllDirty() {
@@ -153,6 +156,8 @@ private class SettingTable(private val database: ExpenseDatabase) : LocalSyncTab
             val data = decode(SettingData.serializer(), record) ?: return@forEach
             queries.save(record.id, data.value, record.updatedAt, 0)
         }
+        // An order logged on another device may wait for a payment already here.
+        if (records.any { it.id.startsWith(ExpenseRepository.ORDER_PREFIX) }) settlePendingOrders(database, nowMillis())
     }
 
     override fun markAllDirty() {
