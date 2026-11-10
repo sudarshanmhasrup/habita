@@ -1,0 +1,87 @@
+name: "Desktop"
+
+# Every change to the app on main becomes a Windows, Mac and Linux build on the server, which the
+# installed apps offer as an update and the download page lists. Build numbers only go up, so a
+# re-run publishes a newer number too. The server address and token come from the repository's
+# settings, never from the code.
+on:
+    push:
+        branches: [main]
+        paths:
+            - "desktop/**"
+            - "compose/**"
+            - "core/**"
+            - "feature/**"
+            - "shared/**"
+            - "gradle/**"
+            - "*.kts"
+            - ".github/workflows/desktop.yml"
+    workflow_dispatch:
+
+concurrency:
+    group: desktop-release
+    cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+    release:
+        name: "Build and publish (${{ matrix.platform }})"
+        runs-on: ${{ matrix.runner }}
+        permissions:
+            contents: read
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    -   platform: windows
+                        runner: windows-latest
+                        task: packageMsi
+                        format: msi
+                    -   platform: mac
+                        runner: macos-latest
+                        task: packageDmg
+                        format: dmg
+                    -   platform: linux
+                        runner: ubuntu-latest
+                        task: packageDeb
+                        format: deb
+        env:
+            HABITA_SERVER_URL: ${{ vars.HABITA_SERVER_URL }}
+            HABITA_NAME: ${{ vars.HABITA_NAME }}
+            HABITA_LOGIN: "true"
+        defaults:
+            run:
+                shell: bash
+        steps:
+            -   uses: actions/checkout@v7
+                with:
+                    persist-credentials: false
+
+            -   uses: actions/setup-java@v6
+                with:
+                    distribution: temurin
+                    java-version: 21
+
+            -   uses: gradle/actions/setup-gradle@v6
+
+            -   name: "Pick the build number"
+                # The same number on every platform; installers take at most 65535.
+                run: echo "HABITA_VERSION_CODE=$((GITHUB_RUN_NUMBER * 10 + GITHUB_RUN_ATTEMPT))" >> "$GITHUB_ENV"
+
+            -   name: "Build the installer"
+                run: ./gradlew ":desktop:${{ matrix.task }}"
+
+            -   name: "Publish to the server"
+                env:
+                    HABITA_PUBLISH_TOKEN: ${{ secrets.HABITA_PUBLISH_TOKEN }}
+                run: |
+                    build=$(find .build/desktop/compose/binaries/main/${{ matrix.format }} -name "*.${{ matrix.format }}" | head -n 1)
+                    test -n "$build" || { echo "No ${{ matrix.format }} was built"; exit 1; }
+                    curl --fail-with-body -sS -X POST \
+                        -H "Authorization: Bearer $HABITA_PUBLISH_TOKEN" \
+                        -H "X-Version-Code: $HABITA_VERSION_CODE" \
+                        -H "X-Version-Name: 1.0.$HABITA_VERSION_CODE" \
+                        -H "Content-Type: application/octet-stream" \
+                        --data-binary "@$build" \
+                        "${HABITA_SERVER_URL%/}/app/${{ matrix.platform }}/releases"
