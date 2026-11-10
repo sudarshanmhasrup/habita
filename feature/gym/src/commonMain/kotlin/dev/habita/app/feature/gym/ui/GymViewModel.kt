@@ -51,6 +51,7 @@ internal sealed interface GymRoute {
             is PreStart -> 1
             Workout -> 2
             is Summary -> 3
+            is Share -> 4
         }
 
     data object Select : GymRoute
@@ -62,6 +63,9 @@ internal sealed interface GymRoute {
     data object Workout : GymRoute
 
     data class Summary(val sessionId: String) : GymRoute
+
+    /** The photo card for [sessionId]; back returns to [from], the summary or the list. */
+    data class Share(val sessionId: String, val from: GymRoute) : GymRoute
 }
 
 internal data class GymData(
@@ -126,7 +130,12 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
 
     val report: StateFlow<SessionReport?> = _route
         .flatMapLatest { route ->
-            if (route is GymRoute.Summary) flow<SessionReport?> { emit(repository.report(route.sessionId)) } else flowOf(null)
+            val sessionId = when (route) {
+                is GymRoute.Summary -> route.sessionId
+                is GymRoute.Share -> route.sessionId
+                else -> null
+            }
+            if (sessionId != null) flow<SessionReport?> { emit(repository.report(sessionId)) } else flowOf(null)
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
@@ -151,6 +160,11 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
 
     fun openProgress() {
         _route.value = GymRoute.Progress
+    }
+
+    /** Opens the photo card for [sessionId], from wherever the gym is now. */
+    fun openShare(sessionId: String) {
+        _route.value = GymRoute.Share(sessionId, _route.value)
     }
 
     private val _error = MutableStateFlow<String?>(null)
@@ -190,8 +204,9 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
 
     /** Goes back one screen. Returns `false` on the first gym screen, where back leaves the gym. */
     fun back(): Boolean {
-        if (_route.value == GymRoute.Select) return false
-        _route.value = GymRoute.Select
+        val route = _route.value
+        if (route == GymRoute.Select) return false
+        _route.value = if (route is GymRoute.Share) route.from else GymRoute.Select
         return true
     }
 

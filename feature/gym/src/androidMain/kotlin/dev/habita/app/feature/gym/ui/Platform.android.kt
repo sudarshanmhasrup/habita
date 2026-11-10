@@ -9,21 +9,35 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.net.Uri
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import dev.habita.app.feature.gym.android.RestEndAlarm
+import java.io.File
+import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 internal actual fun rememberRestAlert(): () -> Unit {
@@ -144,4 +158,78 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+/** Photos are decoded no larger than this on their long side: plenty for a 1080 × 1920 card. */
+private const val PHOTO_MAX_EDGE = 2400
+
+private fun Context.fileUri(file: File): Uri = FileProvider.getUriForFile(this, "$packageName.files", file)
+
+/** Decodes [uri] upright (ImageDecoder applies the camera's rotation) and scaled down to fit. */
+private fun Context.decodePhoto(uri: Uri): ImageBitmap =
+    ImageDecoder.decodeBitmap(ImageDecoder.createSource(contentResolver, uri)) { decoder, info, _ ->
+        // A software bitmap, so the card can draw it onto its own canvas.
+        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+        val longEdge = maxOf(info.size.width, info.size.height)
+        if (longEdge > PHOTO_MAX_EDGE) {
+            val scale = PHOTO_MAX_EDGE.toFloat() / longEdge
+            decoder.setTargetSize((info.size.width * scale).roundToInt(), (info.size.height * scale).roundToInt())
+        }
+    }.asImageBitmap()
+
+@Composable
+internal actual fun rememberPhotoSource(onPhoto: (ImageBitmap) -> Unit, onError: () -> Unit): PhotoSource? {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    fun load(uri: Uri) {
+        scope.launch {
+            val photo = withContext(Dispatchers.IO) { runCatching { context.decodePhoto(uri) }.getOrNull() }
+            if (photo != null) onPhoto(photo) else onError()
+        }
+    }
+    val chooser = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let(::load)
+    }
+    // The camera app writes the photo to this file in the app's cache; the same file every time.
+    val cameraFile = remember(context) { File(File(context.cacheDir, "camera"), "photo.jpg") }
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
+        if (saved) load(Uri.fromFile(cameraFile))
+    }
+    return remember(chooser, camera) {
+        PhotoSource(
+            takePhoto = {
+                cameraFile.parentFile?.mkdirs()
+                runCatching { camera.launch(context.fileUri(cameraFile)) }.onFailure { onError() }
+            },
+            choosePhoto = {
+                chooser.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            },
+        )
+    }
+}
+
+@Composable
+internal actual fun rememberImageSharer(): ImageSharer? {
+    val context = LocalContext.current
+    return remember(context) {
+        ImageSharer { image, fileName ->
+            runCatching {
+                // Only the latest card is kept; older ones are cleared so the cache doesn't grow.
+                val folder = File(context.cacheDir, "share").apply {
+                    mkdirs()
+                    listFiles()?.forEach { it.delete() }
+                }
+                val file = File(folder, fileName)
+                file.outputStream().use { image.asAndroidBitmap().compress(Bitmap.CompressFormat.JPEG, 92, it) }
+                val uri = context.fileUri(file)
+                val send = Intent(Intent.ACTION_SEND)
+                    .setType("image/jpeg")
+                    .putExtra(Intent.EXTRA_STREAM, uri)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                // Lets the share sheet show the card as its preview.
+                send.clipData = ClipData.newRawUri(null, uri)
+                context.startActivity(Intent.createChooser(send, null))
+            }.isSuccess
+        }
+    }
 }
