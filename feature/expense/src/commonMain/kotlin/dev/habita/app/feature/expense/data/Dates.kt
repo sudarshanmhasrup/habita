@@ -34,7 +34,7 @@ expect fun startOfDay(millis: Long): Long
 /** The latest salary day a budget month can start on, so every month has it. */
 internal const val MAX_PAY_DAY = 28
 
-private const val DAY_MILLIS = 24 * 60 * 60 * 1000L
+internal const val DAY_MILLIS = 24 * 60 * 60 * 1000L
 
 /**
  * The first millisecond of the budget month named [month]: midnight on [payDay] of that month.

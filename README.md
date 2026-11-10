@@ -130,8 +130,15 @@ to 5 on the budget screen, November is 5 November to 4 December, and the month s
 dates. Saving it sets the income and limits for the month on screen and the months after it, until
 one that has its own, so a raise or a new limit never changes what earlier months show. Categories
 are renamed, removed and brought back on the same screen; a removed category stays on its old
-payments. Export writes the month as markdown, laid out like a Notion budget page, to paste into
+payments. The month arrows go one month ahead, so next month's budget can be planned before it
+starts. Export writes the month as markdown, laid out like a Notion budget page, to paste into
 Notion or hand to an AI.
+
+The month screen puts the budget first: a table of each category's limit, what was spent and what's
+left, with a bar per category and, in the running month, a tick for how far through the month it
+is. Below it, "Where it went" splits the month's spending by its biggest categories, then the
+payments follow. A payment from an SMS opens with "What for" empty, ready to type; left empty, it
+keeps the payee's name.
 
 ## The daily routine
 

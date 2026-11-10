@@ -1,6 +1,14 @@
 package dev.habita.app.feature.expense.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import dev.habita.app.core.data.nowMillis
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -62,6 +70,7 @@ import kotlinx.coroutines.delay
 @Composable
 internal fun MonthScreen(
     month: YearMonth,
+    thisMonth: YearMonth,
     summary: MonthSummary?,
     sms: SmsAccess,
     message: String?,
@@ -96,8 +105,19 @@ internal fun MonthScreen(
                 Gap(Space.item)
                 MonthSwitcher(month, summary?.rangeLabel, canGoBack, canGoForward, onPrevious, onNext)
                 Gap(Space.item)
+                if (month > thisMonth) {
+                    // Next month, open early to plan its budget.
+                    HabitaCard(Modifier.fillMaxWidth(), borderColor = HabitaTheme.colors.accent) {
+                        HText("Next month", type.title)
+                        Gap(Space.tiny)
+                        HText("It hasn't started yet. Plan its budget now; this month keeps its own.", type.caption, color = HabitaTheme.colors.muted)
+                        Gap(Space.item)
+                        PrimaryButton("Plan the budget", onBudget, Modifier.fillMaxWidth())
+                    }
+                    Gap(Space.item)
+                }
                 if (summary != null) Overview(summary, onBudget, Modifier.appear(0))
-                if (sms.supported && !canGoForward) {
+                if (sms.supported && month == thisMonth) {
                     Gap(Space.item)
                     SmsCard(sms, onImport)
                 }
@@ -109,10 +129,14 @@ internal fun MonthScreen(
             second = {
                 if (wide) Gap(56.dp)
                 if (summary != null) {
-                    // What was paid comes first; the budget, which changes rarely, after it.
-                    Payments(summary, onOpen)
-                    Gap(Space.section)
+                    // The budget first, so where the month stands is the first thing seen.
                     Categories(summary, onBudget)
+                    if (summary.spentPaise > 0) {
+                        Gap(Space.section)
+                        WhereItWent(summary)
+                    }
+                    Gap(Space.section)
+                    Payments(summary, onOpen)
                     Gap(Space.card)
                 }
             },
@@ -322,9 +346,15 @@ internal fun SmallPill(text: String, selected: Boolean = false, onClick: () -> U
     }
 }
 
-/** Each category: spent against its limit, and what's left. */
+/**
+ * Each category as a table row: its limit, spent and what's left, with a bar of how much of the limit
+ * is used. In the month running now, a tick on each bar marks how far through the month it is, so
+ * a bar past its tick is going faster than the month.
+ */
 @Composable
 private fun ColumnScope.Categories(summary: MonthSummary, onBudget: () -> Unit) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
     Row(verticalAlignment = Alignment.CenterVertically) {
         Overline("Budget", Modifier.weight(1f))
         TextAction("Edit", onBudget)
@@ -333,43 +363,138 @@ private fun ColumnScope.Categories(summary: MonthSummary, onBudget: () -> Unit) 
     // Only categories with a limit or some spending; the rest are in the budget editor.
     val shown = summary.categories.filter { it.category.limitPaise > 0 || it.spentPaise > 0 }
     if (shown.isEmpty()) {
-        HText("Nothing spent yet. Set limits under Edit.", HabitaTheme.typography.caption, color = HabitaTheme.colors.muted)
+        HText("Nothing spent yet. Set limits under Edit.", type.caption, color = colors.muted)
         return
     }
-    HabitaCard(Modifier.fillMaxWidth().appear(3), contentPadding = PaddingValues(horizontal = Space.card, vertical = Space.inside)) {
+    val day = summary.dayOf(nowMillis())
+    val pace = day?.let { it.toFloat() / summary.dayCount }
+    HabitaCard(Modifier.fillMaxWidth().appear(3), contentPadding = PaddingValues(horizontal = Space.card, vertical = Space.card)) {
+        if (summary.plannedPaise > 0) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Column(Modifier.weight(1f)) {
+                    HText("Planned", type.caption, color = colors.muted)
+                    HText(formatRupees(summary.plannedPaise), type.title)
+                }
+                if (day != null) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        HText("Day $day of ${summary.dayCount}", type.label)
+                        HText("Tick = today", type.caption, color = colors.muted)
+                    }
+                }
+            }
+            Gap(Space.item)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TableHead("Category", Modifier.weight(1f), TextAlign.Start)
+            TableHead("Spent", Modifier.width(AMOUNT_WIDTH))
+            TableHead("Left", Modifier.width(AMOUNT_WIDTH))
+        }
+        Gap(Space.inside)
+        Divider()
         shown.forEachIndexed { index, spend ->
             if (index > 0) Divider()
-            CategoryRow(spend)
+            CategoryRow(spend, pace)
         }
     }
 }
 
+private val AMOUNT_WIDTH = 76.dp
+
 @Composable
-private fun CategoryRow(spend: CategorySpend) {
+private fun TableHead(text: String, modifier: Modifier, align: TextAlign = TextAlign.End) {
+    HText(text.uppercase(), HabitaTheme.typography.overline, color = HabitaTheme.colors.muted, textAlign = align, modifier = modifier, maxLines = 1)
+}
+
+@Composable
+private fun CategoryRow(spend: CategorySpend, pace: Float?) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     val remaining = spend.remainingPaise
     Column(Modifier.fillMaxWidth().padding(vertical = Space.item)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            HText(spend.category.name, type.bodyStrong, modifier = Modifier.weight(1f), maxLines = 1)
-            HText(
+            Column(Modifier.weight(1f)) {
+                HText(spend.category.name, type.bodyStrong, maxLines = 2)
+                HText(if (remaining == null) "No limit" else "of ${formatRupees(spend.category.limitPaise)}", type.caption, color = colors.muted, maxLines = 1)
+            }
+            Amount(formatRupees(spend.spentPaise), colors.text)
+            Amount(
                 when {
-                    remaining == null -> formatRupees(spend.spentPaise)
-                    remaining < 0 -> "${formatRupees(-remaining)} over"
-                    else -> "${formatRupees(remaining)} left"
+                    remaining == null -> "—"
+                    remaining < 0 -> "−" + formatRupees(-remaining)
+                    else -> formatRupees(remaining)
                 },
-                type.label,
-                color = if (spend.isOver) colors.error else colors.text,
+                if (spend.isOver) colors.error else colors.text,
             )
         }
         if (remaining != null) {
-            Gap(Space.tiny)
-            HText("${formatRupees(spend.spentPaise)} of ${formatRupees(spend.category.limitPaise)}", type.caption, color = colors.muted)
             Gap(Space.inside)
-            ProgressBar(spend.used.coerceAtMost(1f), color = if (spend.isOver) colors.error else colors.accent)
+            PaceBar(spend.used, pace, if (spend.isOver) colors.error else colors.accent)
         }
     }
 }
+
+@Composable
+private fun Amount(text: String, color: Color) {
+    HText(text, HabitaTheme.typography.label, color = color, textAlign = TextAlign.End, modifier = Modifier.width(AMOUNT_WIDTH), maxLines = 1)
+}
+
+/** A bar of [used] (0 to 1, more is full), with a tick at [pace] when it's given. */
+@Composable
+private fun PaceBar(used: Float, pace: Float?, color: Color) {
+    val colors = HabitaTheme.colors
+    Box(Modifier.fillMaxWidth().height(12.dp), contentAlignment = Alignment.Center) {
+        ProgressBar(used.coerceAtMost(1f), color = color, height = 6.dp)
+        if (pace != null) {
+            Canvas(Modifier.fillMaxWidth().height(12.dp)) {
+                val x = size.width * pace.coerceIn(0f, 1f)
+                drawLine(colors.text, Offset(x, 0f), Offset(x, size.height), 2.dp.toPx(), StrokeCap.Round)
+            }
+        }
+    }
+}
+
+/**
+ * Where the month's money went: one bar split by the biggest categories, then a row each with its
+ * amount and share, so nothing is read from colour alone.
+ */
+@Composable
+private fun ColumnScope.WhereItWent(summary: MonthSummary) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
+    val spends = summary.biggestSpends()
+    // Shades of the accent, darkest for the biggest; everything else in the border colour.
+    val shades = listOf(1f, 0.7f, 0.45f, 0.25f)
+    val parts = spends.mapIndexed { index, (category, paise) ->
+        Triple(category?.name ?: "Everything else", paise, if (category == null) colors.border else colors.accent.copy(alpha = shades[index.coerceAtMost(shades.lastIndex)]))
+    }
+    Overline("Where it went")
+    Gap(Space.item)
+    HabitaCard(Modifier.fillMaxWidth().appear(3), contentPadding = PaddingValues(Space.card)) {
+        Canvas(Modifier.fillMaxWidth().height(16.dp).clip(RoundedCornerShape(8.dp))) {
+            val gap = 2.dp.toPx()
+            var x = 0f
+            parts.forEach { (_, paise, color) ->
+                val width = size.width * paise / summary.spentPaise
+                drawRect(color, Offset(x, 0f), Size((width - gap).coerceAtLeast(1f), size.height))
+                x += width
+            }
+        }
+        Gap(Space.item)
+        parts.forEach { (name, paise, color) ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(10.dp).background(color, CircleShape))
+                Gap(Space.inside)
+                HText(name, type.body, modifier = Modifier.weight(1f), maxLines = 1)
+                HText("${percent(paise, summary.spentPaise)}%", type.caption, color = colors.muted)
+                Gap(Space.item)
+                HText(formatRupees(paise), type.bodyStrong, textAlign = TextAlign.End, modifier = Modifier.width(AMOUNT_WIDTH + 16.dp))
+            }
+        }
+    }
+}
+
+/** [part] as a whole percentage of [whole]. */
+internal fun percent(part: Long, whole: Long): Long = if (whole <= 0) 0 else (part * 100 + whole / 2) / whole
 
 /** Every payment of the month, newest first, grouped by day. */
 @Composable

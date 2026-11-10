@@ -82,6 +82,9 @@ object BankSms {
     /** The payee as a key for remembering its category: lowercase with spaces collapsed. */
     fun payeeKey(payee: String): String = payee.lowercase().replace(Regex("""\s+"""), " ").trim()
 
+    /** What a payment from an SMS is called until it's given a name: its payee, or "Bank payment". */
+    fun description(payee: String?): String = payee?.let(::displayName) ?: "Bank payment"
+
     /**
      * A readable name for a payee: the part of a UPI id before the "@", or the name, in title
      * case. "rapido@ybl" becomes "Rapido".

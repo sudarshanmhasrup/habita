@@ -38,6 +38,23 @@ data class MonthSummary(
     /** Payments not sorted yet. A split payment counts as sorted. */
     val unsorted: List<Expense> = expenses.filter { !it.isSplit && it.categoryId == null }
 
+    /** How many days the month has. */
+    val dayCount: Int get() = ((endsAt - startsAt + DAY_MILLIS / 2) / DAY_MILLIS).toInt()
+
+    /** Which day of the month [millis] falls on, from 1, or `null` when it's outside the month. */
+    fun dayOf(millis: Long): Int? =
+        if (millis < startsAt || millis >= endsAt) null else ((millis - startsAt) / DAY_MILLIS).toInt() + 1
+
+    /**
+     * Where the money went: the [top] categories that took the most, biggest first, then everything
+     * else together (other categories and unsorted payments) as a `null` category.
+     */
+    fun biggestSpends(top: Int = 4): List<Pair<Category?, Long>> {
+        val biggest = categories.filter { it.spentPaise > 0 }.sortedByDescending { it.spentPaise }.take(top)
+        val rest = spentPaise - biggest.sumOf { it.spentPaise }
+        return biggest.map { it.category to it.spentPaise } + listOfNotNull(rest.takeIf { it > 0 }?.let { null to it })
+    }
+
     companion object {
         /**
          * Adds up [expenses] by category, a split payment part by part. Archived categories only

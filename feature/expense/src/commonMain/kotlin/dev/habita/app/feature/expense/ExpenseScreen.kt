@@ -37,6 +37,7 @@ fun ExpenseScreen(feature: ExpenseFeature, onExit: () -> Unit) {
     val payDay by viewModel.payDay.collectAsStateWithLifecycle()
     val canGoBack by viewModel.canGoBack.collectAsStateWithLifecycle()
     val canGoForward by viewModel.canGoForward.collectAsStateWithLifecycle()
+    val thisMonth by viewModel.thisMonth.collectAsStateWithLifecycle()
     val openRequest by feature.openRequest.collectAsStateWithLifecycle()
     val sms = rememberSmsAccess()
     val scope = rememberCoroutineScope()
@@ -71,6 +72,7 @@ fun ExpenseScreen(feature: ExpenseFeature, onExit: () -> Unit) {
             when (screen) {
                 ExpenseRoute.Month -> MonthScreen(
                     month = month,
+                    thisMonth = thisMonth,
                     summary = summary,
                     sms = sms,
                     message = message,
