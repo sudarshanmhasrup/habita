@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.habita.app.core.data.newId
 import dev.habita.app.core.data.nowMillis
+import dev.habita.app.feature.expense.data.BankSms
 import dev.habita.app.feature.expense.data.Expense
 import dev.habita.app.feature.expense.data.ExpensePart
 import dev.habita.app.feature.expense.data.ExpenseRepository
@@ -105,7 +106,8 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
     private val _deleted = MutableStateFlow<Expense?>(null)
     val deleted: StateFlow<Expense?> = _deleted.asStateFlow()
 
-    private val thisMonth = repository.thisMonth.stateIn(viewModelScope, SharingStarted.Eagerly, _month.value)
+    /** The budget month it is now. */
+    val thisMonth: StateFlow<YearMonth> = repository.thisMonth.stateIn(viewModelScope, SharingStarted.Eagerly, _month.value)
 
     private val firstMonth = repository.firstMonth.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
@@ -113,8 +115,8 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
     val canGoBack: StateFlow<Boolean> = combine(_month, firstMonth) { month, first -> first != null && month > first }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    /** Whether the month shown is before this one. */
-    val canGoForward: StateFlow<Boolean> = combine(_month, thisMonth) { month, now -> month < now }
+    /** Whether there is a later month to go to: up to next month, so its budget can be planned. */
+    val canGoForward: StateFlow<Boolean> = combine(_month, thisMonth) { month, now -> month < now.next() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun previousMonth() {
@@ -147,7 +149,7 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
                 ExpenseDraft(
                     id = existing.id,
                     amountText = amountText(existing.amountPaise),
-                    description = existing.description,
+                    description = formDescription(existing),
                     categoryId = existing.categoryId,
                     mode = existing.mode,
                     paidAt = existing.paidAt,
@@ -170,7 +172,8 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
         val expense = Expense(
             id = draft.id ?: newId(),
             amountPaise = amountPaise,
-            description = draft.description.trim().ifEmpty { "Payment" },
+            // Left empty, a payment keeps the name it had, such as its payee's.
+            description = draft.description.trim().ifEmpty { original?.description ?: "Payment" },
             payee = original?.payee,
             categoryId = if (parts.isEmpty()) draft.categoryId else mainCategory(parts),
             mode = draft.mode,
@@ -255,6 +258,13 @@ internal class ExpenseViewModel(private val repository: ExpenseRepository) : Vie
         _message.value = text
     }
 }
+
+/**
+ * What the "What for" field starts with: empty for a bank SMS payment still called after its
+ * payee, so the owner types what it was for instead of editing the bank's name.
+ */
+internal fun formDescription(expense: Expense): String =
+    if (expense.source == ExpenseSource.SMS && expense.description == BankSms.description(expense.payee)) "" else expense.description
 
 /** Paise as the amount field shows them: "39", "39.5" or "1234567.05", never "1.2E7". */
 internal fun amountText(paise: Long): String {

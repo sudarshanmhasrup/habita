@@ -122,7 +122,7 @@ class ExpenseRepository(core: Core) {
             val expense = Expense(
                 id = newId(),
                 amountPaise = debit.amountPaise,
-                description = debit.payee?.let(BankSms::displayName) ?: "Bank payment",
+                description = BankSms.description(debit.payee),
                 payee = debit.payee,
                 categoryId = category?.id,
                 mode = PaymentMode.ONLINE,

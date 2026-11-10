@@ -63,4 +63,40 @@ class MonthSummaryTest {
         assertTrue("1. **Food:** 4,940" in markdown)
         assertTrue("| 60 | Lunch | Food | Online |" in markdown)
     }
+
+    @Test
+    fun countsTheDaysOfAMonthFromSalaryToSalary() {
+        val summary = MonthSummary.of(month, 0, emptyList(), emptyList(), payDay = 5)
+        // 5 November to 4 December.
+        assertEquals(30, summary.dayCount)
+        assertEquals(1, summary.dayOf(summary.startsAt))
+        assertEquals(6, summary.dayOf(summary.startsAt + 5 * DAY_MILLIS + 1_000))
+        assertEquals(30, summary.dayOf(summary.endsAt - 1))
+        assertNull(summary.dayOf(summary.endsAt))
+        assertNull(summary.dayOf(summary.startsAt - 1))
+    }
+
+    @Test
+    fun biggestSpendsPutTheRestTogether() {
+        val rent = Category("rent", "Rent", 10_000_00, 3)
+        val gym = Category("gym", "Gym", 2_000_00, 4)
+        val summary = MonthSummary.of(
+            month,
+            0,
+            listOf(food, commute, other, rent, gym),
+            listOf(
+                expense("rent", 10_000, "rent"),
+                expense("zepto", 1_259, "food"),
+                expense("gym", 2_000, "gym"),
+                expense("zudio", 1_307, "other"),
+                expense("rapido", 54, "commute"),
+                expense("unknown", 40, null),
+            ),
+        )
+        val spends = summary.biggestSpends(top = 3)
+        assertEquals(listOf("rent", "gym", "other", null), spends.map { it.first?.id })
+        // Food, commute and the unsorted payment.
+        assertEquals(1_353_00, spends.last().second)
+        assertEquals(summary.spentPaise, spends.sumOf { it.second })
+    }
 }
