@@ -17,7 +17,8 @@ import dev.habita.server.routes.exportRoutes
 import dev.habita.server.routes.gymRoutes
 import dev.habita.server.routes.syncRoutes
 import dev.habita.server.sync.SyncEngine
-import dev.habita.server.updates.Releases
+import dev.habita.server.updates.downloadPage
+import dev.habita.server.updates.platformReleases
 import dev.habita.server.updates.publishRoutes
 import dev.habita.server.updates.releaseRoutes
 import dev.habita.server.sync.gymTables
@@ -113,7 +114,7 @@ fun Application.module(config: ServerConfig, clock: () -> Long = System::current
             rateLimiter(limit = 120, refillPeriod = 1.minutes)
         }
     }
-    val releases = Releases(File(config.releasesPath))
+    val releases = platformReleases(File(config.releasesPath))
     install(Authentication) {
         // CI publishes builds with its own token, compared in constant time. No token, no publishing.
         bearer(PUBLISH_AUTH) {
@@ -135,6 +136,9 @@ fun Application.module(config: ServerConfig, clock: () -> Long = System::current
             call.respondText("OK")
         }
         authRoutes(config, store, clock)
+        // The download page is only a login form: everything it shows comes from routes below
+        // that need a login.
+        downloadPage()
         authenticate(SESSION_AUTH) {
             gymRoutes(program, store, clock)
             syncRoutes(sync, clock)

@@ -9,7 +9,7 @@ import android.net.Uri
 import android.provider.Settings
 import dev.habita.app.core.update.AppInstaller
 import dev.habita.app.core.update.UpdateException
-import dev.habita.app.shared.api.AndroidRelease
+import dev.habita.app.shared.api.AppRelease
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -24,7 +24,7 @@ class AndroidAppInstaller(private val context: Context) : AppInstaller {
     override val versionCode: Int = BuildConfig.VERSION_CODE
 
     override suspend fun install(
-        release: AndroidRelease,
+        release: AppRelease,
         download: suspend (onProgress: (Float) -> Unit, write: (ByteArray, Int) -> Unit) -> Unit,
         onProgress: (Float) -> Unit,
     ) {

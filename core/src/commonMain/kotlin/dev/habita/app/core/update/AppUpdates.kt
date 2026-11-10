@@ -2,7 +2,7 @@ package dev.habita.app.core.update
 
 import dev.habita.app.core.Core
 import dev.habita.app.core.network.ApiException
-import dev.habita.app.shared.api.AndroidRelease
+import dev.habita.app.shared.api.AppRelease
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +26,7 @@ interface AppInstaller {
      * asks the user to confirm. Throws [UpdateException] with a message for the user when it
      * can't.
      */
-    suspend fun install(release: AndroidRelease, download: suspend (onProgress: (Float) -> Unit, write: (ByteArray, Int) -> Unit) -> Unit, onProgress: (Float) -> Unit)
+    suspend fun install(release: AppRelease, download: suspend (onProgress: (Float) -> Unit, write: (ByteArray, Int) -> Unit) -> Unit, onProgress: (Float) -> Unit)
 }
 
 class UpdateException(message: String) : Exception(message)
@@ -34,14 +34,14 @@ class UpdateException(message: String) : Exception(message)
 sealed interface UpdateState {
     data object None : UpdateState
 
-    data class Available(val release: AndroidRelease) : UpdateState
+    data class Available(val release: AppRelease) : UpdateState
 
-    data class Downloading(val release: AndroidRelease, val progress: Float) : UpdateState
+    data class Downloading(val release: AppRelease, val progress: Float) : UpdateState
 
     /** Handed to the system installer, which is asking the user. */
-    data class Installing(val release: AndroidRelease) : UpdateState
+    data class Installing(val release: AppRelease) : UpdateState
 
-    data class Failed(val release: AndroidRelease, val message: String) : UpdateState
+    data class Failed(val release: AppRelease, val message: String) : UpdateState
 }
 
 /**
@@ -69,7 +69,7 @@ class AppUpdates(private val core: Core, private val installer: AppInstaller) {
     suspend fun check() {
         if (core.settings.token.value == null) return
         val latest = try {
-            core.api.getOrNull<AndroidRelease>("app/android/latest")
+            core.api.getOrNull<AppRelease>("app/android/latest")
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {

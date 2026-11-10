@@ -3,11 +3,11 @@ package dev.habita.app.shared.api
 import kotlinx.serialization.Serializable
 
 /**
- * A published Android build. The app compares [versionCode] with its own, downloads the APK and
- * checks it against [sha256] before handing it to the installer.
+ * A published build for one platform (Android, Windows, macOS or Linux). The app compares
+ * [versionCode] with its own, downloads the file and checks it against [sha256] before installing.
  */
 @Serializable
-data class AndroidRelease(
+data class AppRelease(
     val versionCode: Int,
     val versionName: String,
     val sha256: String,
