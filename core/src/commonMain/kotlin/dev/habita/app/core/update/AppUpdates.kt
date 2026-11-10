@@ -14,10 +14,16 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration.Companion.hours
 
 /**
- * Installs a downloaded build on this platform. Only Android has one: iOS apps update through
- * Xcode or the App Store.
+ * Installs a downloaded build on this platform: Android, and the installed desktop apps. iOS apps
+ * update through Xcode or the App Store.
  */
 interface AppInstaller {
+    /** The server's name for this platform's builds (`android`, `windows`, `mac` or `linux`). */
+    val platform: String
+
+    /** What the update card says while the system installer takes over. */
+    val installingHint: String
+
     /** The build running now; a release with a higher number is an update. */
     val versionCode: Int
 
@@ -38,8 +44,8 @@ sealed interface UpdateState {
 
     data class Downloading(val release: AppRelease, val progress: Float) : UpdateState
 
-    /** Handed to the system installer, which is asking the user. */
-    data class Installing(val release: AppRelease) : UpdateState
+    /** Handed to the system installer; [hint] says what happens next. */
+    data class Installing(val release: AppRelease, val hint: String) : UpdateState
 
     data class Failed(val release: AppRelease, val message: String) : UpdateState
 }
@@ -69,7 +75,7 @@ class AppUpdates(private val core: Core, private val installer: AppInstaller) {
     suspend fun check() {
         if (core.settings.token.value == null) return
         val latest = try {
-            core.api.getOrNull<AppRelease>("app/android/latest")
+            core.api.getOrNull<AppRelease>("app/${installer.platform}/latest")
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -94,10 +100,10 @@ class AppUpdates(private val core: Core, private val installer: AppInstaller) {
             try {
                 installer.install(
                     release = release,
-                    download = { onProgress, write -> core.api.download("app/android/apk", onProgress, write) },
+                    download = { onProgress, write -> core.api.download("app/${installer.platform}/download", onProgress, write) },
                     onProgress = { _state.value = UpdateState.Downloading(release, it) },
                 )
-                _state.value = UpdateState.Installing(release)
+                _state.value = UpdateState.Installing(release, installer.installingHint)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: UpdateException) {

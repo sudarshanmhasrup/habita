@@ -163,7 +163,7 @@ private fun UpdateCard(update: UpdateState, onInstall: () -> Unit, modifier: Mod
         HText(
             when (update) {
                 is UpdateState.Downloading -> "Downloading… ${(update.progress * 100).toInt()}%"
-                is UpdateState.Installing -> "Confirm the install when Android asks."
+                is UpdateState.Installing -> update.hint
                 is UpdateState.Failed -> update.message
                 else -> "${release.sizeBytes / (1024 * 1024)} MB · your data stays as it is."
             },

@@ -28,6 +28,10 @@ fun rawSetting(name: String): String {
 fun kotlinString(value: String): String =
     "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("$", "\\$") + "\""
 
+// CI passes HABITA_VERSION_CODE so every published build is newer than the last. A build from
+// source has none (0), and never offers or installs updates.
+val versionCode = rawSetting("HABITA_VERSION_CODE").toIntOrNull()?.takeIf { it in 1..65535 } ?: 0
+
 val generateDesktopConfig by tasks.registering {
     val contents = "package dev.habita.app.desktop\n\n" +
         "import dev.habita.app.core.AppConfig\n\n" +
@@ -36,7 +40,9 @@ val generateDesktopConfig by tasks.registering {
         "    serverUrl = ${kotlinString(rawSetting("HABITA_SERVER_URL"))},\n" +
         "    userName = ${kotlinString(rawSetting("HABITA_NAME"))},\n" +
         "    loginEnabled = ${rawSetting("HABITA_LOGIN") == "true"},\n" +
-        ")"
+        ")\n\n" +
+        "/** This build's number; a published build with a higher one is an update. */\n" +
+        "internal const val DESKTOP_VERSION_CODE: Int = $versionCode"
     val output = layout.buildDirectory.dir("generated/config/kotlin")
     inputs.property("contents", contents)
     outputs.dir(output)
@@ -66,9 +72,23 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Habita"
-            packageVersion = libs.versions.desktop.version.get()
+            // Installers need a.b.c with c below 65536; the build number goes last.
+            packageVersion = if (versionCode > 0) "1.0.$versionCode" else libs.versions.desktop.version.get()
             macOS {
                 bundleID = libs.versions.desktop.group.get()
+            }
+            windows {
+                // Fixed for good: it is how Windows knows a new build replaces the installed one.
+                upgradeUuid = "0a099d1e-3c7f-4d80-b2c5-c962b17512d7"
+                // Installs for this user only, so updates never ask for an administrator.
+                perUserInstall = true
+                dirChooser = false
+                menu = true
+                shortcut = true
+            }
+            linux {
+                packageName = "habita"
+                shortcut = true
             }
         }
     }
