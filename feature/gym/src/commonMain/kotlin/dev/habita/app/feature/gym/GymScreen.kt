@@ -17,11 +17,13 @@ import dev.habita.app.core.data.nowMillis
 import dev.habita.app.core.ui.HabitaScreen
 import dev.habita.app.core.ui.ScreenTransition
 import dev.habita.app.feature.gym.data.GymRepository
+import dev.habita.app.feature.gym.ui.GymData
 import dev.habita.app.feature.gym.ui.GymRoute
 import dev.habita.app.feature.gym.ui.GymViewModel
 import dev.habita.app.feature.gym.ui.PreStartScreen
 import dev.habita.app.feature.gym.ui.ProgressScreen
 import dev.habita.app.feature.gym.ui.SelectScreen
+import dev.habita.app.feature.gym.ui.ShareScreen
 import dev.habita.app.feature.gym.ui.SummaryScreen
 import dev.habita.app.feature.gym.ui.WorkoutScreen
 import dev.habita.app.feature.gym.ui.backupDate
@@ -184,6 +186,7 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
                     onRetry = viewModel::retrySync,
                     onRestore = openFile,
                     onProgress = viewModel::openProgress,
+                    onPhotoCard = latestFinished(current)?.let { id -> { viewModel.openShare(id) } },
                     onBackup = {
                         scope.launch { saveFile("habita-backup-${backupDate(nowMillis())}.json", viewModel.backup()) }
                     },
@@ -220,14 +223,21 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
                 is GymRoute.Summary -> SummaryScreen(
                     report = report,
                     onDone = { viewModel.back() },
+                    onPhotoCard = { viewModel.openShare(screen.sessionId) },
                     onUndo = viewModel::undoLastSet.takeIf { undoable != null && current.active == null },
                 )
 
                 GymRoute.Progress -> ProgressScreen(progress, onBack = { viewModel.back() })
+
+                is GymRoute.Share -> ShareScreen(report, onBack = { viewModel.back() })
             }
         }
     }
 }
+
+/** The most recently finished workout, for a photo card from the gym screen at any time. */
+private fun latestFinished(data: GymData): String? =
+    data.sessions.filter { !it.deleted && it.endedAt != null }.maxByOrNull { it.endedAt!! }?.id
 
 /** "12 workouts, 300 sets and 20 body days". */
 private fun restoredLine(result: RestoreResult): String {

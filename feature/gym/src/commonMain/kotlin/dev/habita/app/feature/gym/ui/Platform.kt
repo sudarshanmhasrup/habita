@@ -1,6 +1,7 @@
 package dev.habita.app.feature.gym.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.ImageBitmap
 
 /** Returns a function that buzzes the phone, used when a rest ends. */
 @Composable
@@ -49,3 +50,27 @@ internal class NotificationAccess(val enabled: Boolean, val request: () -> Unit)
  */
 @Composable
 internal expect fun rememberNotificationAccess(): NotificationAccess?
+
+/**
+ * Where a photo card gets its photo. [takePhoto] opens the camera, `null` where there is none to
+ * open; [choosePhoto] opens the gallery.
+ */
+internal class PhotoSource(val takePhoto: (() -> Unit)?, val choosePhoto: () -> Unit)
+
+/**
+ * The photo source for the photo card, or `null` where the app can't get photos yet (iOS).
+ * [onPhoto] gets the picked photo, upright and at most a few thousand pixels on its long side;
+ * [onError] runs when it couldn't be opened. Backing out calls neither.
+ */
+@Composable
+internal expect fun rememberPhotoSource(onPhoto: (ImageBitmap) -> Unit, onError: () -> Unit): PhotoSource?
+
+/** Hands a finished card to other apps: the share sheet on Android, a save dialog on desktop. */
+internal fun interface ImageSharer {
+    /** Returns false when it failed; backing out of the share sheet still counts as done. */
+    fun share(image: ImageBitmap, fileName: String): Boolean
+}
+
+/** The card sharer, or `null` where sharing isn't built yet (iOS). */
+@Composable
+internal expect fun rememberImageSharer(): ImageSharer?

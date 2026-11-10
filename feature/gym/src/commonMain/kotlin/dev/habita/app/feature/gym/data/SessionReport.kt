@@ -35,6 +35,8 @@ data class SessionReport(
     /** This workout's volume over its recent sessions, ending with today's. */
     val volumeTrend: List<TrendPoint>,
     val efforts: Map<Effort, Int>,
+    /** When the workout started, for the date on its photo card. */
+    val startedAt: Long = 0,
 )
 
 internal object Reports {
@@ -105,6 +107,7 @@ internal object Reports {
             exercises = exercises,
             volumeTrend = volumeTrend,
             efforts = todaySets.mapNotNull { it.effort }.groupingBy { it }.eachCount(),
+            startedAt = session.startedAt,
         )
     }
 }

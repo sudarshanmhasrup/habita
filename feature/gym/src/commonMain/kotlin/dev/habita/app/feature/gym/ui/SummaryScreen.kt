@@ -34,6 +34,7 @@ import dev.habita.app.core.ui.LocalWideLayout
 import dev.habita.app.core.ui.Overline
 import dev.habita.app.core.ui.Pill
 import dev.habita.app.core.ui.PrimaryButton
+import dev.habita.app.core.ui.SecondaryButton
 import dev.habita.app.core.ui.StatTile
 import dev.habita.app.core.ui.TextAction
 import dev.habita.app.core.ui.TwoPane
@@ -49,7 +50,12 @@ import kotlinx.coroutines.launch
 
 /** The end of a workout: the headline numbers, then charts of how it went. */
 @Composable
-internal fun SummaryScreen(report: SessionReport?, onDone: () -> Unit, onUndo: (() -> Unit)? = null) {
+internal fun SummaryScreen(
+    report: SessionReport?,
+    onDone: () -> Unit,
+    onUndo: (() -> Unit)? = null,
+    onPhotoCard: (() -> Unit)? = null,
+) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
     val wide = LocalWideLayout.current
@@ -86,6 +92,16 @@ internal fun SummaryScreen(report: SessionReport?, onDone: () -> Unit, onUndo: (
                 onUndo,
                 Modifier.align(Alignment.CenterHorizontally).heightIn(min = 48.dp),
                 color = HabitaTheme.colors.muted,
+            )
+        }
+        if (onPhotoCard != null && report != null) {
+            SecondaryButton(
+                "Make a photo card",
+                onPhotoCard,
+                Modifier
+                    .align(Alignment.End)
+                    .fillMaxWidth(if (wide) 0.5f else 1f)
+                    .padding(start = Space.screen, end = Space.screen, top = Space.item),
             )
         }
         PrimaryButton(

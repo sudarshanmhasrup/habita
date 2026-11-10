@@ -2,6 +2,7 @@ package dev.habita.app.feature.gym.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.uikit.LocalUIViewController
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -149,3 +150,10 @@ private class FileOpenerDelegate : NSObject(), UIDocumentPickerDelegateProtocol 
 /** iOS asks once at launch, when the reminders are queued. */
 @Composable
 internal actual fun rememberNotificationAccess(): NotificationAccess? = null
+
+/** Not built for iPhone yet: the card shows without a photo and can't be shared. */
+@Composable
+internal actual fun rememberPhotoSource(onPhoto: (ImageBitmap) -> Unit, onError: () -> Unit): PhotoSource? = null
+
+@Composable
+internal actual fun rememberImageSharer(): ImageSharer? = null

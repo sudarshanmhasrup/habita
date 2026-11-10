@@ -2,11 +2,16 @@ package dev.habita.app.feature.gym.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asSkiaBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import java.awt.FileDialog
 import java.awt.Frame
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.io.File
+import org.jetbrains.skia.EncodedImageFormat
+import org.jetbrains.skia.Image
 
 /** Desktop has no vibration. */
 @Composable
@@ -54,3 +59,38 @@ internal actual fun rememberFileOpener(onResult: (String?) -> Unit): () -> Unit 
 /** Desktop has no Sunday reminder to allow. */
 @Composable
 internal actual fun rememberNotificationAccess(): NotificationAccess? = null
+
+/** Desktop has no camera to open; a photo comes from a file. */
+@Composable
+internal actual fun rememberPhotoSource(onPhoto: (ImageBitmap) -> Unit, onError: () -> Unit): PhotoSource? = remember {
+    PhotoSource(takePhoto = null) {
+        val dialog = FileDialog(null as Frame?, "Choose a photo", FileDialog.LOAD).apply { isVisible = true }
+        val directory = dialog.directory
+        val name = dialog.file
+        if (directory != null && name != null) {
+            val photo = runCatching { Image.makeFromEncoded(File(directory, name).readBytes()).toComposeImageBitmap() }.getOrNull()
+            if (photo != null) onPhoto(photo) else onError()
+        }
+    }
+}
+
+/** Desktop has no share sheet: the card is saved as a PNG wherever the user picks. */
+@Composable
+internal actual fun rememberImageSharer(): ImageSharer? = remember {
+    ImageSharer { image, fileName ->
+        val dialog = FileDialog(null as Frame?, "Save photo card", FileDialog.SAVE).apply {
+            file = fileName.substringBeforeLast('.') + ".png"
+            isVisible = true
+        }
+        val directory = dialog.directory
+        val name = dialog.file
+        if (directory == null || name == null) {
+            true
+        } else {
+            runCatching {
+                val png = Image.makeFromBitmap(image.asSkiaBitmap()).encodeToData(EncodedImageFormat.PNG)!!
+                File(directory, name).writeBytes(png.bytes)
+            }.isSuccess
+        }
+    }
+}

@@ -65,6 +65,8 @@ internal fun SelectScreen(
     onBackup: () -> Unit,
     onRestore: () -> Unit,
     onProgress: () -> Unit,
+    /** Opens the photo card of the latest finished workout; `null` before the first one. */
+    onPhotoCard: (() -> Unit)?,
     backupMessage: String?,
     onWeight: (Int) -> Unit,
     onWaist: (Int) -> Unit,
@@ -129,6 +131,10 @@ internal fun SelectScreen(
             DayCards(program, onOpenWorkout)
             Gap(Space.item)
             SecondaryButton("See your progress", onProgress, Modifier.fillMaxWidth())
+            if (onPhotoCard != null) {
+                Gap(Space.item)
+                SecondaryButton("Photo card: last workout", onPhotoCard, Modifier.fillMaxWidth())
+            }
             if (data.swaps.isNotEmpty()) {
                 Gap(Space.item)
                 SwapsCard(program, data.swaps) { asking = Ask.NEW_GYM }
