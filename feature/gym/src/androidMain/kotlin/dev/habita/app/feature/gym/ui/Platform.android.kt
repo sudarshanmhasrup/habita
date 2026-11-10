@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import dev.habita.app.feature.gym.android.RestEndAlarm
 
 @Composable
 internal actual fun rememberRestAlert(): () -> Unit {
@@ -43,6 +44,18 @@ internal actual fun rememberRestAlert(): () -> Unit {
                 @Suppress("DEPRECATION")
                 vibrator.vibrate(pattern, -1)
             }
+        }
+    }
+}
+
+@Composable
+internal actual fun rememberRestAlarm(): RestAlarm {
+    val context = LocalContext.current.applicationContext
+    return remember(context) {
+        object : RestAlarm {
+            override fun set(endsAt: Long) = RestEndAlarm.set(context, endsAt)
+
+            override fun cancel() = RestEndAlarm.cancel(context)
         }
     }
 }

@@ -19,11 +19,47 @@ import platform.UIKit.UIDocumentPickerViewController
 import platform.UIKit.UIPasteboard
 import platform.UniformTypeIdentifiers.UTTypeJSON
 import platform.darwin.NSObject
+import dev.habita.app.core.data.nowMillis
+import platform.UserNotifications.UNAuthorizationOptionAlert
+import platform.UserNotifications.UNAuthorizationOptionSound
+import platform.UserNotifications.UNMutableNotificationContent
+import platform.UserNotifications.UNNotificationRequest
+import platform.UserNotifications.UNNotificationSound
+import platform.UserNotifications.UNTimeIntervalNotificationTrigger
+import platform.UserNotifications.UNUserNotificationCenter
 
 /** The full-strength system buzz; iOS has no custom patterns without Core Haptics. */
 @Composable
 internal actual fun rememberRestAlert(): () -> Unit = remember {
     { AudioServicesPlaySystemSound(kSystemSoundID_Vibrate) }
+}
+
+/** A local notification with the default sound; it asks for permission on first use. */
+@Composable
+internal actual fun rememberRestAlarm(): RestAlarm = remember {
+    object : RestAlarm {
+        private val id = "rest-end"
+
+        override fun set(endsAt: Long) {
+            val seconds = (endsAt - nowMillis()) / 1000.0
+            if (seconds < 1) return
+            val center = UNUserNotificationCenter.currentNotificationCenter()
+            center.requestAuthorizationWithOptions(UNAuthorizationOptionAlert or UNAuthorizationOptionSound) { _, _ -> }
+            val content = UNMutableNotificationContent().apply {
+                setTitle("Rest is over")
+                setBody("Time for the next set.")
+                setSound(UNNotificationSound.defaultSound)
+            }
+            val trigger = UNTimeIntervalNotificationTrigger.triggerWithTimeInterval(seconds, repeats = false)
+            center.addNotificationRequest(UNNotificationRequest.requestWithIdentifier(id, content, trigger), null)
+        }
+
+        override fun cancel() {
+            val center = UNUserNotificationCenter.currentNotificationCenter()
+            center.removePendingNotificationRequestsWithIdentifiers(listOf(id))
+            center.removeDeliveredNotificationsWithIdentifiers(listOf(id))
+        }
+    }
 }
 
 /**

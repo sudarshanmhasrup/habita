@@ -7,6 +7,21 @@ import androidx.compose.runtime.Composable
 internal expect fun rememberRestAlert(): () -> Unit
 
 /**
+ * The end of a rest while the app is away, such as with the phone locked: the system rings and
+ * buzzes then, since the app's own timer stops running in the background.
+ */
+internal interface RestAlarm {
+    /** Rings at [endsAt]; replaces any rest alarm set before. */
+    fun set(endsAt: Long)
+
+    /** Takes back the alarm, and its notification if it already rang. */
+    fun cancel()
+}
+
+@Composable
+internal expect fun rememberRestAlarm(): RestAlarm
+
+/**
  * Returns a function that asks where to save a file named `fileName`, then writes the contents
  * it is given there. [onResult] reports whether the file was saved; `null` means the user backed
  * out.
