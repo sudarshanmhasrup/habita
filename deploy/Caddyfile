@@ -1,11 +1,12 @@
 {$HABITA_DOMAIN} {
 	encode zstd gzip
 
-	# Published Android builds are larger than any other request; everything else stays small.
-	@publish path /app/android/releases
-	@other not path /app/android/releases
+	# Published app builds (Android, Windows, Mac, Linux) are larger than any other request;
+	# everything else stays small.
+	@publish path /app/android/releases /app/windows/releases /app/mac/releases /app/linux/releases
+	@other not path /app/android/releases /app/windows/releases /app/mac/releases /app/linux/releases
 	request_body @publish {
-		max_size 100MB
+		max_size 300MB
 	}
 	request_body @other {
 		max_size 10MB
