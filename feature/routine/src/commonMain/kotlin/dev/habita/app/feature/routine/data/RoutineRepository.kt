@@ -46,22 +46,8 @@ internal class RoutineRepository(core: Core) {
         routineSyncTables(database).forEach(sync::register)
     }
 
-    /** Rewrites a routine of blocks as sections ([Sections.convert]), saving only what changed. */
-    private fun convertToSections() = database.transaction {
-        val oldGroups = groupQueries.active { id, name, position, days, _, _, _ -> RoutineGroup(id, name, position, days.toInt()) }.executeAsList()
-        if (oldGroups.all(Sections::isSection)) return@transaction
-        val oldTasks = taskQueries.active { id, groupId, title, adjustable, position, _, _, _ ->
-            RoutineTask(id, groupId, title, adjustable == 1L, position)
-        }.executeAsList()
-        val (groups, tasks) = Sections.convert(oldGroups, oldTasks)
-        val now = nowMillis()
-        val kept = groups.map { it.id }.toSet()
-        oldGroups.filter { it.id !in kept }.forEach {
-            groupQueries.save(it.id, it.name, it.position, it.days.toLong(), 1, now, 1)
-        }
-        groups.filter { it !in oldGroups }.forEach { writeGroup(it) }
-        tasks.filter { it !in oldTasks }.forEach { writeTask(it) }
-        sync.request()
+    private fun convertToSections() {
+        if (database.convertToSections()) sync.request()
     }
 
     val groups: Flow<List<RoutineGroup>> = groupQueries.active { id, name, position, days, _, _, _ ->
@@ -212,6 +198,50 @@ internal class RoutineRepository(core: Core) {
         io(block)
         sync.request()
     }
+}
+
+/**
+ * Rewrites a routine of blocks as sections ([Sections.convert]), saving only what changed, and
+ * returns whether it saved anything.
+ *
+ * Each record it writes is stamped 1 ms after the records it was made from, not with the current
+ * time. That way it replaces the blocks it came from, but loses to any later edit made on another
+ * device: an old copy converted before the first sync can't overwrite the routine edited since.
+ */
+internal fun RoutineDatabase.convertToSections(): Boolean = transactionWithResult {
+    val groupTimes = mutableMapOf<String, Long>()
+    val oldGroups = routineGroupQueries.active { id, name, position, days, _, updatedAt, _ ->
+        groupTimes[id] = updatedAt
+        RoutineGroup(id, name, position, days.toInt())
+    }.executeAsList()
+    if (oldGroups.all(Sections::isSection)) return@transactionWithResult false
+    val taskTimes = mutableMapOf<String, Long>()
+    val oldTasks = routineTaskQueries.active { id, groupId, title, adjustable, position, _, updatedAt, _ ->
+        taskTimes[id] = updatedAt
+        RoutineTask(id, groupId, title, adjustable == 1L, position)
+    }.executeAsList()
+    val (groups, tasks) = Sections.convert(oldGroups, oldTasks)
+    val oldGroupOf = oldTasks.associate { it.id to it.groupId }
+    val newest = (groupTimes.values + taskTimes.values).maxOrNull() ?: 0
+
+    // A task takes the newer of its own time and its block's; a section, the newest of what made it.
+    fun taskTime(id: String) = maxOf(taskTimes[id] ?: 0, groupTimes[oldGroupOf[id]] ?: 0)
+    fun sectionTime(group: RoutineGroup): Long {
+        val sources = tasks.filter { it.groupId == group.id }.map { taskTime(it.id) } + listOfNotNull(groupTimes[group.id])
+        return sources.maxOrNull() ?: newest
+    }
+
+    val kept = groups.map { it.id }.toSet()
+    oldGroups.filter { it.id !in kept }.forEach {
+        routineGroupQueries.save(it.id, it.name, it.position, it.days.toLong(), 1, groupTimes.getValue(it.id) + 1, 1)
+    }
+    groups.filter { it !in oldGroups }.forEach {
+        routineGroupQueries.save(it.id, it.name, it.position, it.days.toLong(), 0, sectionTime(it) + 1, 1)
+    }
+    tasks.filter { it !in oldTasks }.forEach {
+        routineTaskQueries.save(it.id, it.groupId, it.title, if (it.adjustable) 1 else 0, it.position, 0, taskTime(it.id) + 1, 1)
+    }
+    true
 }
 
 /**
