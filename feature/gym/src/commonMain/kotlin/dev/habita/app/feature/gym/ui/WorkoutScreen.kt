@@ -25,6 +25,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -262,6 +264,16 @@ private fun RestContent(
     val type = HabitaTheme.typography
     val alert = rememberRestAlert()
     var now by remember { mutableLongStateOf(nowMillis()) }
+    val alarm = rememberRestAlarm()
+    // In the background the timer below stops, so the system rings instead. Back on screen, the
+    // timer takes over again and the alarm goes, along with its notification.
+    LifecycleStartEffect(rest) {
+        alarm.cancel()
+        onStopOrDispose {
+            val away = lifecycle.currentState < Lifecycle.State.STARTED
+            if (away && rest.remainingMillis(nowMillis()) > 0) alarm.set(rest.endsAt)
+        }
+    }
     // Ticks until the rest is over, buzzes, then moves on. This screen leaves as soon as the rest
     // ends, so a repeat call only happens if the first one was ignored while another action ran.
     LaunchedEffect(rest) {
@@ -325,6 +337,11 @@ private fun RestContent(
             if (onUndo != null) {
                 Gap(Space.item)
                 TextAction("Undo last set", onUndo, Modifier.heightIn(min = 48.dp), color = colors.muted)
+            }
+            // Without notifications, a rest that ends with the phone locked only buzzes.
+            val notifications = rememberNotificationAccess()
+            if (notifications?.enabled == false) {
+                TextAction("Turn on notifications to hear the timer when locked", notifications.request, Modifier.heightIn(min = 48.dp))
             }
         }
     }

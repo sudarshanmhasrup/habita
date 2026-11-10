@@ -12,6 +12,16 @@ import java.io.File
 @Composable
 internal actual fun rememberRestAlert(): () -> Unit = {}
 
+/** A desktop app keeps running in the background, so its own timer is enough. */
+@Composable
+internal actual fun rememberRestAlarm(): RestAlarm = remember {
+    object : RestAlarm {
+        override fun set(endsAt: Long) = Unit
+
+        override fun cancel() = Unit
+    }
+}
+
 @Composable
 internal actual fun rememberFileSaver(onResult: (Boolean?) -> Unit): (fileName: String, contents: String) -> Unit =
     { fileName, contents ->
