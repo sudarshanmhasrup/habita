@@ -60,6 +60,8 @@ class RouteAuthTest {
     }
 
     private companion object {
-        val PUBLIC = setOf("GET /health", "POST /auth/login")
+        // GET /download is the download page: a login form with no data in it. The builds it
+        // lists come from /app/{platform}/..., which need a login.
+        val PUBLIC = setOf("GET /health", "POST /auth/login", "GET /download")
     }
 }

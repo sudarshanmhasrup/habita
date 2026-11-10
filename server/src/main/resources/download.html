@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Get Habita</title>
+<style>
+    :root {
+        --bg: #FFFFFF; --card: #FFFFFF; --border: #E3E7E1; --text: #101613; --muted: #6B766F;
+        --accent: #2F6F4E; --on-accent: #FFFFFF; --tint: #DFEDE4; --error: #B3261E;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --bg: #0E1311; --card: #161C19; --border: #26302B; --text: #E8EEEA; --muted: #8E9A93;
+            --accent: #6FBF94; --on-accent: #0E1311; --tint: #1E3329; --error: #F2B8B5;
+        }
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+        font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        display: flex; justify-content: center; padding: 48px 16px;
+    }
+    main { width: 100%; max-width: 440px; }
+    h1 { font-size: 28px; font-weight: 650; letter-spacing: -0.01em; margin: 0 0 4px; }
+    .lead { color: var(--muted); margin: 0 0 28px; }
+    .card {
+        background: var(--card); border: 1px solid var(--border); border-radius: 22px; padding: 20px;
+    }
+    label { display: block; font-size: 14px; color: var(--muted); margin: 0 0 6px; }
+    input {
+        width: 100%; font: inherit; color: var(--text); background: var(--bg);
+        border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin: 0 0 16px;
+    }
+    input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+    button {
+        font: inherit; font-weight: 600; border: 0; border-radius: 999px; cursor: pointer;
+        padding: 12px 20px; background: var(--accent); color: var(--on-accent);
+    }
+    button:disabled { opacity: 0.55; cursor: default; }
+    button.quiet { background: transparent; color: var(--muted); padding: 8px 0; font-weight: 500; }
+    .wide { width: 100%; }
+    .error { color: var(--error); font-size: 14px; min-height: 21px; margin: 12px 0 0; }
+    .builds { display: grid; gap: 12px; }
+    .build { display: flex; align-items: center; gap: 16px; }
+    .build.mine { border-color: var(--accent); }
+    .build .info { flex: 1; min-width: 0; }
+    .build h2 { font-size: 17px; margin: 0; }
+    .build p { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
+    .pill {
+        display: inline-block; font-size: 12px; font-weight: 600; color: var(--accent);
+        background: var(--tint); border-radius: 999px; padding: 2px 8px; margin-left: 6px;
+        vertical-align: 2px;
+    }
+    .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+    .foot p { margin: 0; font-size: 13px; color: var(--muted); }
+    [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+    <h1>Get Habita</h1>
+    <p class="lead">Log in to download the app for this device.</p>
+
+    <section id="login" class="card">
+        <form id="login-form" novalidate>
+            <label for="email">Email</label>
+            <input id="email" type="email" autocomplete="username" required>
+            <label for="password">Password</label>
+            <input id="password" type="password" autocomplete="current-password" required>
+            <button id="login-button" class="wide" type="submit">Log in</button>
+            <p id="login-error" class="error" role="alert"></p>
+        </form>
+    </section>
+
+    <section id="downloads" hidden>
+        <div id="builds" class="builds"></div>
+        <p id="download-error" class="error" role="alert"></p>
+        <div class="foot">
+            <p>Installed apps update themselves.</p>
+            <button id="logout" class="quiet" type="button">Log out</button>
+        </div>
+    </section>
+</main>
+<script>
+(() => {
+    "use strict";
+    const PLATFORMS = [
+        { id: "windows", name: "Windows", note: "Installer for Windows 10 and 11" },
+        { id: "mac", name: "Mac", note: "Disk image for macOS" },
+        { id: "linux", name: "Linux", note: "Package for Debian and Ubuntu" },
+        { id: "android", name: "Android", note: "APK for Android phones" },
+    ];
+    const KEY = "habita.token";
+    const $ = (id) => document.getElementById(id);
+
+    function store(action, value) {
+        try {
+            if (action === "get") return sessionStorage.getItem(KEY);
+            if (action === "set") sessionStorage.setItem(KEY, value);
+            if (action === "clear") sessionStorage.removeItem(KEY);
+        } catch (_) { /* Storage can be blocked; the page still works until it's closed. */ }
+        return null;
+    }
+
+    let token = store("get");
+
+    function thisDevice() {
+        const agent = navigator.userAgent;
+        if (/Android/i.test(agent)) return "android";
+        if (/Windows/i.test(agent)) return "windows";
+        if (/Macintosh|Mac OS X/i.test(agent)) return "mac";
+        if (/Linux/i.test(agent)) return "linux";
+        return null;
+    }
+
+    function size(bytes) {
+        return bytes >= 1024 * 1024 ? `${Math.round(bytes / 1024 / 1024)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    }
+
+    function day(millis) {
+        return new Date(millis).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    }
+
+    function showLogin(message) {
+        token = null;
+        store("clear");
+        $("downloads").hidden = true;
+        $("login").hidden = false;
+        $("login-error").textContent = message || "";
+    }
+
+    async function api(path, options = {}) {
+        const response = await fetch(path, {
+            ...options,
+            headers: { ...(options.headers || {}), Authorization: `Bearer ${token}` },
+        });
+        if (response.status === 401) {
+            showLogin("Your session ended. Log in again.");
+            throw new Error("logged out");
+        }
+        return response;
+    }
+
+    $("login-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const email = $("email").value.trim();
+        const password = $("password").value;
+        if (!email || !password) {
+            $("login-error").textContent = "Enter your email and password.";
+            return;
+        }
+        $("login-button").disabled = true;
+        $("login-error").textContent = "";
+        try {
+            const response = await fetch("/auth/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password }),
+            });
+            if (response.status === 429) throw new Error("Too many tries. Wait a minute and try again.");
+            if (!response.ok) throw new Error("Wrong email or password.");
+            token = (await response.json()).token;
+            store("set", token);
+            $("password").value = "";
+            await showDownloads();
+        } catch (error) {
+            $("login-error").textContent = error instanceof TypeError ? "Can't reach the server." : error.message;
+        } finally {
+            $("login-button").disabled = false;
+        }
+    });
+
+    async function showDownloads() {
+        $("login").hidden = true;
+        $("downloads").hidden = false;
+        const mine = thisDevice();
+        const ordered = [...PLATFORMS].sort((a, b) => (b.id === mine) - (a.id === mine));
+        const list = $("builds");
+        list.replaceChildren();
+        for (const platform of ordered) {
+            const card = document.createElement("div");
+            card.className = "card build" + (platform.id === mine ? " mine" : "");
+            const info = document.createElement("div");
+            info.className = "info";
+            const title = document.createElement("h2");
+            title.textContent = platform.name;
+            if (platform.id === mine) {
+                const pill = document.createElement("span");
+                pill.className = "pill";
+                pill.textContent = "This device";
+                title.append(pill);
+            }
+            const detail = document.createElement("p");
+            detail.textContent = "Checking…";
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = "Download";
+            button.disabled = true;
+            info.append(title, detail);
+            card.append(info, button);
+            list.append(card);
+            loadBuild(platform, detail, button);
+        }
+    }
+
+    async function loadBuild(platform, detail, button) {
+        try {
+            const response = await api(`/app/${platform.id}/latest`);
+            if (response.status === 204) {
+                detail.textContent = "Not published yet.";
+                return;
+            }
+            if (!response.ok) throw new Error();
+            const release = await response.json();
+            detail.textContent = `${platform.note} · ${size(release.sizeBytes)} · ${day(release.publishedAt)}`;
+            button.disabled = false;
+            button.onclick = () => download(platform, release, button);
+        } catch (error) {
+            if (error.message !== "logged out") detail.textContent = "Couldn't check. Reload to try again.";
+        }
+    }
+
+    async function download(platform, release, button) {
+        $("download-error").textContent = "";
+        button.disabled = true;
+        try {
+            const response = await api(`/app/${platform.id}/download`);
+            if (!response.ok || !response.body) throw new Error();
+            const reader = response.body.getReader();
+            const parts = [];
+            let received = 0;
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                parts.push(value);
+                received += value.length;
+                button.textContent = `${Math.floor((received / release.sizeBytes) * 100)}%`;
+            }
+            if (received !== release.sizeBytes) throw new Error();
+            const name = /filename="?([^";]+)"?/.exec(response.headers.get("Content-Disposition") || "")?.[1]
+                || `habita.${platform.id}`;
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(new Blob(parts));
+            link.download = name;
+            document.body.append(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
+            button.textContent = "Downloaded";
+        } catch (error) {
+            if (error.message !== "logged out") {
+                $("download-error").textContent = `Couldn't download the ${platform.name} app. Try again.`;
+            }
+            button.textContent = "Download";
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    $("logout").addEventListener("click", async () => {
+        const old = token;
+        showLogin();
+        try {
+            await fetch("/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${old}` } });
+        } catch (_) { /* Offline: this page has forgotten the session either way. */ }
+    });
+
+    if (token) showDownloads(); else $("email").focus();
+})();
+</script>
+</body>
+</html>

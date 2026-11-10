@@ -1,6 +1,6 @@
 package dev.habita.server
 
-import dev.habita.app.shared.api.AndroidRelease
+import dev.habita.app.shared.api.AppRelease
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
@@ -41,7 +41,7 @@ class ReleaseTest {
         assertEquals(HttpStatusCode.Created, client.publish(bytes, 105).status)
 
         val token = client.token()
-        val latest = client.get("/app/android/latest") { bearerAuth(token) }.body<AndroidRelease>()
+        val latest = client.get("/app/android/latest") { bearerAuth(token) }.body<AppRelease>()
         assertEquals(105, latest.versionCode)
         assertEquals(bytes.size.toLong(), latest.sizeBytes)
         val downloaded = client.get("/app/android/apk") { bearerAuth(token) }.readRawBytes()
@@ -68,7 +68,7 @@ class ReleaseTest {
         assertEquals(HttpStatusCode.BadRequest, client.publish(apk(2), 104).status)
         assertEquals(HttpStatusCode.BadRequest, client.publish(apk(2), 105).status)
         assertEquals(HttpStatusCode.BadRequest, client.publish("not an apk".encodeToByteArray(), 106).status)
-        assertEquals(105, client.get("/app/android/latest") { bearerAuth(client.token()) }.body<AndroidRelease>().versionCode)
+        assertEquals(105, client.get("/app/android/latest") { bearerAuth(client.token()) }.body<AppRelease>().versionCode)
     }
 
     @Test
