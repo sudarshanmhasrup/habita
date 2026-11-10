@@ -22,6 +22,8 @@ import java.security.MessageDigest
  */
 class AndroidAppInstaller(private val context: Context) : AppInstaller {
     override val versionCode: Int = BuildConfig.VERSION_CODE
+    override val platform = "android"
+    override val installingHint = "Confirm the install when Android asks."
 
     override suspend fun install(
         release: AppRelease,

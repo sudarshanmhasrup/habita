@@ -285,6 +285,22 @@ The desktop app reads the same `local.properties` settings as Android and keeps 
 To build an installer for the current system, run `./gradlew :desktop:packageDmg` on macOS,
 `:desktop:packageMsi` on Windows or `:desktop:packageDeb` on Linux.
 
+### Download page and updates
+
+Every merge to `main` builds the Android app and the Windows, Mac and Linux installers in GitHub
+Actions and publishes them to your server. They read the server address from the repository
+variable `HABITA_SERVER_URL` and publish with the secret `HABITA_PUBLISH_TOKEN`, which must match
+the server's. Nothing about your server is kept in the code.
+
+Open `/download` on your server in a browser and log in with the app's email and password to get
+the app for that device. Installed apps check the server every few hours and offer each new build
+with an Install button; nothing installs without you. On Windows the update installs on its own
+and Habita reopens; on a Mac the disk image opens for Habita to be dragged into Applications; on
+Linux the system asks for your password. An app run from source never offers updates.
+
+The builds aren't signed, so the first install asks once: on Windows choose More info, then Run
+anyway; on a Mac right-click Habita and choose Open.
+
 ### Build the iOS app
 
 The iOS app reads the same `local.properties` settings as Android. Open

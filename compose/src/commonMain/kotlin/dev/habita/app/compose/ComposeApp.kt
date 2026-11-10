@@ -112,5 +112,5 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
 
 private enum class Screen { Home, Gym, Expense, Routine, Food }
 
-/** Platforms without an installer (iOS, desktop) never have an update to show. */
+/** Platforms without an installer (iOS, desktop run from source) never have an update to show. */
 private val noUpdates: StateFlow<UpdateState> = MutableStateFlow(UpdateState.None)

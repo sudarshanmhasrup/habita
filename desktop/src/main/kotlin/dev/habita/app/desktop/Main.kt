@@ -23,6 +23,7 @@ import dev.habita.app.compose.ComposeApp
 import dev.habita.app.compose.HabitaApp
 import dev.habita.app.core.data.DesktopDatabaseFactory
 import dev.habita.app.core.ui.LocalTitleBarInsets
+import kotlin.system.exitProcess
 
 /** Height of the macOS title bar the app draws under; the traffic lights sit inside it. */
 private val TitleBarHeight = 32.dp
@@ -38,7 +39,7 @@ private val isMac = System.getProperty("os.name").startsWith("Mac", ignoreCase =
  * zooms it on double-click. Other systems keep their native title bar.
  */
 fun main() = application {
-    val app = remember { HabitaApp(config = DESKTOP_CONFIG, databases = DesktopDatabaseFactory()) }
+    val app = remember { HabitaApp(config = DESKTOP_CONFIG, databases = DesktopDatabaseFactory(), installer = installer()) }
     val icon = remember {
         BitmapPainter(Thread.currentThread().contextClassLoader.getResourceAsStream("habita-icon.png")!!.use(::loadImageBitmap))
     }
@@ -72,6 +73,17 @@ fun main() = application {
             ) {}
         }
     }
+}
+
+/**
+ * The updater, only for an app installed from a published build: the installer's launcher sets
+ * `jpackage.app-version`, and CI gives the build its number. Run from source, there's nothing to
+ * replace, so no updates are offered.
+ */
+private fun installer(): DesktopAppInstaller? {
+    val system = DesktopSystem.current() ?: return null
+    if (System.getProperty("jpackage.app-version") == null || DESKTOP_VERSION_CODE == 0) return null
+    return DesktopAppInstaller(system, DESKTOP_VERSION_CODE, quit = { exitProcess(0) })
 }
 
 private fun WindowState.toggleZoom() {
