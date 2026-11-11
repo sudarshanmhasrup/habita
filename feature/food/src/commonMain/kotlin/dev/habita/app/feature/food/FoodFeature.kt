@@ -72,8 +72,8 @@ class FoodFeature(core: Core, internal val money: FoodMoney? = null) {
 
     /** The pantry as of today, or `null` before there is a plan. */
     internal val pantry: Flow<List<ItemStock>?> =
-        combine(repository.plan, repository.stockEvents, made, repository.opened, day) { plan, events, made, opened, day ->
-            plan?.let { Pantry.of(it, events, day, made, opened) }
+        combine(repository.plan, repository.stockEvents, made, repository.packDates, day) { plan, events, made, packs, day ->
+            plan?.let { Pantry.of(it, events, day, made, packs.opened, packs.expires) }
         }.shareIn(core.scope, sharing, replay = 1)
 
     /** Past days the app asks about because they weren't logged, oldest first. */

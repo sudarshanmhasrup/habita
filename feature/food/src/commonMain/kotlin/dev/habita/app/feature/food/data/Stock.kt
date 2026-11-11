@@ -26,7 +26,7 @@ data class StockEvent(
  * [daysLeft] counts whole days the plan can still eat from it, and [runsOut] is the day it runs
  * out; both `null` when unknown or when no meal uses it. [openedOn] is when the pack in use was
  * opened and [finishBy] the last day it keeps, for items whose plan says how long an open pack
- * lasts.
+ * lasts; [expiresOn] is the best-before date printed on it. [useBy] is the earlier of the two.
  */
 data class ItemStock(
     val item: FoodItem,
@@ -37,10 +37,13 @@ data class ItemStock(
     val pricePaise: Long?,
     val shop: String?,
     val openedOn: Int? = null,
+    val expiresOn: Int? = null,
 ) {
     val packsLeft: Double? get() = left?.let { it / item.packSize }
 
     val finishBy: Int? get() = openedOn?.let { day -> item.openDays?.let { day + it } }
+
+    val useBy: Int? get() = listOfNotNull(finishBy, expiresOn).minOrNull()
 }
 
 /**
@@ -61,6 +64,7 @@ object Pantry {
         today: Int,
         made: Map<Int, Set<String>> = emptyMap(),
         opened: Map<String, Int> = emptyMap(),
+        expires: Map<String, Int> = emptyMap(),
     ): List<ItemStock> {
         val byItem = events.filterNot(::isOldSkip).groupBy { it.itemId }
         val mealUse = plan.meals.associate { meal ->
@@ -101,6 +105,7 @@ object Pantry {
                 pricePaise = bought?.pricePaise ?: item.pricePaise,
                 shop = bought?.shop ?: item.shop,
                 openedOn = opened[item.id].takeIf { item.openDays != null },
+                expiresOn = expires[item.id],
             )
         }
     }

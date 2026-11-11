@@ -185,4 +185,34 @@ class PantryTest {
         assertEquals((day + 23 until day + 30).toList(), DayLog.unlogged(emptyMap(), firstDay = day, today = day + 30))
         assertEquals(emptyList(), DayLog.unlogged(emptyMap(), firstDay = null, today = day))
     }
+
+    @Test
+    fun `use by is the earlier of the open days and the best-before date`() {
+        val bread = FoodItem("bread", "Bread 450 g", 450.0, "g", BuyAt.APP, "Zepto", 59_00, openDays = 5)
+        val withBread = plan.copy(items = plan.items + bread)
+        val pantry = Pantry.of(withBread, emptyList(), today = day, opened = mapOf("bread" to day - 2), expires = mapOf("bread" to day + 1, "oats" to day + 90))
+
+        val stock = pantry.first { it.item.id == "bread" }
+        assertEquals(day + 3, stock.finishBy)
+        assertEquals(day + 1, stock.useBy)
+        assertEquals(day + 90, pantry.first { it.item.id == "oats" }.useBy)
+        assertEquals(mapOf("bread" to day), DayLog.expires(mapOf("expires:bread" to "$day", "expires:oats" to "")))
+    }
+
+    @Test
+    fun `best-before dates read the way packs print them`() {
+        val today = dayFrom(2026, 11, 11)
+
+        assertEquals(dayFrom(2026, 11, 14), parseDate("14/11", today))
+        assertEquals(dayFrom(2026, 11, 14), parseDate("14-11-2026", today))
+        assertEquals(dayFrom(2026, 11, 14), parseDate("14.11.26", today))
+        assertEquals(dayFrom(2026, 11, 14), parseDate("14 Nov", today))
+        // No year: January is next year's, a date a few weeks back stays this year's.
+        assertEquals(dayFrom(2027, 1, 5), parseDate("5/1", today))
+        assertEquals(dayFrom(2026, 10, 20), parseDate("20/10", today))
+        assertNull(parseDate("31/2", today))
+        assertNull(parseDate("tomorrow", today))
+        assertEquals("14/11", shortDate(dayFrom(2026, 11, 14)))
+        assertEquals("Sat 14 Nov", dateLabel(dayFrom(2026, 11, 14)))
+    }
 }

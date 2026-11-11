@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.theme.Space
+import dev.habita.app.core.ui.Chip
 import dev.habita.app.core.ui.Divider
 import dev.habita.app.core.ui.Gap
 import dev.habita.app.core.ui.HText
@@ -39,13 +40,15 @@ import dev.habita.app.feature.food.data.Refill
 import dev.habita.app.feature.food.data.formatAmount
 import dev.habita.app.feature.food.data.trim
 import dev.habita.app.feature.food.data.dateLabel
+import dev.habita.app.feature.food.data.shortDate
 import dev.habita.app.feature.food.data.weekdayName
 import dev.habita.app.feature.food.data.whenLabel
 
 /**
  * What's left of each item and when it runs out, worked out from the meals made. Tap an item to
- * say how many you have now (or, if you'd rather, add what you bought), and for items that keep
- * only a few days once open, when you opened a pack. The market list is the week's vegetables and
+ * say how many you have now (or, if you'd rather, add what you bought), the best-before date of
+ * the pack in use, and for items that keep only a few days once open, when you opened it. The
+ * market list is the week's vegetables and
  * fruit; app items come through refills, and an order is logged with "Log an order".
  */
 @Composable
@@ -56,7 +59,8 @@ internal fun PantryScreen(
     onBack: () -> Unit,
     onCount: (ItemStock, Double) -> Unit,
     onBought: (ItemStock, Double) -> Unit,
-    onOpened: (ItemStock) -> Unit,
+    onOpened: (ItemStock, Int) -> Unit,
+    onExpires: (ItemStock, String) -> Boolean,
     onFinished: (ItemStock) -> Unit,
     onRefill: () -> Unit,
     onLogOrder: () -> Unit,
@@ -110,6 +114,7 @@ internal fun PantryScreen(
                             onCount,
                             onBought,
                             onOpened,
+                            onExpires,
                             onFinished,
                         )
                     }
@@ -128,7 +133,8 @@ private fun ColumnScope.ItemRow(
     onToggle: () -> Unit,
     onCount: (ItemStock, Double) -> Unit,
     onBought: (ItemStock, Double) -> Unit,
-    onOpened: (ItemStock) -> Unit,
+    onOpened: (ItemStock, Int) -> Unit,
+    onExpires: (ItemStock, String) -> Boolean,
     onFinished: (ItemStock) -> Unit,
 ) {
     val colors = HabitaTheme.colors
@@ -139,9 +145,9 @@ private fun ColumnScope.ItemRow(
             HText(stock.item.name, type.bodyStrong)
             Gap(Space.tiny)
             HText(status(stock, today), type.caption, color = if (low) colors.error else colors.muted)
-            opened(stock, today)?.let { text ->
+            dates(stock, today)?.let { text ->
                 Gap(Space.tiny)
-                HText(text, type.caption, color = if (stock.finishBy!! <= today) colors.error else colors.muted)
+                HText(text, type.caption, color = if (stock.useBy!! <= today) colors.error else colors.muted)
             }
         }
         TextAction(if (expanded) "Close" else "Update", onToggle)
@@ -180,23 +186,61 @@ private fun ColumnScope.ItemRow(
             { buying = !buying; amount = "" },
             color = colors.muted,
         )
+        var bestBefore by remember(stock.item.id, stock.expiresOn) { mutableStateOf(stock.expiresOn?.let(::shortDate).orEmpty()) }
+        var unreadable by remember(stock.item.id) { mutableStateOf(false) }
+        Gap(Space.item)
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.item), verticalAlignment = Alignment.Bottom) {
+            LabeledField(
+                if (unreadable) "Best before: write it like 14/11" else "Best before, as on the pack (14/11)",
+                bestBefore,
+                { bestBefore = it; unreadable = false },
+                Modifier.weight(1f),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            )
+            TextAction("Save", { unreadable = !onExpires(stock, bestBefore) })
+        }
         if (stock.item.openDays != null) {
+            Gap(Space.item)
+            HText("Opened this pack:", type.caption, color = colors.muted)
             Gap(Space.inside)
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.item)) {
-                TextAction("Opened a new pack today", { onOpened(stock) })
-                if (stock.openedOn != null) TextAction("Finished it", { onFinished(stock) }, color = colors.muted)
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.inside)) {
+                (0..3).forEach { back ->
+                    val day = today - back
+                    Chip(
+                        when (back) {
+                            0 -> "Today"
+                            1 -> "Yest."
+                            else -> weekdayName(day)
+                        },
+                        stock.openedOn == day,
+                        { onOpened(stock, day) },
+                        Modifier.weight(1f),
+                    )
+                }
             }
+        }
+        if (stock.openedOn != null || stock.expiresOn != null) {
+            Gap(Space.inside)
+            TextAction("Pack finished: clear its dates", { onFinished(stock) }, color = colors.muted)
         }
     }
 }
 
-/** "Opened Mon · finish by Thu", or `null` when no open pack is being tracked. */
-private fun opened(stock: ItemStock, today: Int): String? {
-    val openedOn = stock.openedOn ?: return null
-    val finishBy = stock.finishBy ?: return null
-    val opened = if (openedOn == today) "Opened today" else "Opened ${whenLabelPast(openedOn, today)}"
-    val finish = if (finishBy < today) "past its days" else "finish by ${whenLabel(finishBy, today)}"
-    return "$opened · $finish"
+/**
+ * "Opened Mon · finish by Sat", "Best before Fri" or both, or `null` when the pack in use has
+ * neither date.
+ */
+private fun dates(stock: ItemStock, today: Int): String? {
+    val parts = buildList {
+        val openedOn = stock.openedOn
+        val finishBy = stock.finishBy
+        if (openedOn != null && finishBy != null) {
+            add(if (openedOn == today) "Opened today" else "Opened ${whenLabelPast(openedOn, today)}")
+            add(if (finishBy < today) "past its days" else "finish by ${whenLabel(finishBy, today)}")
+        }
+        stock.expiresOn?.let { add(if (it < today) "past best before" else "best before ${whenLabel(it, today)}") }
+    }
+    return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")?.replaceFirstChar { it.uppercase() }
 }
 
 /** "yesterday", "Mon" within the week, or "Mon 9 Nov". */

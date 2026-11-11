@@ -13,6 +13,7 @@ import dev.habita.app.feature.food.data.PlanResult
 import dev.habita.app.feature.food.data.Refill
 import dev.habita.app.feature.food.data.RefillLine
 import dev.habita.app.feature.food.data.dateLabel
+import dev.habita.app.feature.food.data.parseDate
 import dev.habita.app.feature.food.data.trim
 import dev.habita.app.feature.food.data.whenLabel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -119,20 +120,34 @@ internal class FoodViewModel(private val feature: FoodFeature) : ViewModel() {
 
     private fun dayName(day: Int): String = if (day == this.day.value) "Today" else dateLabel(day)
 
-    /** Opened a new pack of an item today. */
-    fun opened(stock: ItemStock) {
+    /** Opened a new pack of an item on [openedOn], today or a few days back. */
+    fun opened(stock: ItemStock, openedOn: Int) {
         val today = day.value ?: return
         viewModelScope.launch {
-            repository.opened(stock.item.id, today)
-            val finishBy = stock.item.openDays?.let { whenLabel(today + it, today) }
-            _message.value = "${stock.item.name}: opened today${finishBy?.let { ", finish it by $it" }.orEmpty()}."
+            repository.opened(stock.item.id, openedOn)
+            val finishBy = stock.item.openDays?.let { whenLabel(openedOn + it, today) }
+            _message.value = "${stock.item.name}: opened${finishBy?.let { ", finish it by $it" }.orEmpty()}."
         }
     }
 
-    /** The open pack of an item is finished. */
+    /**
+     * The pack in use is best before the date in [text], such as "14/11"; blank clears it. Returns
+     * `false` when the date doesn't read, so the field can say so.
+     */
+    fun expires(stock: ItemStock, text: String): Boolean {
+        val today = day.value ?: return false
+        val date = if (text.isBlank()) null else parseDate(text, today) ?: return false
+        viewModelScope.launch {
+            repository.expires(stock.item.id, date)
+            _message.value = date?.let { "${stock.item.name}: best before ${dateLabel(it)}." } ?: "${stock.item.name}: best-before date cleared."
+        }
+        return true
+    }
+
+    /** The pack in use is finished: its opened day and best-before date are cleared. */
     fun finished(stock: ItemStock) {
         viewModelScope.launch {
-            repository.opened(stock.item.id, null)
+            repository.finished(stock.item.id)
             _message.value = "${stock.item.name}: pack finished."
         }
     }
