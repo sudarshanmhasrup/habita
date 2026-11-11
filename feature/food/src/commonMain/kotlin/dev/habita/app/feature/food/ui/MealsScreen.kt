@@ -1,6 +1,7 @@
 package dev.habita.app.feature.food.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.theme.Space
+import dev.habita.app.core.ui.Chip
 import dev.habita.app.core.ui.Gap
 import dev.habita.app.core.ui.HText
 import dev.habita.app.core.ui.HabitaCard
@@ -27,15 +29,24 @@ import dev.habita.app.core.ui.TopBar
 import dev.habita.app.core.ui.TwoPane
 import dev.habita.app.core.ui.appear
 import dev.habita.app.feature.food.data.FoodPlan
+import dev.habita.app.feature.food.data.ItemStock
 import dev.habita.app.feature.food.data.Meal
+import dev.habita.app.feature.food.data.dateLabel
+import dev.habita.app.feature.food.data.whenLabel
 
 /**
- * The day's meals in order, each opening its recipe, with the day's protein and calories above
- * and the refill question when it stands. Without a plan yet, it explains how to add one.
+ * The day's meals in order, each opening its recipe, with the day's protein and calories above,
+ * the question of what was made (today, or a past day that wasn't logged), packs to use up, and
+ * the refill question when it stands. Without a plan yet, it explains how to add one.
  */
 @Composable
 internal fun MealsScreen(
     plan: FoodPlan?,
+    today: Int?,
+    made: Map<Int, Set<String>>,
+    unlogged: List<Int>,
+    pantry: List<ItemStock>?,
+    onLogDay: (Int, Set<String>) -> Unit,
     refillQuestion: String?,
     onBack: () -> Unit,
     onMeal: (Meal) -> Unit,
@@ -74,6 +85,15 @@ internal fun MealsScreen(
                 StatTile("Calories", grouped(plan.calories), Modifier.weight(1f), detail = "kcal a day")
             }
             Gap(Space.item)
+            if (today != null) {
+                DayLogCard(plan.meals, today, made, unlogged, onLogDay, Modifier.appear(1))
+                Gap(Space.item)
+                val useUp = pantry.orEmpty().filter { it.finishBy != null && it.left != 0.0 }
+                if (useUp.isNotEmpty()) {
+                    UseUpCard(useUp, today, Modifier.appear(1))
+                    Gap(Space.item)
+                }
+            }
             if (refillQuestion != null) {
                 HabitaCard(Modifier.fillMaxWidth().appear(1)) {
                     Overline("Refill", color = colors.accent)
@@ -113,18 +133,100 @@ private fun MealCard(meal: Meal, modifier: Modifier, onClick: () -> Unit) {
     }
 }
 
+/**
+ * What was made on a day, as a tick for each meal. It asks about the oldest past day that wasn't
+ * logged first, then today; once today is logged it folds to one line with "Change".
+ */
+@Composable
+private fun DayLogCard(
+    meals: List<Meal>,
+    today: Int,
+    made: Map<Int, Set<String>>,
+    unlogged: List<Int>,
+    onLogDay: (Int, Set<String>) -> Unit,
+    modifier: Modifier,
+) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
+    var changing by remember(today) { mutableStateOf(false) }
+    val day = unlogged.firstOrNull() ?: today
+    val logged = made[day]
+    HabitaCard(modifier.fillMaxWidth()) {
+        if (day == today && logged != null && !changing) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Overline("Today", color = colors.accent)
+                    Gap(Space.tiny)
+                    HText("${logged.count { id -> meals.any { it.id == id } }} of ${meals.size} meals made", type.title)
+                }
+                TextAction("Change", { changing = true })
+            }
+            return@HabitaCard
+        }
+        var picked by remember(day, logged) { mutableStateOf(logged ?: meals.map { it.id }.toSet()) }
+        Overline(if (day == today) "Today" else "Not logged yet", color = colors.accent)
+        Gap(Space.inside)
+        HText(if (day == today) "What did you make today?" else "What did you make on ${dateLabel(day)}?", type.title)
+        Gap(Space.tiny)
+        HText(
+            if (unlogged.size > 1) "${unlogged.size} days to catch up. Untick what you didn't make." else "Untick what you didn't make. Only these come off the pantry.",
+            type.body,
+            color = colors.muted,
+        )
+        meals.forEach { meal ->
+            Gap(Space.inside)
+            Chip(
+                listOfNotNull(meal.time, shortName(meal)).joinToString(" · "),
+                meal.id in picked,
+                { picked = if (meal.id in picked) picked - meal.id else picked + meal.id },
+                Modifier.fillMaxWidth(),
+            )
+        }
+        Gap(Space.item)
+        PrimaryButton("Save", { onLogDay(day, picked); changing = false }, Modifier.fillMaxWidth())
+        if (day != today) {
+            Gap(Space.inside)
+            TextAction("Made nothing that day", { onLogDay(day, emptySet()) })
+        }
+    }
+}
+
+/** Opened packs that only keep a few days, such as dahi, and the day to finish each by. */
+@Composable
+private fun UseUpCard(items: List<ItemStock>, today: Int, modifier: Modifier) {
+    val colors = HabitaTheme.colors
+    val type = HabitaTheme.typography
+    HabitaCard(modifier.fillMaxWidth()) {
+        Overline("Use up", color = colors.accent)
+        items.forEach { stock ->
+            val finishBy = stock.finishBy ?: return@forEach
+            Gap(Space.inside)
+            Row {
+                HText(stock.item.name, type.body, modifier = Modifier.weight(1f))
+                HText(
+                    if (finishBy < today) "past its days" else "finish by ${whenLabel(finishBy, today)}",
+                    type.bodyStrong,
+                    color = if (finishBy <= today) colors.error else colors.text,
+                )
+            }
+        }
+    }
+}
+
+/** "Meal 1: Breakfast - Overnight oats" → "Breakfast". */
+private fun shortName(meal: Meal): String = meal.name.substringAfter(':').substringBefore(" - ").trim().ifEmpty { meal.name }
+
 /** 2210 → "2,210". */
 internal fun grouped(value: Int): String = value.toString().reversed().chunked(3).joinToString(",").reversed()
 
 private fun macros(meal: Meal): String =
     listOfNotNull(meal.proteinGrams?.let { "$it g protein" }, meal.calories?.let { "$it kcal" }).joinToString(" · ")
 
-/** One meal's recipe: what goes in, how much, and the steps. "Skipped it" puts it back. */
+/** One meal's recipe: what goes in, how much, and the steps. */
 @Composable
-internal fun RecipeScreen(meal: Meal, onBack: () -> Unit, onSkip: () -> Unit) {
+internal fun RecipeScreen(meal: Meal, onBack: () -> Unit) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
-    var confirming by remember(meal.id) { mutableStateOf(false) }
     TwoPane(
         Modifier.fillMaxSize(),
         first = {
@@ -164,18 +266,6 @@ internal fun RecipeScreen(meal: Meal, onBack: () -> Unit, onSkip: () -> Unit) {
                             HText(step, type.body)
                         }
                     }
-                }
-                Gap(Space.item)
-            }
-            if (meal.ingredients.any { it.itemId != null }) {
-                if (confirming) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        HText("Put today's ingredients back in the pantry?", type.label, modifier = Modifier.weight(1f))
-                        TextAction("Cancel", { confirming = false }, color = colors.muted)
-                        TextAction("Yes", { confirming = false; onSkip() })
-                    }
-                } else {
-                    SecondaryButton("Skipped it today", { confirming = true }, Modifier.fillMaxWidth())
                 }
             }
         },

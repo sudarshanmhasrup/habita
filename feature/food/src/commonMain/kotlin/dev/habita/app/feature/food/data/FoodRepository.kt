@@ -42,6 +42,15 @@ class FoodRepository(core: Core) {
         }
     }
 
+    private val allValues: Flow<Map<String, String>> = values.all().asFlow().mapToList(Dispatchers.Default)
+        .map { rows -> rows.associate { it.key to it.value_ } }
+
+    /** The logged days: day → ids of the meals made. See [DayLog]. */
+    val made: Flow<Map<Int, Set<String>>> = allValues.map(DayLog::made).distinctUntilChanged()
+
+    /** When each item's current pack was opened: item id → day. */
+    val opened: Flow<Map<String, Int>> = allValues.map(DayLog::opened).distinctUntilChanged()
+
     /** The day through which refill questions wait, after "Not now". */
     val snoozedThrough: Flow<Int> = values.byKey(SNOOZE).asFlow().mapToOneOrNull(Dispatchers.Default)
         .map { it?.value_?.toIntOrNull() ?: Int.MIN_VALUE }
@@ -60,8 +69,8 @@ class FoodRepository(core: Core) {
     }
 
     /**
-     * Adds to the stock: purchases, with their per-pack price and shop, or a skipped meal's
-     * ingredients. Each entry is an item id and a quantity in its unit.
+     * Adds purchases to the stock, with their per-pack price and shop. Each entry is an item id
+     * and a quantity in its unit.
      */
     suspend fun add(entries: List<Pair<String, Double>>, pricesPaise: Map<String, Long> = emptyMap(), shop: String? = null, note: String = "") =
         change {
@@ -74,6 +83,12 @@ class FoodRepository(core: Core) {
                 }
             }
         }
+
+    /** On [day], exactly the meals in [mealIds] were made; saving a day again replaces it. */
+    suspend fun logDay(day: Int, mealIds: Set<String>) = change { values.save(DayLog.madeKey(day), DayLog.encode(mealIds), nowMillis(), 1) }
+
+    /** The item's pack in use was opened on [day]; `null` when it's finished. */
+    suspend fun opened(itemId: String, day: Int?) = change { values.save(DayLog.openedKey(itemId), day?.toString().orEmpty(), nowMillis(), 1) }
 
     /** No refill questions through [day]. */
     suspend fun snoozeThrough(day: Int) = change { values.save(SNOOZE, day.toString(), nowMillis(), 1) }

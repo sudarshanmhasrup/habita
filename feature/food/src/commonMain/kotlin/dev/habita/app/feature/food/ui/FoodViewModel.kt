@@ -6,14 +6,15 @@ import dev.habita.app.feature.food.FoodFeature
 import dev.habita.app.feature.food.data.FoodPlan
 import dev.habita.app.feature.food.data.FoodSpend
 import dev.habita.app.feature.food.data.ItemStock
-import dev.habita.app.feature.food.data.Meal
 import dev.habita.app.feature.food.data.Order
 import dev.habita.app.feature.food.data.OrderResult
 import dev.habita.app.feature.food.data.OrderText
 import dev.habita.app.feature.food.data.PlanResult
 import dev.habita.app.feature.food.data.Refill
 import dev.habita.app.feature.food.data.RefillLine
+import dev.habita.app.feature.food.data.dateLabel
 import dev.habita.app.feature.food.data.trim
+import dev.habita.app.feature.food.data.whenLabel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -50,6 +51,8 @@ internal class FoodViewModel(private val feature: FoodFeature) : ViewModel() {
     val plan: StateFlow<FoodPlan?> = repository.plan.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val planText: StateFlow<String?> = repository.planText.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val pantry: StateFlow<List<ItemStock>?> = feature.pantry.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val made: StateFlow<Map<Int, Set<String>>> = feature.made.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+    val unlogged: StateFlow<List<Int>> = feature.unlogged.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val day: StateFlow<Int?> = feature.day.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val refillQuestion: StateFlow<String?> = feature.refillQuestion.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val spend: StateFlow<FoodSpend?> = feature.foodSpend.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -101,12 +104,36 @@ internal class FoodViewModel(private val feature: FoodFeature) : ViewModel() {
         _message.value = text
     }
 
-    /** The meal wasn't eaten today: its ingredients go back in the pantry. */
-    fun skip(meal: Meal) {
-        val tracked = meal.ingredients.mapNotNull { ingredient -> ingredient.itemId?.let { it to ingredient.amount!! } }
+    /** On [day], exactly the meals in [mealIds] were made. */
+    fun logDay(day: Int, mealIds: Set<String>) {
+        val total = plan.value?.meals?.size ?: 0
         viewModelScope.launch {
-            repository.add(tracked, note = "Skipped ${meal.name}")
-            _message.value = "Put ${meal.name}'s ingredients back in the pantry."
+            repository.logDay(day, mealIds)
+            _message.value = when {
+                mealIds.isEmpty() -> "${dayName(day)}: nothing made. The pantry stays as it was."
+                mealIds.size == total -> "${dayName(day)}: all $total meals made."
+                else -> "${dayName(day)}: ${mealIds.size} of $total meals made."
+            }
+        }
+    }
+
+    private fun dayName(day: Int): String = if (day == this.day.value) "Today" else dateLabel(day)
+
+    /** Opened a new pack of an item today. */
+    fun opened(stock: ItemStock) {
+        val today = day.value ?: return
+        viewModelScope.launch {
+            repository.opened(stock.item.id, today)
+            val finishBy = stock.item.openDays?.let { whenLabel(today + it, today) }
+            _message.value = "${stock.item.name}: opened today${finishBy?.let { ", finish it by $it" }.orEmpty()}."
+        }
+    }
+
+    /** The open pack of an item is finished. */
+    fun finished(stock: ItemStock) {
+        viewModelScope.launch {
+            repository.opened(stock.item.id, null)
+            _message.value = "${stock.item.name}: pack finished."
         }
     }
 
@@ -114,7 +141,7 @@ internal class FoodViewModel(private val feature: FoodFeature) : ViewModel() {
     fun count(stock: ItemStock, packs: Double) {
         viewModelScope.launch {
             repository.count(stock.item.id, packs * stock.item.packSize)
-            _message.value = "${stock.item.name}: ${trim(packs)} left."
+            _message.value = "${stock.item.name}: you have ${trim(packs)} now."
         }
     }
 

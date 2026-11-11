@@ -1,5 +1,6 @@
--- Single food values that sync, by key: the plan as written ("plan", markdown, see PlanText) and
--- until which day a refill question waits ("snooze").
+-- Single food values that sync, by key: the plan as written ("plan", markdown, see PlanText),
+-- until which day a refill question waits ("snooze"), the meals made on a day ("made:<day>") and
+-- when an item's pack was opened ("opened:<item id>"); see DayLog.
 CREATE TABLE food_value (
     key TEXT NOT NULL PRIMARY KEY,
     value TEXT NOT NULL,
