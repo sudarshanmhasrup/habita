@@ -2,6 +2,7 @@ package dev.habita.app.feature.food
 
 import dev.habita.app.core.Core
 import dev.habita.app.core.data.nowMillis
+import dev.habita.app.feature.food.data.DayLog
 import dev.habita.app.feature.food.data.FoodRepository
 import dev.habita.app.feature.food.data.FoodSpend
 import dev.habita.app.feature.food.data.ItemStock
@@ -41,7 +42,7 @@ interface FoodMoney {
 }
 
 /**
- * Food: the day's meals with their recipes, the pantry worked out from the plan, and refills that
+ * Food: the day's meals with their recipes, the pantry worked out from the meals made, and refills that
  * ask first. Habita doesn't order anything itself: a refill copies a request for Claude, which
  * fills the cheapest cart for the user to pay, and the order comes back as text to log here.
  * Create it once at startup.
@@ -66,9 +67,18 @@ class FoodFeature(core: Core, internal val money: FoodMoney? = null) {
 
     internal val day: Flow<Int> = clock.map { it.first }.distinctUntilChanged().shareIn(core.scope, sharing, replay = 1)
 
+    /** The logged days: day → ids of the meals made. */
+    internal val made: Flow<Map<Int, Set<String>>> = repository.made.shareIn(core.scope, sharing, replay = 1)
+
     /** The pantry as of today, or `null` before there is a plan. */
-    internal val pantry: Flow<List<ItemStock>?> = combine(repository.plan, repository.stockEvents, day) { plan, events, day ->
-        plan?.let { Pantry.of(it, events, day) }
+    internal val pantry: Flow<List<ItemStock>?> =
+        combine(repository.plan, repository.stockEvents, made, repository.opened, day) { plan, events, made, opened, day ->
+            plan?.let { Pantry.of(it, events, day, made, opened) }
+        }.shareIn(core.scope, sharing, replay = 1)
+
+    /** Past days the app asks about because they weren't logged, oldest first. */
+    internal val unlogged: Flow<List<Int>> = combine(repository.stockEvents, made, day) { events, made, day ->
+        DayLog.unlogged(made, events.minOfOrNull { it.day }, day)
     }.shareIn(core.scope, sharing, replay = 1)
 
     /** The refill question while it should be asked: app items about to run out, not snoozed. */

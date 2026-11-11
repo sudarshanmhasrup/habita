@@ -38,11 +38,14 @@ import dev.habita.app.feature.food.data.ItemStock
 import dev.habita.app.feature.food.data.Refill
 import dev.habita.app.feature.food.data.formatAmount
 import dev.habita.app.feature.food.data.trim
+import dev.habita.app.feature.food.data.dateLabel
+import dev.habita.app.feature.food.data.weekdayName
 import dev.habita.app.feature.food.data.whenLabel
 
 /**
- * What's left of each item and when it runs out, worked out from the plan. Tap an item to say how
- * much is really left or to add what was bought. The market list is the week's vegetables and
+ * What's left of each item and when it runs out, worked out from the meals made. Tap an item to
+ * say how many you have now (or, if you'd rather, add what you bought), and for items that keep
+ * only a few days once open, when you opened a pack. The market list is the week's vegetables and
  * fruit; app items come through refills, and an order is logged with "Log an order".
  */
 @Composable
@@ -53,6 +56,8 @@ internal fun PantryScreen(
     onBack: () -> Unit,
     onCount: (ItemStock, Double) -> Unit,
     onBought: (ItemStock, Double) -> Unit,
+    onOpened: (ItemStock) -> Unit,
+    onFinished: (ItemStock) -> Unit,
     onRefill: () -> Unit,
     onLogOrder: () -> Unit,
 ) {
@@ -67,7 +72,7 @@ internal fun PantryScreen(
             Gap(Space.inside)
             HText("Pantry", type.headline)
             Gap(Space.tiny)
-            HText("It goes down by the plan every day. Tap an item to fix the count or add what you bought.", type.body, color = colors.muted)
+            HText("It goes down by the meals you log as made. Tap an item to set how many you have.", type.body, color = colors.muted)
             Gap(Space.item)
             if (refillQuestion != null) PrimaryButton("Refill: see what to order", onRefill, Modifier.fillMaxWidth().appear(0))
             else SecondaryButton("Order now anyway", onRefill, Modifier.fillMaxWidth().appear(0))
@@ -97,7 +102,16 @@ internal fun PantryScreen(
                 HabitaCard(Modifier.fillMaxWidth()) {
                     items.forEachIndexed { index, stock ->
                         if (index > 0) Divider(Modifier.padding(vertical = Space.item))
-                        ItemRow(stock, today, open == stock.item.id, { open = if (open == stock.item.id) null else stock.item.id }, onCount, onBought)
+                        ItemRow(
+                            stock,
+                            today,
+                            open == stock.item.id,
+                            { open = if (open == stock.item.id) null else stock.item.id },
+                            onCount,
+                            onBought,
+                            onOpened,
+                            onFinished,
+                        )
                     }
                 }
                 Gap(Space.section)
@@ -114,6 +128,8 @@ private fun ColumnScope.ItemRow(
     onToggle: () -> Unit,
     onCount: (ItemStock, Double) -> Unit,
     onBought: (ItemStock, Double) -> Unit,
+    onOpened: (ItemStock) -> Unit,
+    onFinished: (ItemStock) -> Unit,
 ) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
@@ -123,36 +139,71 @@ private fun ColumnScope.ItemRow(
             HText(stock.item.name, type.bodyStrong)
             Gap(Space.tiny)
             HText(status(stock, today), type.caption, color = if (low) colors.error else colors.muted)
+            opened(stock, today)?.let { text ->
+                Gap(Space.tiny)
+                HText(text, type.caption, color = if (stock.finishBy!! <= today) colors.error else colors.muted)
+            }
         }
         TextAction(if (expanded) "Close" else "Update", onToggle)
     }
     if (expanded) {
-        var left by remember(stock.item.id) { mutableStateOf("") }
-        var bought by remember(stock.item.id) { mutableStateOf("") }
+        // One number at a time: how many you have now, or (switched) how many you just bought.
+        var amount by remember(stock.item.id) { mutableStateOf("") }
+        var buying by remember(stock.item.id) { mutableStateOf(false) }
+        val pieces = stock.item.packSize == 1.0
         val pack = formatAmount(stock.item.packSize, stock.item.unit)
-        Gap(Space.item)
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.item), verticalAlignment = Alignment.Bottom) {
-            LabeledField(
-                "Packs left now (of $pack)",
-                left,
-                { left = it.filter { c -> c.isDigit() || c == '.' } },
-                Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
-            )
-            TextAction("Save", { left.toDoubleOrNull()?.let { onCount(stock, it); left = "" } })
+        val label = when {
+            buying && pieces -> "How many did you buy?"
+            buying -> "Packs you bought (1 pack = $pack)"
+            pieces -> "How many do you have now?"
+            else -> "Packs you have now (1 pack = $pack)"
         }
         Gap(Space.item)
         Row(horizontalArrangement = Arrangement.spacedBy(Space.item), verticalAlignment = Alignment.Bottom) {
             LabeledField(
-                "Packs bought",
-                bought,
-                { bought = it.filter { c -> c.isDigit() || c == '.' } },
+                label,
+                amount,
+                { amount = it.filter { c -> c.isDigit() || c == '.' } },
                 Modifier.weight(1f),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
             )
-            TextAction("Add", { bought.toDoubleOrNull()?.takeIf { it > 0 }?.let { onBought(stock, it); bought = "" } })
+            TextAction(if (buying) "Add" else "Save", {
+                amount.toDoubleOrNull()?.takeIf { !buying || it > 0 }?.let {
+                    if (buying) onBought(stock, it) else onCount(stock, it)
+                    amount = ""
+                }
+            })
+        }
+        Gap(Space.inside)
+        TextAction(
+            if (buying) "Set how many you have instead" else "Just bought some? Add them instead",
+            { buying = !buying; amount = "" },
+            color = colors.muted,
+        )
+        if (stock.item.openDays != null) {
+            Gap(Space.inside)
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.item)) {
+                TextAction("Opened a new pack today", { onOpened(stock) })
+                if (stock.openedOn != null) TextAction("Finished it", { onFinished(stock) }, color = colors.muted)
+            }
         }
     }
+}
+
+/** "Opened Mon · finish by Thu", or `null` when no open pack is being tracked. */
+private fun opened(stock: ItemStock, today: Int): String? {
+    val openedOn = stock.openedOn ?: return null
+    val finishBy = stock.finishBy ?: return null
+    val opened = if (openedOn == today) "Opened today" else "Opened ${whenLabelPast(openedOn, today)}"
+    val finish = if (finishBy < today) "past its days" else "finish by ${whenLabel(finishBy, today)}"
+    return "$opened · $finish"
+}
+
+/** "yesterday", "Mon" within the week, or "Mon 9 Nov". */
+private fun whenLabelPast(day: Int, today: Int): String = when (today - day) {
+    1 -> "yesterday"
+    in 2..6 -> weekdayName(day)
+    else -> dateLabel(day)
 }
 
 /** "6 packs left · runs out Thu", "Not counted yet" or "Not in any meal". */

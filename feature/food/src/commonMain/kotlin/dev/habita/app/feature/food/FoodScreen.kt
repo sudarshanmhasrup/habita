@@ -42,6 +42,8 @@ fun FoodScreen(feature: FoodFeature, onExit: () -> Unit) {
     val plan by viewModel.plan.collectAsStateWithLifecycle()
     val planText by viewModel.planText.collectAsStateWithLifecycle()
     val pantry by viewModel.pantry.collectAsStateWithLifecycle()
+    val made by viewModel.made.collectAsStateWithLifecycle()
+    val unlogged by viewModel.unlogged.collectAsStateWithLifecycle()
     val day by viewModel.day.collectAsStateWithLifecycle()
     val question by viewModel.refillQuestion.collectAsStateWithLifecycle()
     val spend by viewModel.spend.collectAsStateWithLifecycle()
@@ -78,6 +80,11 @@ fun FoodScreen(feature: FoodFeature, onExit: () -> Unit) {
             when (screen) {
                 FoodRoute.Today -> MealsScreen(
                     plan = plan,
+                    today = day,
+                    made = made,
+                    unlogged = unlogged,
+                    pantry = pantry,
+                    onLogDay = viewModel::logDay,
                     refillQuestion = question,
                     onBack = onExit,
                     onMeal = { viewModel.open(FoodRoute.Recipe(it.id)) },
@@ -87,7 +94,7 @@ fun FoodScreen(feature: FoodFeature, onExit: () -> Unit) {
                 )
 
                 is FoodRoute.Recipe -> plan?.meals?.firstOrNull { it.id == screen.mealId }?.let { meal ->
-                    RecipeScreen(meal, onBack = { viewModel.back() }, onSkip = { viewModel.skip(meal) })
+                    RecipeScreen(meal, onBack = { viewModel.back() })
                 }
 
                 FoodRoute.Pantry -> {
@@ -101,6 +108,8 @@ fun FoodScreen(feature: FoodFeature, onExit: () -> Unit) {
                             onBack = { viewModel.back() },
                             onCount = viewModel::count,
                             onBought = viewModel::bought,
+                            onOpened = viewModel::opened,
+                            onFinished = viewModel::finished,
                             onRefill = { viewModel.open(FoodRoute.Refill) },
                             onLogOrder = { viewModel.open(FoodRoute.Order) },
                         )

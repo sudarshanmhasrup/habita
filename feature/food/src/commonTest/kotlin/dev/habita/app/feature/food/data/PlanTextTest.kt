@@ -75,4 +75,26 @@ class PlanTextTest {
         assertEquals("2.5", trim(2.5))
         assertEquals(1259.0, PlanText.number("₹1,259"))
     }
+
+    @Test
+    fun `items can say how long an opened pack keeps`() {
+        val text = """
+            ## Items
+
+            | Id | Item | Pack | Unit | Opened |
+            | --- | --- | --- | --- | --- |
+            | dahi | Dahi 1 kg | 1000 | g | 3 days |
+            | oats | Oats 1 kg | 1000 | g | |
+
+            ## Lunch
+
+            | Item | Amount |
+            | --- | --- |
+            | dahi | 150 |
+        """.trimIndent()
+        val plan = (PlanText.parse(text) as PlanResult.Ok).plan
+
+        assertEquals(3, plan.item("dahi")?.openDays)
+        assertEquals(null, plan.item("oats")?.openDays)
+    }
 }

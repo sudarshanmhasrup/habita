@@ -8,7 +8,8 @@ enum class BuyAt { APP, MARKET }
 /**
  * Something kept in the pantry, such as milk. Amounts are in its [unit]: "g", "ml" or "pc"
  * (pieces). [packSize] is how much one pack holds; [pricePaise] and [shop] are what the plan says
- * it costs and where, until a purchase says otherwise.
+ * it costs and where, until a purchase says otherwise. [openDays] is how many days an opened pack
+ * keeps, such as 3 for dahi; `null` when it doesn't matter.
  */
 data class FoodItem(
     val id: String,
@@ -18,6 +19,7 @@ data class FoodItem(
     val buyAt: BuyAt,
     val shop: String?,
     val pricePaise: Long?,
+    val openDays: Int? = null,
 )
 
 /**
@@ -77,7 +79,8 @@ sealed interface PlanResult {
  * The plan as written: markdown that reads well on its own and can be handed to an AI to change.
  * An "Items" section has a table of pantry items; every other "## " section is a meal, with
  * optional "Time:", "Protein:" and "Calories:" lines, a table of ingredients and the steps after
- * "Steps:". An ingredient whose name is an item id is counted against the pantry. See [EXAMPLE].
+ * "Steps:". An ingredient whose name is an item id is counted against the pantry. An optional
+ * "Opened" column on items says how many days an opened pack keeps. See [EXAMPLE].
  */
 object PlanText {
     private val units = setOf("g", "ml", "pc")
@@ -145,6 +148,7 @@ object PlanText {
         val buy = column(header, "buy")
         val shop = column(header, "shop")
         val price = column(header, "price")
+        val opened = column(header, "opened", "keeps open")
         if (listOf(id, name, pack, unit).any { it < 0 }) {
             problems += "Items: the table needs Id, Item, Pack and Unit columns."
             return emptyList()
@@ -167,6 +171,7 @@ object PlanText {
                     buyAt = if (cell(buy).equals("market", ignoreCase = true)) BuyAt.MARKET else BuyAt.APP,
                     shop = cell(shop).ifEmpty { null },
                     pricePaise = number(cell(price))?.let { (it * 100).roundToLong() },
+                    openDays = number(cell(opened))?.toInt()?.takeIf { it > 0 },
                 )
             }
             null
