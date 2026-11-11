@@ -72,12 +72,18 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Habita"
+            // The installers ship a trimmed Java runtime, so every module the app needs is listed:
+            // java.sql for the local database and jdk.crypto.ec for HTTPS to the server.
+            // ./gradlew :desktop:suggestRuntimeModules shows the rest after a new dependency.
+            modules("java.instrument", "java.management", "java.sql", "jdk.crypto.ec", "jdk.unsupported")
             // Installers need a.b.c with c below 65536; the build number goes last.
             packageVersion = if (versionCode > 0) "1.0.$versionCode" else libs.versions.desktop.version.get()
             macOS {
                 bundleID = libs.versions.desktop.group.get()
+                iconFile.set(project.file("icons/habita.icns"))
             }
             windows {
+                iconFile.set(project.file("icons/habita.ico"))
                 // Fixed for good: it is how Windows knows a new build replaces the installed one.
                 upgradeUuid = "0a099d1e-3c7f-4d80-b2c5-c962b17512d7"
                 // Installs for this user only, so updates never ask for an administrator.
@@ -88,6 +94,7 @@ compose.desktop {
             }
             linux {
                 packageName = "habita"
+                iconFile.set(project.file("icons/habita.png"))
                 shortcut = true
             }
         }
