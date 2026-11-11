@@ -88,7 +88,10 @@ internal fun MealsScreen(
             if (today != null) {
                 DayLogCard(plan.meals, today, made, unlogged, onLogDay, Modifier.appear(1))
                 Gap(Space.item)
-                val useUp = pantry.orEmpty().filter { it.finishBy != null && it.left != 0.0 }
+                val useUp = pantry.orEmpty().filter { stock ->
+                    val useBy = stock.useBy ?: return@filter false
+                    stock.left != 0.0 && (stock.finishBy != null || useBy - today <= USE_UP_DAYS)
+                }
                 if (useUp.isNotEmpty()) {
                     UseUpCard(useUp, today, Modifier.appear(1))
                     Gap(Space.item)
@@ -191,7 +194,13 @@ private fun DayLogCard(
     }
 }
 
-/** Opened packs that only keep a few days, such as dahi, and the day to finish each by. */
+/** How close a best-before date has to be for the meals screen to mention it. */
+private const val USE_UP_DAYS = 3
+
+/**
+ * Packs to use up soon: opened ones that only keep a few days, such as dahi, and any nearing their
+ * best-before date, each with the day to finish it by.
+ */
 @Composable
 private fun UseUpCard(items: List<ItemStock>, today: Int, modifier: Modifier) {
     val colors = HabitaTheme.colors
@@ -199,7 +208,7 @@ private fun UseUpCard(items: List<ItemStock>, today: Int, modifier: Modifier) {
     HabitaCard(modifier.fillMaxWidth()) {
         Overline("Use up", color = colors.accent)
         items.forEach { stock ->
-            val finishBy = stock.finishBy ?: return@forEach
+            val finishBy = stock.useBy ?: return@forEach
             Gap(Space.inside)
             Row {
                 HText(stock.item.name, type.body, modifier = Modifier.weight(1f))

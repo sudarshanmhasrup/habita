@@ -48,8 +48,8 @@ class FoodRepository(core: Core) {
     /** The logged days: day → ids of the meals made. See [DayLog]. */
     val made: Flow<Map<Int, Set<String>>> = allValues.map(DayLog::made).distinctUntilChanged()
 
-    /** When each item's current pack was opened: item id → day. */
-    val opened: Flow<Map<String, Int>> = allValues.map(DayLog::opened).distinctUntilChanged()
+    /** When each item's current pack was opened and when it's best before: item id → day. */
+    val packDates: Flow<PackDates> = allValues.map { PackDates(DayLog.opened(it), DayLog.expires(it)) }.distinctUntilChanged()
 
     /** The day through which refill questions wait, after "Not now". */
     val snoozedThrough: Flow<Int> = values.byKey(SNOOZE).asFlow().mapToOneOrNull(Dispatchers.Default)
@@ -90,6 +90,18 @@ class FoodRepository(core: Core) {
     /** The item's pack in use was opened on [day]; `null` when it's finished. */
     suspend fun opened(itemId: String, day: Int?) = change { values.save(DayLog.openedKey(itemId), day?.toString().orEmpty(), nowMillis(), 1) }
 
+    /** The item's pack in use is best before [day]; `null` clears it. */
+    suspend fun expires(itemId: String, day: Int?) = change { values.save(DayLog.expiresKey(itemId), day?.toString().orEmpty(), nowMillis(), 1) }
+
+    /** The pack in use is finished: its opened day and best-before date are cleared. */
+    suspend fun finished(itemId: String) = change {
+        val now = nowMillis()
+        database.transaction {
+            values.save(DayLog.openedKey(itemId), "", now, 1)
+            values.save(DayLog.expiresKey(itemId), "", now, 1)
+        }
+    }
+
     /** No refill questions through [day]. */
     suspend fun snoozeThrough(day: Int) = change { values.save(SNOOZE, day.toString(), nowMillis(), 1) }
 
@@ -103,3 +115,6 @@ class FoodRepository(core: Core) {
         const val SNOOZE = "snooze"
     }
 }
+
+/** When each item's current pack was opened, and when it's best before: item id → day. */
+data class PackDates(val opened: Map<String, Int>, val expires: Map<String, Int>)

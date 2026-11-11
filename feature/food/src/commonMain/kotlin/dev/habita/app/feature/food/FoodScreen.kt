@@ -109,6 +109,7 @@ fun FoodScreen(feature: FoodFeature, onExit: () -> Unit) {
                             onCount = viewModel::count,
                             onBought = viewModel::bought,
                             onOpened = viewModel::opened,
+                            onExpires = viewModel::expires,
                             onFinished = viewModel::finished,
                             onRefill = { viewModel.open(FoodRoute.Refill) },
                             onLogOrder = { viewModel.open(FoodRoute.Order) },
