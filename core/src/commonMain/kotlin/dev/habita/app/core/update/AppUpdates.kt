@@ -90,12 +90,28 @@ class AppUpdates(private val core: Core, private val installer: AppInstaller) {
     }
 
     fun install() {
-        val release = when (val current = _state.value) {
+        val offered = when (val current = _state.value) {
             is UpdateState.Available -> current.release
             is UpdateState.Failed -> current.release
             else -> return
         }
         core.scope.launch {
+            _state.value = UpdateState.Downloading(offered, 0f)
+            // The server only serves its newest build, which may be newer than the one offered
+            // hours ago. Checking against the offered build's SHA-256 would then call a good
+            // download damaged, so ask again and install what will actually be downloaded.
+            val release = try {
+                core.api.getOrNull<AppRelease>("app/${installer.platform}/latest")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _state.value = UpdateState.Failed(offered, "Couldn't download the update. Check your connection.")
+                return@launch
+            }
+            if (release == null || release.versionCode <= installer.versionCode) {
+                _state.value = UpdateState.None
+                return@launch
+            }
             _state.value = UpdateState.Downloading(release, 0f)
             try {
                 installer.install(
