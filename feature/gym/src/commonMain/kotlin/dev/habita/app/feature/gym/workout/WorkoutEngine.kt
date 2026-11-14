@@ -6,6 +6,7 @@ import dev.habita.app.shared.gym.ExerciseTarget
 import dev.habita.app.shared.gym.Progression
 import dev.habita.app.shared.gym.SetLog
 import dev.habita.app.shared.gym.WarmUp
+import dev.habita.app.shared.gym.WarmUpItem
 import dev.habita.app.shared.gym.WarmUpLog
 import dev.habita.app.shared.gym.WarmUpStatus
 import dev.habita.app.shared.gym.Workout
@@ -69,6 +70,17 @@ object WorkoutEngine {
             active.copy(warmUpQueue = queue)
         }
         return next to log
+    }
+
+    /**
+     * Skips the treadmill walk that opens the warm-up, for a day the walk to the gym already did
+     * its job. Returns `null` when the next warm-up item isn't a walk.
+     */
+    fun skipWalk(active: ActiveWorkout, id: String, now: Long): Pair<ActiveWorkout, WarmUpLog>? {
+        if (active.phase != Phase.WARM_UP) return null
+        val next = active.warmUpQueue.firstOrNull() ?: return null
+        if (!active.warmUp.items[next].isWalk()) return null
+        return completeWarmUp(active, WarmUpStatus.SKIPPED, id, now)
     }
 
     /** The machine is taken: the current warm-up item comes back after the next one. */
@@ -207,3 +219,9 @@ object WorkoutEngine {
     private fun moveFirstBehindNext(queue: List<Int>): List<Int> =
         if (queue.size < 2) queue else listOf(queue[1], queue[0]) + queue.drop(2)
 }
+
+/** Whether this warm-up item is the treadmill walk, which a walk to the gym can replace. */
+internal fun WarmUpItem.isWalk(): Boolean = name.trim().startsWith("Treadmill", ignoreCase = true)
+
+/** Whether [warmUp] opens with the treadmill walk, so starting asks about the walk to the gym. */
+internal fun startsWithWalk(warmUp: WarmUp?): Boolean = warmUp?.items?.firstOrNull()?.isWalk() == true

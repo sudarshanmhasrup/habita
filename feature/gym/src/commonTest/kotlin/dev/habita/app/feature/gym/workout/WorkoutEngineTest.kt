@@ -198,4 +198,33 @@ class WorkoutEngineTest {
         assertEquals(25_000, updated.targets[2].weightGrams)
         assertFalse(updated.isFinished)
     }
+
+    private val walkFirst = warmUp.copy(items = listOf(WarmUpItem("Treadmill walk", "3 min")) + warmUp.items)
+
+    @Test
+    fun walkingToTheGymSkipsTheTreadmillAndKeepsTheRest() {
+        val (active, log) = WorkoutEngine.skipWalk(start(walkFirst), "w1", now = 5)!!
+
+        assertEquals(0, log.position)
+        assertEquals(WarmUpStatus.SKIPPED, log.status)
+        assertEquals(Phase.WARM_UP, active.phase)
+        assertEquals(1, active.currentWarmUp)
+        assertEquals(listOf(1, 2, 3), active.warmUpQueue)
+    }
+
+    @Test
+    fun aWarmUpWithoutATreadmillWalkHasNothingToSkip() {
+        assertNull(WorkoutEngine.skipWalk(start(), "w1", now = 5))
+        assertFalse(startsWithWalk(warmUp))
+        assertTrue(startsWithWalk(walkFirst))
+        assertFalse(startsWithWalk(null))
+    }
+
+    @Test
+    fun onlyAWalkAtTheFrontIsSkipped() {
+        val walkLast = warmUp.copy(items = warmUp.items + WarmUpItem("Treadmill walk", "3 min"))
+
+        assertNull(WorkoutEngine.skipWalk(start(walkLast), "w1", now = 5))
+        assertFalse(startsWithWalk(walkLast))
+    }
 }

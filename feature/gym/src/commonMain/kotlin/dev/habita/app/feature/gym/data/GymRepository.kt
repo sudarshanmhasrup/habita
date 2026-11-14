@@ -184,7 +184,11 @@ class GymRepository(core: Core) {
         targetsFor(program, Swaps.apply(workout, program, Swaps.active(store.swaps())), nowMillis())
     }
 
-    suspend fun start(workoutId: String): ActiveWorkout = write {
+    /**
+     * Starts [workoutId]. When [walked] to the gym, the treadmill walk that opens the warm-up is
+     * logged as skipped straight away.
+     */
+    suspend fun start(workoutId: String, walked: Boolean = false): ActiveWorkout = write {
         check(store.active() == null) { "A workout is already in progress" }
         val loaded = checkNotNull(store.program()) { "No program yet" }
         val program = loaded.program
@@ -192,7 +196,7 @@ class GymRepository(core: Core) {
         val workout = Swaps.apply(planned, program, Swaps.active(store.swaps()))
         val warmUp = program.warmUps.first { it.id == workout.warmUpId }
         val now = nowMillis()
-        val active = WorkoutEngine.start(
+        val started = WorkoutEngine.start(
             sessionId = newId(),
             workout = workout,
             warmUp = warmUp,
@@ -201,6 +205,8 @@ class GymRepository(core: Core) {
             now = now,
             planned = planned,
         )
+        val skippedWalk = if (walked) WorkoutEngine.skipWalk(started, newId(), now) else null
+        val active = skippedWalk?.first ?: started
         store.transaction {
             store.saveSession(
                 WorkoutSession(
@@ -211,6 +217,7 @@ class GymRepository(core: Core) {
                     updatedAt = now,
                 ),
             )
+            skippedWalk?.second?.let(store::saveWarmUp)
             store.saveActive(active)
         }
         active
