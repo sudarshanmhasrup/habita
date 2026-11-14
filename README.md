@@ -22,13 +22,16 @@ start over.
 
 ## How the gym feature works
 
-1. Open the app and pick a workout. The app suggests the next one in your rotation (Upper A, Lower
-   A, Upper B, Lower B), whatever day it is, so a missed day never skips a workout. Full body is a
-   fallback that does not move the rotation.
-2. Do the warm-up one exercise at a time: done, skip, or machine taken, which moves it to after the
-   next exercise. A 2-minute rest follows.
-3. Do the main workout set by set. Weighted exercises start with a warm-up set at about half of
-   today's weight for 10 reps, which can be skipped and never counts toward progress. Each
+1. Open the app and pick a workout. The app suggests the next one in your rotation (Push, Pull,
+   Legs A, Upper, Legs B), whatever day it is, so a missed day never skips a workout. Full body is
+   a fallback that does not move the rotation.
+2. Start asks whether you walked to the gym; if you did, the treadmill walk is skipped. Do the
+   warm-up one exercise at a time: done, skip, or machine taken, which moves it to after the next
+   exercise. The plan can set a break after the warm-up; the current one goes straight on.
+3. Do the main workout set by set. The day's first two exercises start with a warm-up set at
+   about half of today's weight for 10 reps, plus a second at about three quarters once the
+   weight is heavy (over 20 kg a dumbbell or 40 kg on a machine). Warm-up sets can be skipped and
+   never count toward progress. Each
    exercise shows last time's weight and reps and today's
    target, filled in so that a normal set is one tap. Log a set by tapping how it felt: Easy,
    Medium or Hard. The weight can be changed on any set, and the next set is suggested from how
