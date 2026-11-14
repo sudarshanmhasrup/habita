@@ -40,7 +40,7 @@ object WorkoutEngine {
             warmUp = warmUp,
             exercises = exercises,
             targets = targets,
-            phase = if (noWarmUp) Phase.BREAK else Phase.WARM_UP,
+            phase = if (noWarmUp) afterWarmUp(warmUp) else Phase.WARM_UP,
             warmUpQueue = warmUp.items.indices.toList(),
             exerciseQueue = workout.exercises.indices.toList(),
             setsLogged = List(workout.exercises.size) { 0 },
@@ -65,7 +65,7 @@ object WorkoutEngine {
         )
         val queue = active.warmUpQueue.drop(1)
         val next = if (queue.isEmpty()) {
-            active.copy(warmUpQueue = queue, phase = Phase.BREAK, rest = breakRest(active.warmUp, now))
+            active.copy(warmUpQueue = queue, phase = afterWarmUp(active.warmUp), rest = breakRest(active.warmUp, now))
         } else {
             active.copy(warmUpQueue = queue)
         }
@@ -159,8 +159,10 @@ object WorkoutEngine {
                 warmUp = true,
             )
         }
+        // Skipping drops the rest of the warm-up sets; a heavy weight gets a second one first.
+        val finished = log == null || active.warmUpSetsLogged(slotIndex) + 1 >= active.warmUpSetCount(slotIndex)
         val next = active.copy(
-            warmUpSetsDone = active.warmUpSetsDone + slotIndex,
+            warmUpSetsDone = if (finished) active.warmUpSetsDone + slotIndex else active.warmUpSetsDone,
             loggedSets = if (log != null) active.loggedSets + log else active.loggedSets,
             rest = if (log != null) Rest(now, now + WARM_UP_SET_REST_SECONDS * 1000L) else null,
         )
@@ -214,7 +216,11 @@ object WorkoutEngine {
         )
     }
 
-    private fun breakRest(warmUp: WarmUp, now: Long) = Rest(now, now + warmUp.restSeconds * 1000L)
+    /** A warm-up with no break goes straight into the main workout. */
+    private fun afterWarmUp(warmUp: WarmUp) = if (warmUp.restSeconds > 0) Phase.BREAK else Phase.MAIN
+
+    private fun breakRest(warmUp: WarmUp, now: Long) =
+        if (warmUp.restSeconds > 0) Rest(now, now + warmUp.restSeconds * 1000L) else null
 
     private fun moveFirstBehindNext(queue: List<Int>): List<Int> =
         if (queue.size < 2) queue else listOf(queue[1], queue[0]) + queue.drop(2)

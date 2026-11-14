@@ -318,7 +318,7 @@ private fun DayCards(program: Program, onOpenWorkout: (String) -> Unit) {
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.item)) {
                     workouts.forEach { workout ->
                         Chip(
-                            text = workout.name.substringAfterLast(' '),
+                            text = workout.shortName(),
                             // Up next is shown above; here every workout is just a choice.
                             selected = false,
                             onClick = { onOpenWorkout(workout.id) },
@@ -451,3 +451,7 @@ private fun dayFocus(warmUpId: String): String? = when (warmUpId) {
     "lower" -> "Legs, glutes, core"
     else -> null
 }
+
+/** "Day 3 · Legs A" → "Legs A"; a name without a "·" keeps its last word, "Upper Body A" → "A". */
+internal fun Workout.shortName(): String =
+    if ("·" in name) name.substringAfter("·").trim() else name.substringAfterLast(' ')

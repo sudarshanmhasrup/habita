@@ -227,4 +227,48 @@ class WorkoutEngineTest {
         assertNull(WorkoutEngine.skipWalk(start(walkLast), "w1", now = 5))
         assertFalse(startsWithWalk(walkLast))
     }
+
+    @Test
+    fun aWarmUpWithNoBreakGoesStraightIntoTheMainWorkout() {
+        var active = start(warmUp.copy(restSeconds = 0))
+        repeat(3) { active = WorkoutEngine.completeWarmUp(active, WarmUpStatus.DONE, "w$it", now = 5).first }
+
+        assertEquals(Phase.MAIN, active.phase)
+        assertNull(active.rest)
+        assertEquals(Phase.MAIN, start(warmUp.copy(items = emptyList(), restSeconds = 0)).phase)
+    }
+
+    @Test
+    fun onlyTheFirstTwoExercisesGetAWarmUpSet() {
+        val active = start().inMain()
+
+        assertEquals(1, active.warmUpSetCount(0))
+        assertEquals(1, active.warmUpSetCount(1))
+        assertEquals(0, active.warmUpSetCount(2))
+        assertFalse(active.needsWarmUpSet(2))
+    }
+
+    @Test
+    fun aHeavyWeightGetsASecondWarmUpSetAtThreeQuarters() {
+        val heavy = targets.mapIndexed { index, it -> if (index == 0) it.copy(weightGrams = 30_000) else it }
+        var active = WorkoutEngine.start("s1", workout, warmUp, exercises, heavy, now = 0).inMain()
+        assertEquals(2, active.warmUpSetCount(0))
+        assertEquals(1, active.warmUpSetNumber(0))
+
+        active = WorkoutEngine.endRest(WorkoutEngine.logWarmUpSet(active, 15_000, 10, "w1", 1_000).first)
+        assertTrue(active.needsWarmUpSet(0))
+        assertEquals(2, active.warmUpSetNumber(0))
+
+        active = WorkoutEngine.endRest(WorkoutEngine.logWarmUpSet(active, 22_000, 10, "w2", 2_000).first)
+        assertFalse(active.needsWarmUpSet(0))
+        assertEquals(1, active.setNumber(0))
+    }
+
+    @Test
+    fun skippingTheFirstWarmUpSetSkipsTheSecondToo() {
+        val heavy = targets.mapIndexed { index, it -> if (index == 0) it.copy(weightGrams = 30_000) else it }
+        val active = WorkoutEngine.start("s1", workout, warmUp, exercises, heavy, now = 0).inMain()
+
+        assertFalse(WorkoutEngine.logWarmUpSet(active, 0, null, "w", 0).first.needsWarmUpSet(0))
+    }
 }

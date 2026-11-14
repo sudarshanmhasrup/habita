@@ -22,7 +22,7 @@ class RetiredExerciseTest {
         file.writeText(original)
         loadProgram(file.toString(), store, NOW)
 
-        // A new plan that drops the plank: its exercise row and its workout row.
+        // A new plan that drops the plank's exercise row (no workout has it).
         val withoutPlank = original.lines()
             .filterNot { it.startsWith("| plank ") }
             .joinToString("\n")
@@ -32,7 +32,7 @@ class RetiredExerciseTest {
         assertEquals(2, loaded.version)
         assertEquals("Plank", loaded.program.exercise("plank")?.name)
         assertFalse(loaded.program.inUse("plank"))
-        assertTrue(loaded.program.inUse("goblet-squat"))
+        assertTrue(loaded.program.inUse("hack-squat"))
         driver.close()
     }
 }
