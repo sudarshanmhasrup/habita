@@ -135,6 +135,19 @@ private class Phone(server: SyncTransport) : LocalSyncTable, SyncCheckpoint {
 
 class SyncEngineTest {
     @Test
+    fun `slow-changing data is fetched on the first sync, not on every one`() = runBlocking {
+        val phone = Phone(FakeServer())
+        var fetched = 0
+        phone.engine.beforeEachSync { fetched++ }
+
+        assertTrue(phone.engine.sync())
+        assertTrue(phone.engine.sync())
+        assertTrue(phone.engine.sync())
+
+        assertEquals(1, fetched)
+    }
+
+    @Test
     fun `edits made offline go up once the server is back`() = runBlocking {
         val server = FakeServer().apply { online = false }
         val phone = Phone(server)

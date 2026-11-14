@@ -16,6 +16,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 import kotlinx.serialization.Serializable
 
 sealed interface SyncState {
@@ -68,6 +71,7 @@ class SyncEngine(
 ) {
     private val tables = mutableMapOf<String, LocalSyncTable>()
     private val beforeSync = mutableListOf<suspend () -> Unit>()
+    private var beforeSyncRan: TimeMark? = null
     private val mutex = Mutex()
     private val requests = Channel<Unit>(Channel.CONFLATED)
     private var retry: Job? = null
@@ -87,11 +91,16 @@ class SyncEngine(
     /** Starts syncing. Call once, after every feature has registered its collections. */
     fun start() {
         scope.launch {
-            loggedIn.collect { if (it) request() }
+            loggedIn.collect {
+                // A new login fetches the slow-changing data again straight away.
+                beforeSyncRan = null
+                if (it) request()
+            }
         }
         scope.launch {
             for (request in requests) {
-                // Waits briefly so a burst of changes goes out as one push.
+                // Waits a moment so a burst of taps goes out as one push, without making a change
+                // wait to reach other devices.
                 delay(DEBOUNCE_MILLIS)
                 if (!sync() && loggedIn.value) scheduleRetry()
             }
@@ -103,7 +112,11 @@ class SyncEngine(
         tables[table.collection] = table
     }
 
-    /** Adds work that runs at the start of every sync, such as fetching the workout plan. */
+    /**
+     * Adds work that runs at the start of a sync, such as fetching the workout plan. It changes
+     * rarely, so it runs on the first sync and then at most every [BEFORE_SYNC_EVERY]: syncing a
+     * tick from another device shouldn't wait for it.
+     */
     fun beforeEachSync(step: suspend () -> Unit) {
         beforeSync += step
     }
@@ -119,7 +132,10 @@ class SyncEngine(
         retry?.cancel()
         _state.value = SyncState.Syncing
         try {
-            beforeSync.forEach { it() }
+            if (beforeSyncRan.let { it == null || it.elapsedNow() >= BEFORE_SYNC_EVERY }) {
+                beforeSync.forEach { it() }
+                beforeSyncRan = TimeSource.Monotonic.markNow()
+            }
             pull()
             push()
             failures = 0
@@ -248,7 +264,8 @@ class SyncEngine(
     }
 
     private companion object {
-        const val DEBOUNCE_MILLIS = 500L
+        const val DEBOUNCE_MILLIS = 100L
+        val BEFORE_SYNC_EVERY = 10.minutes
         const val FIRST_RETRY_MILLIS = 10_000L
         const val MAX_RETRY_MILLIS = 60_000L
         const val PULL_PAGE = 500
