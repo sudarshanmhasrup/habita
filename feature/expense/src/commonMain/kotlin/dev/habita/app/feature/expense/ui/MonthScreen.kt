@@ -227,7 +227,7 @@ private fun Overview(summary: MonthSummary, onBudget: () -> Unit, modifier: Modi
         val over = summary.leftPaise < 0
         Overline(if (over) "Over your income" else "Left from income")
         Gap(Space.tiny)
-        CountingText(if (over) -summary.leftPaise else summary.leftPaise, { formatRupees(it) }, big, color = if (over) colors.error else colors.text)
+        AmountLeft(if (over) -summary.leftPaise else summary.leftPaise, big, color = if (over) colors.error else colors.text)
         Gap(Space.tiny)
         HText(
             "Spent ${formatRupees(summary.spentPaise)} of ${formatRupees(summary.incomePaise)}",
