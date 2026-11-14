@@ -5,6 +5,7 @@ import dev.habita.app.core.data.newId
 import dev.habita.app.core.data.nowMillis
 import dev.habita.app.feature.gym.db.GymDatabase
 import dev.habita.app.feature.gym.workout.ActiveWorkout
+import dev.habita.app.feature.gym.workout.Phase
 import dev.habita.app.feature.gym.workout.WorkoutEngine
 import dev.habita.app.shared.api.Export
 import dev.habita.app.shared.api.ExportedProgram
@@ -214,6 +215,7 @@ class GymRepository(core: Core) {
                     workoutId = workout.id,
                     programVersion = loaded.version,
                     startedAt = now,
+                    mainStartedAt = now.takeIf { active.phase == Phase.MAIN },
                     updatedAt = now,
                 ),
             )
@@ -224,8 +226,10 @@ class GymRepository(core: Core) {
     }
 
     suspend fun completeWarmUp(status: WarmUpStatus) = update { active ->
-        val (next, log) = WorkoutEngine.completeWarmUp(active, status, newId(), nowMillis())
+        val now = nowMillis()
+        val (next, log) = WorkoutEngine.completeWarmUp(active, status, newId(), now)
         store.saveWarmUp(log)
+        markMainStarted(active, next, now)
         next
     }
 
@@ -447,6 +451,13 @@ class GymRepository(core: Core) {
     private fun finishSession(active: ActiveWorkout, now: Long) {
         updateSession(active.sessionId) { it.copy(mainStartedAt = it.mainStartedAt ?: now, endedAt = now, updatedAt = now) }
         store.saveActive(null)
+    }
+
+    /** With no break after the warm-up, the main workout's time starts as the warm-up ends. */
+    private fun markMainStarted(before: ActiveWorkout, after: ActiveWorkout, now: Long) {
+        if (before.phase != Phase.MAIN && after.phase == Phase.MAIN) {
+            updateSession(after.sessionId) { it.copy(mainStartedAt = now, updatedAt = now) }
+        }
     }
 
     private fun updateSession(id: String, change: (WorkoutSession) -> WorkoutSession) {

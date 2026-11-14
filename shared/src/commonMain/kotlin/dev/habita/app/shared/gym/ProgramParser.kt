@@ -186,7 +186,8 @@ object ProgramParser {
             id = id(requiredKey(block, "id"), block.keys.getValue("id").second),
             name = block.name,
             items = rows.map { WarmUpItem(name = it.cells[0], amount = it.cells[1]) },
-            restSeconds = positiveInt(requiredKey(block, "rest"), block.keys.getValue("rest").second, "rest"),
+            // 0 means no break: the main workout starts right after the warm-up.
+            restSeconds = nonNegativeInt(requiredKey(block, "rest"), block.keys.getValue("rest").second, "rest"),
         ).also { rejectUnknownKeys(block, setOf("id", "rest")) }
     }
 
@@ -269,6 +270,10 @@ object ProgramParser {
     private fun positiveInt(value: String, line: Int, name: String): Int =
         value.toIntOrNull()?.takeIf { it > 0 }
             ?: throw ProgramFormatException(line, "$name must be a positive whole number, found \"$value\"")
+
+    private fun nonNegativeInt(value: String, line: Int, name: String): Int =
+        value.toIntOrNull()?.takeIf { it >= 0 }
+            ?: throw ProgramFormatException(line, "$name must be a whole number of 0 or more, found \"$value\"")
 
     private fun kilogramsToGrams(value: String, line: Int): Int =
         value.toDoubleOrNull()?.takeIf { it > 0 }?.let { (it * 1000).roundToInt() }

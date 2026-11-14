@@ -24,12 +24,13 @@ class ProgramTest {
         val program = response.program
 
         assertEquals(1, response.version)
-        assertEquals(listOf("upper-a", "lower-a", "upper-b", "lower-b", "full-body"), program.workouts.map { it.id })
-        assertEquals(listOf(1, 2, 3, 4, null), program.workouts.map { it.rotation })
-        assertEquals(44, program.exercises.size)
+        assertEquals(listOf("push", "pull", "legs-a", "upper-day", "legs-b", "full-body"), program.workouts.map { it.id })
+        assertEquals(listOf(1, 2, 3, 4, 5, null), program.workouts.map { it.rotation })
+        assertEquals(47, program.exercises.size)
         assertEquals(Equipment.BODYWEIGHT, program.exercise("plank")!!.equipment)
         assertEquals(2500, program.exercise("cable-triceps-pushdown")!!.defaultStep)
-        assertEquals(30, program.workout("lower-b")!!.exercises.last().target)
+        assertEquals(5, program.workout("upper-day")!!.exercises.size)
+        assertTrue(program.warmUps.all { it.restSeconds == 0 })
     }
 
     @Test
@@ -43,7 +44,7 @@ class ProgramTest {
         assertEquals(1, loadProgram(file.toString(), store, NOW).version)
         assertEquals(1, loadProgram(file.toString(), store, NOW + DAY).version)
 
-        val changed = original.replace("| 3    | 30     | 60   |", "| 3    | 40     | 60   |")
+        val changed = original.replace("| cable-crunch               | 3    | 12     | 60   |", "| cable-crunch               | 3    | 15     | 60   |")
         assertTrue(changed != original)
         file.writeText(changed)
         assertEquals(2, loadProgram(file.toString(), store, NOW + 2 * DAY).version)

@@ -24,33 +24,40 @@ class GymRoutesTest {
             sets("s1", "seated-cable-row", NOW - 7 * DAY + 60_000, 40 * KG, 12, 11, 10),
     )
 
+    /** Last week's Day 1 (Push) in the real plan. */
+    private val lastPush = SyncChanges(
+        sessions = listOf(session("p1", "push", NOW - 7 * DAY)),
+        sets = sets("p1", "seated-dumbbell-shoulder-press", NOW - 7 * DAY, 20 * KG, 12, 12, 12) +
+            sets("p1", "dumbbell-lateral-raise", NOW - 7 * DAY + 60_000, 40 * KG, 12, 11, 10),
+    )
+
     @Test
     fun `suggests the next workout in the rotation`() = serverTest { client ->
         val token = client.token()
         suspend fun next() = client.get("/workouts/next") { bearerAuth(token) }.body<NextWorkoutResponse>().workoutId
 
-        assertEquals("upper-a", next())
-        client.push(token, history)
-        assertEquals("lower-a", next())
+        assertEquals("push", next())
+        client.push(token, lastPush)
+        assertEquals("pull", next())
     }
 
     @Test
     fun `targets follow the progression rules`() = serverTest { client ->
         val token = client.token()
-        suspend fun targets() = client.get("/workouts/upper-a/targets") { bearerAuth(token) }
+        suspend fun targets() = client.get("/workouts/push/targets") { bearerAuth(token) }
             .body<WorkoutTargetsResponse>().targets.associateBy { it.exerciseId }
 
         assertTrue(targets().values.all { it.reason == TargetReason.FIRST_TIME })
 
-        client.push(token, history)
+        client.push(token, lastPush)
         val afterHistory = targets()
-        assertEquals(TargetReason.INCREASE, afterHistory.getValue("dumbbell-bench-press").reason)
-        assertEquals(22 * KG, afterHistory.getValue("dumbbell-bench-press").weightGrams)
-        assertEquals(TargetReason.REPEAT, afterHistory.getValue("seated-cable-row").reason)
-        assertEquals(40 * KG, afterHistory.getValue("seated-cable-row").weightGrams)
+        assertEquals(TargetReason.INCREASE, afterHistory.getValue("seated-dumbbell-shoulder-press").reason)
+        assertEquals(22 * KG, afterHistory.getValue("seated-dumbbell-shoulder-press").weightGrams)
+        assertEquals(TargetReason.REPEAT, afterHistory.getValue("dumbbell-lateral-raise").reason)
+        assertEquals(40 * KG, afterHistory.getValue("dumbbell-lateral-raise").weightGrams)
 
-        client.push(token, SyncChanges(steps = listOf(ExerciseStep("dumbbell-bench-press", 2500, NOW))))
-        assertEquals(22_500, targets().getValue("dumbbell-bench-press").weightGrams)
+        client.push(token, SyncChanges(steps = listOf(ExerciseStep("seated-dumbbell-shoulder-press", 2500, NOW))))
+        assertEquals(22_500, targets().getValue("seated-dumbbell-shoulder-press").weightGrams)
     }
 
     @Test

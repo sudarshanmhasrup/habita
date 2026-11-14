@@ -76,7 +76,9 @@ internal fun PreStartScreen(
                     Gap(Space.section)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Overline("Warm-up", Modifier.weight(1f))
-                        HText("then ${warmUp.restSeconds / 60} min break", type.caption, color = colors.muted)
+                        if (warmUp.restSeconds > 0) {
+                            HText("then ${warmUp.restSeconds / 60} min break", type.caption, color = colors.muted)
+                        }
                     }
                     Gap(Space.item)
                     HabitaCard(Modifier.fillMaxWidth().appear(1)) {

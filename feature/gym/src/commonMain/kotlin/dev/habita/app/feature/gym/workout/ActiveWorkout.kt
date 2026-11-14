@@ -3,6 +3,7 @@ package dev.habita.app.feature.gym.workout
 import dev.habita.app.shared.gym.Exercise
 import dev.habita.app.shared.gym.ExerciseTarget
 import dev.habita.app.shared.gym.SetAdvice
+import dev.habita.app.shared.gym.Progression
 import dev.habita.app.shared.gym.SetLog
 import dev.habita.app.shared.gym.WarmUp
 import dev.habita.app.shared.gym.Workout
@@ -105,9 +106,23 @@ data class ActiveWorkout(
     fun warmUpSetFor(slot: Int): SetLog? =
         loggedSets.lastOrNull { it.exerciseId == workout.exercises[slot].exerciseId && it.warmUp }
 
-    /** Weighted exercises start with a lighter warm-up set, unless it was done or skipped. */
+    /**
+     * How many light sets [slot] starts with: none past the day's first two exercises, which start
+     * warm; one, or two once its weight is heavy ([Progression.warmUpSets]).
+     */
+    fun warmUpSetCount(slot: Int): Int =
+        if (slot >= Progression.WARM_UP_SET_EXERCISES) 0 else Progression.warmUpSets(nextSet(slot).weightGrams, exercises[slot].equipment)
+
+    /** The warm-up sets logged today for [slot]. */
+    fun warmUpSetsLogged(slot: Int): Int =
+        loggedSets.count { it.exerciseId == workout.exercises[slot].exerciseId && it.warmUp }
+
+    /** Whether [slot]'s next set is a light warm-up set: not yet all done, skipped or past. */
     fun needsWarmUpSet(slot: Int): Boolean =
-        exercises[slot].isWeighted && slot !in warmUpSetsDone && setsLogged[slot] == 0
+        warmUpSetCount(slot) > 0 && slot !in warmUpSetsDone && setsLogged[slot] == 0
+
+    /** Which warm-up set comes next for [slot]: 1, then 2 for a heavy weight. */
+    fun warmUpSetNumber(slot: Int): Int = warmUpSetsLogged(slot) + 1
 
     /** Fraction of all sets logged, for the progress bar. */
     val progress: Float

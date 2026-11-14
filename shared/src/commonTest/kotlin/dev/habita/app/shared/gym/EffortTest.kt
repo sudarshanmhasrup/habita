@@ -112,6 +112,14 @@ class EffortTest {
         assertEquals(8 * KG, Progression.warmUpWeight(15 * KG, 2 * KG))
         assertEquals(10 * KG, Progression.warmUpWeight(20 * KG, 5 * KG))
         assertEquals(2 * KG, Progression.warmUpWeight(2 * KG, 2 * KG))
+        // The second warm-up set for a heavy weight is about three quarters.
+        assertEquals(30 * KG, Progression.warmUpWeight(40 * KG, 5 * KG, number = 2))
+        assertEquals(1, Progression.warmUpSets(20 * KG, Equipment.DUMBBELL))
+        assertEquals(2, Progression.warmUpSets(22 * KG, Equipment.DUMBBELL))
+        assertEquals(1, Progression.warmUpSets(40 * KG, Equipment.MACHINE))
+        assertEquals(2, Progression.warmUpSets(45 * KG, Equipment.CABLE))
+        assertEquals(1, Progression.warmUpSets(null, Equipment.MACHINE))
+        assertEquals(0, Progression.warmUpSets(null, Equipment.BODYWEIGHT))
     }
 
     @Test

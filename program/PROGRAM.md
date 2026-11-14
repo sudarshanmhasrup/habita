@@ -68,6 +68,9 @@ refuses to start if it is malformed, with the line number of the problem.
 | machine-calf-raise                  | Machine Calf Raise                  | machine    | reps    | no       | 5    |
 | hanging-knee-raise                  | Hanging Knee Raise                  | bodyweight | reps    | no       | 1    |
 | lying-dumbbell-leg-curl             | Lying Dumbbell Leg Curl             | dumbbell   | reps    | no       | 2    |
+| smith-machine-hip-thrust            | Smith Machine Hip Thrust            | machine    | reps    | no       | 5    |
+| cable-glute-kickback                | Cable Glute Kickback                | cable      | reps    | yes      | 2.5  |
+| back-extension                      | 45° Back Extension                  | bodyweight | reps    | no       | 1    |
 
 ## Alternatives
 
@@ -85,7 +88,7 @@ alternative is an exercise of its own, with its own history and weights.
 | biceps-curl                      | cable-curl, incline-dumbbell-curl                                     |
 | cable-triceps-pushdown           | overhead-dumbbell-triceps-extension, overhead-cable-triceps-extension |
 | leg-press                        | hack-squat, goblet-squat                                              |
-| hip-thrust                       | dumbbell-hip-thrust, cable-pull-through                               |
+| hip-thrust                       | smith-machine-hip-thrust, dumbbell-hip-thrust, cable-glute-kickback   |
 | hamstring-curl                   | dumbbell-romanian-deadlift, lying-dumbbell-leg-curl                   |
 | leg-extension                    | dumbbell-split-squat                                                  |
 | cable-crunch                     | hanging-knee-raise                                                    |
@@ -101,114 +104,120 @@ alternative is an exercise of its own, with its own history and weights.
 | dumbbell-step-up                 | dumbbell-split-squat                                                  |
 | cable-pull-through               | dumbbell-romanian-deadlift, dumbbell-hip-thrust                       |
 | dumbbell-seated-calf-raise       | machine-calf-raise, dumbbell-standing-calf-raise                      |
+| machine-chest-press              | dumbbell-bench-press, dumbbell-fly                                    |
+| hack-squat                       | leg-press, goblet-squat                                               |
+| dumbbell-romanian-deadlift       | back-extension, lying-dumbbell-leg-curl                               |
 
 ## Warm-ups
+
+The walk to the gym can stand in for the treadmill walk: the app asks at the start.
 
 ### Upper
 
 - Id: upper
-- Rest: 120
+- Rest: 0
 
-| Name                      | Amount                     |
-|---------------------------|----------------------------|
-| Treadmill walk            | 5 min, 4 mph, 5% incline   |
-| Horizontal arm swings     | 20                         |
-| Arm circles               | 20 forward + 20 backward   |
-| Arm crossovers            | 20                         |
-| Band pull-aparts          | 20                         |
-| Banded dislocations       | 10                         |
-| Banded external rotations | 10 each arm                |
+| Name                      | Amount                   |
+|---------------------------|--------------------------|
+| Treadmill walk            | 3 min, 4 mph, 5% incline |
+| Arm circles               | 20 forward + 20 backward |
+| Band pull-aparts          | 20                       |
+| Banded external rotations | 10 each arm              |
 
 ### Lower
 
 - Id: lower
-- Rest: 120
+- Rest: 0
 
-| Name                 | Amount                       |
-|----------------------|------------------------------|
-| Treadmill walk       | 5 min, 4 mph, 5% incline     |
-| Bodyweight squats    | 15                           |
-| Leg swings           | 10 front-to-back each leg    |
-| Hip circles          | 10 forward + 10 backward     |
-| Glute bridges        | 15                           |
-| Standing calf raises | 15                           |
+| Name              | Amount                    |
+|-------------------|---------------------------|
+| Treadmill walk    | 3 min, 4 mph, 5% incline  |
+| Bodyweight squats | 15                        |
+| Leg swings        | 10 front-to-back each leg |
+| Glute bridges     | 15                        |
 
 ### Full body
 
 - Id: full-body
-- Rest: 120
+- Rest: 0
 
 | Name              | Amount                   |
 |-------------------|--------------------------|
-| Treadmill walk    | 5 min, 4 mph, 5% incline |
+| Treadmill walk    | 3 min, 4 mph, 5% incline |
 | Bodyweight squats | 15                       |
 | Arm circles       | 20 forward + 20 backward |
 | Band pull-aparts  | 20                       |
-| Glute bridges     | 15                       |
 
 ## Workouts
 
-### Upper Body A
+Five days in rotation, about 45 minutes each. Every muscle that shapes the physique is trained,
+the big ones twice a week. The first two exercises of each day start with a light warm-up set.
 
-- Id: upper-a
+### Day 1 · Push
+
+- Id: push
 - Warm-up: upper
 - Rotation: 1
 
-| Exercise               | Sets | Target | Rest |
-|------------------------|------|--------|------|
-| dumbbell-bench-press   | 3    | 12     | 90   |
-| seated-cable-row       | 3    | 12     | 90   |
-| lat-pulldown           | 3    | 12     | 90   |
-| dumbbell-lateral-raise | 3    | 12     | 60   |
-| reverse-pec-deck       | 3    | 12     | 60   |
-| biceps-curl            | 3    | 12     | 60   |
-| cable-triceps-pushdown | 3    | 12     | 60   |
+| Exercise                       | Sets | Target | Rest |
+|--------------------------------|------|--------|------|
+| machine-chest-press            | 3    | 12     | 90   |
+| seated-dumbbell-shoulder-press | 3    | 12     | 90   |
+| dumbbell-lateral-raise         | 3    | 12     | 60   |
+| cable-triceps-pushdown         | 3    | 12     | 60   |
 
-### Lower Body A
+### Day 2 · Pull
 
-- Id: lower-a
-- Warm-up: lower
+- Id: pull
+- Warm-up: upper
 - Rotation: 2
+
+| Exercise         | Sets | Target | Rest |
+|------------------|------|--------|------|
+| lat-pulldown     | 3    | 12     | 90   |
+| seated-cable-row | 3    | 12     | 90   |
+| reverse-pec-deck | 3    | 12     | 60   |
+| biceps-curl      | 3    | 12     | 60   |
+
+### Day 3 · Legs A
+
+- Id: legs-a
+- Warm-up: lower
+- Rotation: 3
 
 | Exercise                     | Sets | Target | Rest |
 |------------------------------|------|--------|------|
 | leg-press                    | 3    | 12     | 90   |
-| hip-thrust                   | 3    | 12     | 90   |
 | hamstring-curl               | 3    | 12     | 90   |
 | leg-extension                | 3    | 12     | 60   |
-| cable-crunch                 | 3    | 12     | 60   |
 | dumbbell-standing-calf-raise | 3    | 12     | 60   |
 
-### Upper Body B
+### Day 4 · Upper
 
-- Id: upper-b
+- Id: upper-day
 - Warm-up: upper
-- Rotation: 3
+- Rotation: 4
 
 | Exercise                         | Sets | Target | Rest |
 |----------------------------------|------|--------|------|
 | incline-dumbbell-press           | 3    | 12     | 90   |
-| seated-dumbbell-shoulder-press   | 3    | 12     | 90   |
 | one-arm-dumbbell-row             | 3    | 12     | 90   |
-| pec-deck-fly                     | 3    | 12     | 60   |
-| cable-lateral-raise              | 3    | 12     | 60   |
 | incline-dumbbell-curl            | 3    | 12     | 60   |
 | overhead-cable-triceps-extension | 3    | 12     | 60   |
+| cable-lateral-raise              | 3    | 12     | 60   |
 
-### Lower Body B
+### Day 5 · Legs B
 
-- Id: lower-b
+- Id: legs-b
 - Warm-up: lower
-- Rotation: 4
+- Rotation: 5
 
 | Exercise                   | Sets | Target | Rest |
 |----------------------------|------|--------|------|
-| goblet-squat               | 3    | 12     | 90   |
-| dumbbell-step-up           | 3    | 12     | 90   |
-| cable-pull-through         | 3    | 12     | 90   |
-| hamstring-curl             | 3    | 12     | 60   |
-| dumbbell-seated-calf-raise | 3    | 12     | 60   |
-| plank                      | 3    | 30     | 60   |
+| hack-squat                 | 3    | 12     | 90   |
+| hip-thrust                 | 3    | 12     | 90   |
+| dumbbell-romanian-deadlift | 3    | 12     | 90   |
+| cable-crunch               | 3    | 12     | 60   |
 
 ### Full Body
 
@@ -216,13 +225,9 @@ alternative is an exercise of its own, with its own history and weights.
 - Warm-up: full-body
 - Rotation: fallback
 
-| Exercise               | Sets | Target | Rest |
-|------------------------|------|--------|------|
-| dumbbell-bench-press   | 3    | 12     | 90   |
-| leg-press              | 3    | 12     | 90   |
-| seated-cable-row       | 3    | 12     | 90   |
-| lat-pulldown           | 3    | 12     | 90   |
-| hamstring-curl         | 3    | 12     | 60   |
-| dumbbell-lateral-raise | 3    | 12     | 60   |
-| biceps-curl            | 3    | 12     | 60   |
-| cable-triceps-pushdown | 3    | 12     | 60   |
+| Exercise            | Sets | Target | Rest |
+|---------------------|------|--------|------|
+| leg-press           | 3    | 12     | 90   |
+| machine-chest-press | 3    | 12     | 90   |
+| lat-pulldown        | 3    | 12     | 90   |
+| hamstring-curl      | 3    | 12     | 60   |

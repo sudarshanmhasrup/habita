@@ -204,14 +204,32 @@ object Progression {
     }
 
     /**
-     * The weight for the warm-up set before [workingGrams]: about half, rounded to the nearest
-     * [step], and never less than one step.
+     * The weight for warm-up set [number] before [workingGrams], rounded to the nearest [step] and
+     * never less than one step: about half for the first, about three quarters for the second.
      */
-    fun warmUpWeight(workingGrams: Int, step: Int): Int {
-        if (step <= 0) return workingGrams / 2
-        val steps = (workingGrams / 2 + step / 2) / step
+    fun warmUpWeight(workingGrams: Int, step: Int, number: Int = 1): Int {
+        val light = if (number >= 2) workingGrams * 3 / 4 else workingGrams / 2
+        if (step <= 0) return light
+        val steps = (light + step / 2) / step
         return maxOf(steps, 1) * step
     }
+
+    /**
+     * How many warm-up sets come before [workingGrams] on [equipment]: one, or two once the weight
+     * is heavy (over 20 kg a dumbbell, over 40 kg on a machine or cable), where the jump from half weight
+     * straight to the working weight would be too big.
+     */
+    fun warmUpSets(workingGrams: Int?, equipment: Equipment): Int {
+        if (equipment == Equipment.BODYWEIGHT) return 0
+        val heavy = if (equipment == Equipment.DUMBBELL) HEAVY_DUMBBELL_GRAMS else HEAVY_GRAMS
+        return if (workingGrams != null && workingGrams > heavy) 2 else 1
+    }
+
+    /** Only the day's first exercises get warm-up sets; the rest start warm. */
+    const val WARM_UP_SET_EXERCISES = 2
+
+    private const val HEAVY_DUMBBELL_GRAMS = 20_000
+    private const val HEAVY_GRAMS = 40_000
 
     const val WARM_UP_REPS = 10
 

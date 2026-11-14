@@ -363,7 +363,7 @@ private fun NextUp(active: ActiveWorkout, data: GymData, slotIndex: Int, label: 
             val working = active.nextSet(slotIndex).weightGrams
             val step = data.step(exercise.id) ?: exercise.defaultStep
             "Warm-up set · " + (
-                working?.let { "${formatKg(Progression.warmUpWeight(it, step))} kg × ${Progression.WARM_UP_REPS}" }
+                working?.let { "${formatKg(Progression.warmUpWeight(it, step, active.warmUpSetNumber(slotIndex)))} kg × ${Progression.WARM_UP_REPS}" }
                     ?: "light × ${Progression.WARM_UP_REPS}"
                 )
         } else {
@@ -430,9 +430,10 @@ private fun WarmUpSetContent(active: ActiveWorkout, data: GymData, viewModel: Gy
     val working = active.nextSet(slotIndex).weightGrams
     // Half the working weight once it's known. The first time there is none, so start at one
     // step, the lightest sensible load, ready to adjust.
-    val suggested = working?.let { Progression.warmUpWeight(it, step) } ?: step.takeIf { exercise.isWeighted }
-    var weightText by remember(active.sessionId, slotIndex, exercise.id) { mutableStateOf(suggested?.let(::formatKg) ?: "") }
-    var repsText by remember(active.sessionId, slotIndex, exercise.id) { mutableStateOf(Progression.WARM_UP_REPS.toString()) }
+    val number = active.warmUpSetNumber(slotIndex)
+    val suggested = working?.let { Progression.warmUpWeight(it, step, number) } ?: step.takeIf { exercise.isWeighted }
+    var weightText by remember(active.sessionId, slotIndex, exercise.id, number) { mutableStateOf(suggested?.let(::formatKg) ?: "") }
+    var repsText by remember(active.sessionId, slotIndex, exercise.id, number) { mutableStateOf(Progression.WARM_UP_REPS.toString()) }
     val weightGrams = parseKg(weightText)?.takeIf { it > 0 || !exercise.isWeighted }
     val reps = parseCount(repsText)?.takeIf { it > 0 }
 
@@ -465,13 +466,16 @@ private fun WarmUpSetContent(active: ActiveWorkout, data: GymData, viewModel: Gy
             )
         },
     ) {
-        ExerciseHeader(active, slotIndex, "Exercise ${active.exercisesDone + 1} of ${active.workout.exercises.size} · warm-up set")
+        val count = active.warmUpSetCount(slotIndex)
+        val which = if (count > 1) "warm-up set $number of $count" else "warm-up set"
+        ExerciseHeader(active, slotIndex, "Exercise ${active.exercisesDone + 1} of ${active.workout.exercises.size} · $which")
         SwapAction(active, data.program, slotIndex, viewModel::swap)
         Gap(Space.card)
         Column(Modifier.fillMaxWidth()) {
             HText(
                 if (working != null) {
-                    "About half of today's ${formatKg(working)} kg, easy reps to get the movement in. It doesn't count toward progress."
+                    (if (number >= 2) "About three quarters" else "About half") +
+                        " of today's ${formatKg(working)} kg, easy reps to get the movement in. It doesn't count toward progress."
                 } else {
                     "Go light, about half of what you'll lift, to get the movement in. It doesn't count toward progress."
                 },
