@@ -34,7 +34,8 @@ internal enum class DesktopSystem(val id: String, val extension: String) {
  * touches.
  *
  * - Windows: the installer runs on its own with a progress bar, then Habita opens again.
- * - Mac: the disk image opens for Habita to be dragged into Applications, as on first install.
+ * - Mac: the new Habita replaces the running one where it's installed (never moved to
+ *   Applications), then opens again.
  * - Linux: the system asks for the user's password, installs the package, then Habita opens again.
  *
  * [quit] closes the app, so the install can replace it.
@@ -48,7 +49,7 @@ internal class DesktopAppInstaller(
 
     override val installingHint = when (system) {
         DesktopSystem.WINDOWS -> "Installing. Habita opens again when it's done."
-        DesktopSystem.MAC -> "Drag Habita into Applications, replace the old one, then open it."
+        DesktopSystem.MAC -> "Installing. Habita opens again when it's done."
         DesktopSystem.LINUX -> "Enter your password to install. Habita opens again when it's done."
     }
 
@@ -61,10 +62,7 @@ internal class DesktopAppInstaller(
         withContext(Dispatchers.IO) {
             when (system) {
                 DesktopSystem.WINDOWS -> installOnWindows(build)
-                DesktopSystem.MAC -> {
-                    ProcessBuilder("open", build.absolutePath).start()
-                    quit()
-                }
+                DesktopSystem.MAC -> installOnMac(build)
                 DesktopSystem.LINUX -> installOnLinux(build)
             }
         }
@@ -114,6 +112,28 @@ internal class DesktopAppInstaller(
         quit()
     }
 
+    /**
+     * Replaces the running Habita.app in place, wherever it's installed, so an app kept outside
+     * Applications stays there. A small script waits for Habita to close, copies the new app out of
+     * the disk image next to the old one, swaps them, and opens it. If it can't tell where Habita is
+     * installed (run from source, for example), it opens the disk image instead.
+     */
+    private fun installOnMac(dmg: File) {
+        val bundle = runningApp()?.let { macBundle(it) }
+        if (bundle == null) {
+            ProcessBuilder("open", dmg.absolutePath).start()
+            quit()
+            return
+        }
+        val script = File(dmg.parentFile, "install.sh")
+        script.writeText(macInstallScript(ProcessHandle.current().pid(), dmg.absolutePath, bundle))
+        ProcessBuilder("/usr/bin/nohup", "/bin/bash", script.absolutePath)
+            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+            .redirectError(ProcessBuilder.Redirect.DISCARD)
+            .start()
+        quit()
+    }
+
     /** Installs with the system's password prompt, then opens the new Habita. */
     private fun installOnLinux(deb: File) {
         val result = try {
@@ -131,4 +151,39 @@ internal class DesktopAppInstaller(
 
     /** The installed app's launcher, which opens the new build once it's in place. */
     private fun runningApp(): String? = ProcessHandle.current().info().command().orElse(null)
+}
+
+/** The `.app` folder that holds [launcher], such as `/x/Habita.app/Contents/MacOS/Habita`. */
+internal fun macBundle(launcher: String): String? {
+    val end = launcher.indexOf(".app/Contents/MacOS/")
+    return if (end < 0) null else launcher.substring(0, end + ".app".length)
+}
+
+/**
+ * The script that swaps in the new app: it waits for [pid] to exit, copies Habita.app out of
+ * [dmg] next to [bundle], replaces [bundle] with it, and opens it. A failed copy leaves the old
+ * app as it was and opens the disk image instead.
+ */
+internal fun macInstallScript(pid: Long, dmg: String, bundle: String): String {
+    fun quote(value: String) = "'" + value.replace("'", "'\\''") + "'"
+    return listOf(
+        "#!/bin/bash",
+        "dmg=${quote(dmg)}",
+        "dest=${quote(bundle)}",
+        "while kill -0 $pid 2>/dev/null; do sleep 0.5; done",
+        "mnt=\$(mktemp -d)",
+        "if hdiutil attach -nobrowse -readonly -mountpoint \"\$mnt\" \"\$dmg\" >/dev/null && " +
+            "rm -rf \"\$dest.new\" && ditto \"\$mnt/Habita.app\" \"\$dest.new\"; then",
+        "  hdiutil detach -quiet \"\$mnt\"",
+        "  rm -rf \"\$dest\" && mv \"\$dest.new\" \"\$dest\"",
+        "  xattr -dr com.apple.quarantine \"\$dest\" 2>/dev/null",
+        "  rm -f \"\$dmg\"",
+        "  open \"\$dest\"",
+        "else",
+        "  hdiutil detach -quiet \"\$mnt\" 2>/dev/null",
+        "  rm -rf \"\$dest.new\"",
+        "  open \"\$dmg\"",
+        "fi",
+        "rm -f \"\$0\"",
+    ).joinToString("\n")
 }
