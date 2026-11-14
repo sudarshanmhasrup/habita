@@ -260,7 +260,7 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
         repository.logSet(weightGrams, achieved, effort)?.let { _route.value = GymRoute.Summary(it) }
     }
 
-    /** Saves this morning's weight. */
+    /** Saves today's weight, for the local calendar day it is logged on, night weigh-ins included. */
     fun logWeight(grams: Int) = act { repository.logWeight(today(), grams) }
 
     fun setGoal(goal: BodyGoal) = act { repository.setGoal(goal) }
