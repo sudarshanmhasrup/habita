@@ -44,6 +44,7 @@ import dev.habita.app.core.ui.TwoPane
 import dev.habita.app.core.ui.appear
 import dev.habita.app.feature.expense.ExpenseToday
 import dev.habita.app.feature.expense.data.formatRupees
+import dev.habita.app.feature.expense.ui.AmountLeft
 import dev.habita.app.feature.gym.GymToday
 import dev.habita.app.feature.food.FoodToday
 import dev.habita.app.feature.routine.RoutineToday
@@ -314,9 +315,8 @@ private fun ExpenseCard(expense: ExpenseToday, onOpen: () -> Unit, onAdd: () -> 
         Gap(Space.inside)
         if (expense.incomeSet) {
             val over = expense.leftPaise < 0
-            CountingText(
-                value = if (over) -expense.leftPaise else expense.leftPaise,
-                format = { formatRupees(it) },
+            AmountLeft(
+                paise = if (over) -expense.leftPaise else expense.leftPaise,
                 style = type.number,
                 color = if (over) colors.error else colors.text,
             )
