@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -26,18 +30,23 @@ import dev.habita.app.core.ui.PrimaryButton
 import dev.habita.app.core.ui.StatTile
 import dev.habita.app.core.ui.TopBar
 import dev.habita.app.core.ui.TwoPane
+import dev.habita.app.feature.gym.workout.startsWithWalk
 import dev.habita.app.shared.gym.ExerciseTarget
 import dev.habita.app.shared.gym.Program
 import dev.habita.app.shared.gym.Workout
 
-/** The whole workout before it starts: warm-up, exercises and today's targets. */
+/**
+ * The whole workout before it starts: warm-up, exercises and today's targets. When the warm-up
+ * opens with the treadmill walk, Start first asks whether the walk to the gym already did that
+ * job; [onStart] gets the answer.
+ */
 @Composable
 internal fun PreStartScreen(
     workoutId: String,
     data: GymData,
     targets: List<ExerciseTarget>?,
     onBack: () -> Unit,
-    onStart: () -> Unit,
+    onStart: (walked: Boolean) -> Unit,
     onSwap: (exerciseId: String, replacementId: String?) -> Unit,
 ) {
     val colors = HabitaTheme.colors
@@ -46,68 +55,91 @@ internal fun PreStartScreen(
     val workout = program.workout(workoutId) ?: return
     val warmUp = program.warmUps.firstOrNull { it.id == workout.warmUpId }
     val wide = LocalWideLayout.current
-    Column(Modifier.fillMaxSize()) {
-        TwoPane(Modifier.weight(1f), first = {
-            TopBar("Gym", onBack)
-            Gap(Space.inside)
-            if (workout.id == data.suggested?.id) {
-                Overline("Up next", color = colors.accent)
-                Gap(Space.tiny)
-            }
-            HText(workout.name, type.headline)
-            Gap(Space.card)
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.item)) {
-                StatTile("Exercises", "${workout.exercises.size}", Modifier.weight(1f).appear(0))
-                StatTile("Sets", "${workout.exercises.sumOf { it.sets }}", Modifier.weight(1f).appear(0))
-                StatTile("Minutes", "~${estimateMinutes(workout, warmUp)}", Modifier.weight(1f).appear(0))
-            }
-            if (warmUp != null) {
-                Gap(Space.section)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Overline("Warm-up", Modifier.weight(1f))
-                    HText("then ${warmUp.restSeconds / 60} min break", type.caption, color = colors.muted)
+    var askingWalk by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            TwoPane(Modifier.weight(1f), first = {
+                TopBar("Gym", onBack)
+                Gap(Space.inside)
+                if (workout.id == data.suggested?.id) {
+                    Overline("Up next", color = colors.accent)
+                    Gap(Space.tiny)
                 }
-                Gap(Space.item)
-                HabitaCard(Modifier.fillMaxWidth().appear(1)) {
-                    Column(verticalArrangement = Arrangement.spacedBy(Space.item)) {
-                        warmUp.items.forEach { item ->
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                HText(item.name, type.body, modifier = Modifier.weight(1f))
-                                HText(item.amount, type.caption, color = colors.muted, textAlign = TextAlign.End)
+                HText(workout.name, type.headline)
+                Gap(Space.card)
+                Row(horizontalArrangement = Arrangement.spacedBy(Space.item)) {
+                    StatTile("Exercises", "${workout.exercises.size}", Modifier.weight(1f).appear(0))
+                    StatTile("Sets", "${workout.exercises.sumOf { it.sets }}", Modifier.weight(1f).appear(0))
+                    StatTile("Minutes", "~${estimateMinutes(workout, warmUp)}", Modifier.weight(1f).appear(0))
+                }
+                if (warmUp != null) {
+                    Gap(Space.section)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Overline("Warm-up", Modifier.weight(1f))
+                        HText("then ${warmUp.restSeconds / 60} min break", type.caption, color = colors.muted)
+                    }
+                    Gap(Space.item)
+                    HabitaCard(Modifier.fillMaxWidth().appear(1)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(Space.item)) {
+                            warmUp.items.forEach { item ->
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    HText(item.name, type.body, modifier = Modifier.weight(1f))
+                                    HText(item.amount, type.caption, color = colors.muted, textAlign = TextAlign.End)
+                                }
                             }
                         }
                     }
                 }
-            }
-        }, second = {
-            // Lines the list up with the title in the first pane.
-            if (wide) Gap(56.dp)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Overline("Workout", Modifier.weight(1f))
-                HText("today's weight", type.caption, color = colors.muted)
-            }
-            Gap(Space.item)
-            ExerciseList(program, workout, data.workout(workoutId) ?: workout, targets, onSwap.takeIf { data.active == null })
-            Gap(Space.card)
-        })
-        Box(
-            Modifier
-                .align(Alignment.End)
-                .fillMaxWidth(if (wide) 0.5f else 1f)
-                .padding(horizontal = Space.screen, vertical = Space.item),
-        ) {
-            if (data.active != null) {
-                HText(
-                    "Finish or discard the workout in progress first.",
-                    type.body,
-                    color = colors.muted,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else {
-                PrimaryButton("Start workout", onStart, Modifier.fillMaxWidth())
+            }, second = {
+                // Lines the list up with the title in the first pane.
+                if (wide) Gap(56.dp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Overline("Workout", Modifier.weight(1f))
+                    HText("today's weight", type.caption, color = colors.muted)
+                }
+                Gap(Space.item)
+                ExerciseList(program, workout, data.workout(workoutId) ?: workout, targets, onSwap.takeIf { data.active == null })
+                Gap(Space.card)
+            })
+            Box(
+                Modifier
+                    .align(Alignment.End)
+                    .fillMaxWidth(if (wide) 0.5f else 1f)
+                    .padding(horizontal = Space.screen, vertical = Space.item),
+            ) {
+                if (data.active != null) {
+                    HText(
+                        "Finish or discard the workout in progress first.",
+                        type.body,
+                        color = colors.muted,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    PrimaryButton(
+                        "Start workout",
+                        { if (startsWithWalk(warmUp)) askingWalk = true else onStart(false) },
+                        Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
+        ConfirmPanel(
+            visible = askingWalk,
+            title = "Did you walk to the gym?",
+            detail = "If you walked here and are still warm, the treadmill walk is skipped. The rest of the warm-up stays.",
+            confirm = "Yes, skip the treadmill",
+            onConfirm = {
+                askingWalk = false
+                onStart(true)
+            },
+            cancel = "No, start with the treadmill",
+            onCancel = {
+                askingWalk = false
+                onStart(false)
+            },
+            onDismiss = { askingWalk = false },
+        )
     }
 }
 

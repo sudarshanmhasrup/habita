@@ -23,8 +23,8 @@ import dev.habita.app.core.ui.Scrim
 import dev.habita.app.core.ui.SecondaryButton
 
 /**
- * Asks before something that can't be taken back, over a dimmed screen. Tapping outside or
- * [cancel] backs out. A [destructive] action is drawn in the error colour and the safe choice
+ * Asks before something that can't be taken back, over a dimmed screen. Tapping outside
+ * ([onDismiss], [onCancel] unless given) or [cancel] backs out. A [destructive] action is drawn in the error colour and the safe choice
  * becomes the main button, so a quick tap never deletes anything.
  */
 @Composable
@@ -37,10 +37,11 @@ internal fun BoxScope.ConfirmPanel(
     cancel: String,
     onCancel: () -> Unit,
     destructive: Boolean = false,
+    onDismiss: () -> Unit = onCancel,
 ) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
-    Scrim(visible, onDismiss = onCancel)
+    Scrim(visible, onDismiss = onDismiss)
     AnimatedVisibility(
         visible,
         modifier = Modifier.align(Alignment.BottomCenter),

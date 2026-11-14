@@ -212,7 +212,7 @@ fun GymScreen(feature: GymFeature, onExit: () -> Unit) {
                     data = current,
                     targets = preStartTargets,
                     onBack = { viewModel.back() },
-                    onStart = { viewModel.start(screen.workoutId) },
+                    onStart = { walked -> viewModel.start(screen.workoutId, walked) },
                     onSwap = viewModel::swap,
                 )
 

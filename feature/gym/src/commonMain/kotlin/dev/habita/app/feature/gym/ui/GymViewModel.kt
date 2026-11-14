@@ -222,8 +222,8 @@ internal class GymViewModel(private val repository: GymRepository) : ViewModel()
         _route.value = GymRoute.PreStart(workoutId)
     }
 
-    fun start(workoutId: String) = act {
-        repository.start(workoutId)
+    fun start(workoutId: String, walked: Boolean = false) = act {
+        repository.start(workoutId, walked)
         // Waits for the new workout to reach [data] first; otherwise the gym screen sees the workout
         // route with no workout and sends us back to the list.
         withTimeoutOrNull(2_000) { data.first { it?.active != null } }
