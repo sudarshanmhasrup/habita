@@ -9,6 +9,9 @@
     <uses-permission
         android:name="android.permission.SCHEDULE_EXACT_ALARM"
         android:maxSdkVersion="32" />
+    <!-- Keeps the app up while that alarm rings with the phone locked, until it is dismissed. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <!-- Bank debit SMS become expenses; the SMS never leave the phone. -->
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.READ_SMS" />
@@ -72,6 +75,10 @@
         <receiver
             android:name="dev.habita.app.feature.gym.android.RestEndReceiver"
             android:exported="false" />
+        <service
+            android:name="dev.habita.app.feature.gym.android.RestAlarmService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
         <receiver
             android:name="dev.habita.app.feature.food.android.RefillReminderReceiver"
             android:exported="false" />

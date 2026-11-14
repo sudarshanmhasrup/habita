@@ -35,9 +35,11 @@ start over.
    exercise shows last time's weight and reps and today's
    target, filled in so that a normal set is one tap. Log a set by tapping how it felt: Easy,
    Medium or Hard. The weight can be changed on any set, and the next set is suggested from how
-   this one felt. Finishing a set starts its rest timer, and the phone buzzes when it ends. With
-   the phone locked or the app in the background, a system alarm rings and buzzes instead, as
-   a notification, at alarm volume even on silent.
+   this one felt. Finishing a set starts its rest timer, and when it ends the phone rings like an
+   alarm clock: at alarm volume even on silent, looping with a buzz, also with the phone locked.
+   It stops with Dismiss, on the workout screen or its notification, with the next set, or by
+   itself after a minute. The rest screen picks its sound from the phone's alarm sounds, kept on
+   that phone only. Desktop beeps instead; iOS buzzes once, or notifies when in the background.
    Logged the wrong numbers? "Undo last set" during the rest takes it back, and after the final
    set, the summary has it too, reopening the workout. Taps right after a
    step are ignored until the next step shows, so a double tap never logs twice. Finishing with

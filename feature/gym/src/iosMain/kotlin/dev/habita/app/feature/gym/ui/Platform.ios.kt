@@ -20,6 +20,8 @@ import platform.UIKit.UIDocumentPickerViewController
 import platform.UIKit.UIPasteboard
 import platform.UniformTypeIdentifiers.UTTypeJSON
 import platform.darwin.NSObject
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import dev.habita.app.core.data.nowMillis
 import platform.UserNotifications.UNAuthorizationOptionAlert
 import platform.UserNotifications.UNAuthorizationOptionSound
@@ -29,11 +31,24 @@ import platform.UserNotifications.UNNotificationSound
 import platform.UserNotifications.UNTimeIntervalNotificationTrigger
 import platform.UserNotifications.UNUserNotificationCenter
 
-/** The full-strength system buzz; iOS has no custom patterns without Core Haptics. */
+/**
+ * The full-strength system buzz, once; iOS has no custom patterns without Core Haptics, and no
+ * alarm sound an app may loop. It never counts as ringing, so there is nothing to dismiss.
+ */
 @Composable
-internal actual fun rememberRestAlert(): () -> Unit = remember {
-    { AudioServicesPlaySystemSound(kSystemSoundID_Vibrate) }
+internal actual fun rememberRestRinger(): RestRinger = remember {
+    object : RestRinger {
+        override val ringing: StateFlow<Boolean> = MutableStateFlow(false)
+
+        override fun start() = AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+
+        override fun stop() = Unit
+    }
 }
+
+/** iOS rings with the notification sound; apps can't pick an alarm sound. */
+@Composable
+internal actual fun rememberAlarmTone(): AlarmTone? = null
 
 /** A local notification with the default sound; it asks for permission on first use. */
 @Composable

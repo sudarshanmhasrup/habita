@@ -11,11 +11,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -37,28 +35,47 @@ import java.io.File
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 
 @Composable
-internal actual fun rememberRestAlert(): () -> Unit {
-    val context = LocalContext.current
+internal actual fun rememberRestRinger(): RestRinger {
+    val context = LocalContext.current.applicationContext
     return remember(context) {
-        {
-            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
-            } else {
-                @Suppress("DEPRECATION")
-                context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-            }
-            // Two firm pulses: noticeable through a pocket, short enough not to annoy.
-            val pattern = longArrayOf(0, 250, 150, 250)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(pattern, -1)
-            }
+        object : RestRinger {
+            override val ringing: StateFlow<Boolean> = RestEndAlarm.ringing
+
+            override fun start() = RestEndAlarm.ring(context)
+
+            override fun stop() = RestEndAlarm.stop(context)
         }
+    }
+}
+
+/** The system sound picker, listing the phone's alarm sounds with its default alarm first. */
+@Composable
+internal actual fun rememberAlarmTone(): AlarmTone? {
+    val context = LocalContext.current.applicationContext
+    var name by remember(context) { mutableStateOf(RestEndAlarm.toneName(context)) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        @Suppress("DEPRECATION")
+        val picked = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+        if (result.resultCode == Activity.RESULT_OK && picked != null) {
+            RestEndAlarm.setTone(context, picked)
+            name = RestEndAlarm.toneName(context)
+        }
+    }
+    return AlarmTone(name) {
+        val current = RestEndAlarm.tone(context) ?: Settings.System.DEFAULT_ALARM_ALERT_URI
+        launcher.launch(
+            Intent(RingtoneManager.ACTION_RINGTONE_PICKER)
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Rest alarm")
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_DEFAULT_URI, Settings.System.DEFAULT_ALARM_ALERT_URI)
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, current),
+        )
     }
 }
 
