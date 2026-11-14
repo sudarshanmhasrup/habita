@@ -44,11 +44,13 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import io.ktor.server.websocket.WebSockets
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.security.MessageDigest
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 @Serializable
 data class ErrorResponse(val error: String)
@@ -114,6 +116,13 @@ fun Application.module(config: ServerConfig, clock: () -> Long = System::current
             rateLimiter(limit = 120, refillPeriod = 1.minutes)
         }
     }
+    // Live sync sockets. The ping keeps an idle socket open through Caddy and mobile networks, and
+    // closes one whose app stopped answering. Apps never send more than a close frame.
+    install(WebSockets) {
+        pingPeriodMillis = 30.seconds.inWholeMilliseconds
+        timeoutMillis = 30.seconds.inWholeMilliseconds
+        maxFrameSize = 1024
+    }
     val releases = platformReleases(File(config.releasesPath))
     install(Authentication) {
         // CI publishes builds with its own token, compared in constant time. No token, no publishing.
@@ -141,7 +150,7 @@ fun Application.module(config: ServerConfig, clock: () -> Long = System::current
         downloadPage()
         authenticate(SESSION_AUTH) {
             gymRoutes(program, store, clock)
-            syncRoutes(sync, clock)
+            syncRoutes(sync, clock) { tokenHash -> checkSession(store, tokenHash, fingerprint, clock()) }
             exportRoutes(store, records, clock)
             releaseRoutes(releases)
         }

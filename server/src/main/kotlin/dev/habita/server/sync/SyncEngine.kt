@@ -7,6 +7,10 @@ import dev.habita.app.shared.api.SyncPushResult
 import dev.habita.app.shared.api.SyncRecord
 import dev.habita.app.shared.api.winsOver
 import dev.habita.server.db.HabitaDatabase
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -39,6 +43,14 @@ class SyncEngine(
         counter.serverId().executeAsOne()
     }.also { writePosition() }
 
+    private val _position = MutableStateFlow(counter.current().executeAsOne())
+
+    /**
+     * The server position, which moves after every push that saved something. Live sockets watch
+     * it to tell apps when there is something new to pull.
+     */
+    val position: StateFlow<Long> = _position.asStateFlow()
+
     /**
      * Saves every record that wins over the stored copy, and returns the records it refused. One
      * bad record never blocks the others. A timestamp far in the future, from a phone whose clock
@@ -60,7 +72,11 @@ class SyncEngine(
             }
         }
         SyncPushResult(counter.current().executeAsOne(), rejected)
-    }.also { writePosition() }
+    }.also { result ->
+        writePosition()
+        // Pushes finish in any order once out of the transaction; the position only moves forward.
+        _position.update { maxOf(it, result.cursor) }
+    }
 
     /** Writes the current position next to the database, replacing the file in one step. */
     private fun writePosition() {

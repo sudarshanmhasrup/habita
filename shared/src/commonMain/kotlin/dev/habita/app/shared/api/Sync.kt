@@ -88,3 +88,11 @@ data class SyncPull(
     val hasMore: Boolean,
     val collections: Map<String, List<SyncRecord>>,
 )
+
+/**
+ * What the server sends over the `/sync/live` socket: its position when the socket opens, after
+ * every push that saved something, and every half minute so the app can tell the socket is still
+ * alive. Never any record data: an app whose pull position is behind [cursor] syncs to fetch it.
+ */
+@Serializable
+data class SyncLive(val cursor: Long)

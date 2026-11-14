@@ -8,6 +8,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.habita.app.core.theme.HabitaTheme
 import dev.habita.app.core.ui.HabitaScreen
@@ -52,6 +53,11 @@ fun ComposeApp(app: HabitaApp, onDarkThemeChange: (Boolean) -> Unit = {}) {
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(darkTheme) { onDarkThemeChange(darkTheme) }
+    // Changes from other devices arrive live while the app is on screen, not in the background.
+    LifecycleStartEffect(app.core.live) {
+        app.core.live.setInUse(true)
+        onStopOrDispose { app.core.live.setInUse(false) }
+    }
     val loggedOut = token == null && app.core.config.loginEnabled
     LaunchedEffect(loggedOut) { if (loggedOut) screen = Screen.Home }
     // A payment notification was tapped: the expense screen takes the request from here.
