@@ -41,8 +41,9 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * The morning weigh-in, the weekly average and what to change in the diet. Advice is relative to
- * what is eaten now, so the app never needs a calorie target.
+ * The day's weigh-in (whenever it happens, such as at the gym at night), the weekly average and
+ * what to change in the diet. Advice is relative to what is eaten now, so the app never needs a
+ * calorie target.
  */
 @Composable
 internal fun BodyCard(
@@ -67,13 +68,13 @@ internal fun BodyCard(
         Gap(Space.inside)
         if (todayWeight == null || editingWeight) {
             NumberEntry(
-                label = "This morning, kg",
+                label = "Today's weight, kg",
                 initial = todayWeight?.let(::formatKg).orEmpty(),
                 parse = ::parseWeight,
                 onSave = { onWeight(it); editingWeight = false },
             )
             Gap(Space.tiny)
-            HText("After the toilet, before eating or drinking.", type.caption, color = colors.muted)
+            HText("Same scale, about the same time each day.", type.caption, color = colors.muted)
         } else {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HText("${formatOneDecimal(todayWeight)} kg", type.title)
@@ -302,7 +303,7 @@ private fun NumberEntry(label: String, initial: String, parse: (String) -> Int?,
 private fun adviceText(trend: BodyTrend): Pair<String, String> {
     val change = trend.weeklyChangeGrams?.let { formatOneDecimal(abs(it)) }
     return when (trend.advice) {
-        BodyAdvice.NEED_MORE_DATA -> "Weigh in most mornings" to
+        BodyAdvice.NEED_MORE_DATA -> "Weigh in most days" to
             "Daily weight jumps around with water and food. Advice starts once there are two weeks with " +
             "at least ${Body.MIN_WEIGH_INS} weigh-ins each."
         BodyAdvice.TOO_EARLY -> "Too early to change anything" to when (trend.goal) {

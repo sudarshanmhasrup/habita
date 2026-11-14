@@ -6,7 +6,7 @@ import kotlin.math.abs
 /**
  * One day's body measurements. [day] is the local date as `2026-11-07` and is the record id, so a
  * second weigh-in the same day replaces the first. Either value can be missing: weight is logged
- * most mornings, waist about once a week.
+ * most days (at the gym, often at night), waist about once a week.
  */
 @Serializable
 data class BodyLog(
@@ -85,7 +85,7 @@ data class BodyTrend(
 )
 
 object Body {
-    /** A week counts once it has this many weigh-ins, so one odd morning can't swing it. */
+    /** A week counts once it has this many weigh-ins, so one odd day can't swing it. */
     const val MIN_WEIGH_INS = 3
 
     /** Under this much loss in two weeks counts as flat. */

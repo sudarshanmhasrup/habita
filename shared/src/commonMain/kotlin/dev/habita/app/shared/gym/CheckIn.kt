@@ -181,7 +181,7 @@ object CheckIns {
             val body = bodyWeeks(data.body, data.today, weeks)
             if (body.isNotEmpty()) {
                 append("\n## Bodyweight\n\n")
-                append("Weekly averages of morning weigh-ins, newest first.\n\n")
+                append("Weekly averages of daily weigh-ins, newest first.\n\n")
                 append("| Weeks ago | Average | Weigh-ins | Waist |\n")
                 append("|---|---|---|---|\n")
                 body.forEach { (ago, average, count, waist) ->

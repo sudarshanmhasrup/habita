@@ -82,7 +82,7 @@ alternative is an exercise of its own, so it has its own weights and history.
 
 ### Bodyweight
 
-The gym screen takes a morning weigh-in and, about once a week, a waist measurement. It averages
+The gym screen takes a daily weigh-in and, about once a week, a waist measurement. It averages
 each week (a week needs at least 3 weigh-ins) and says what to change, relative to what you eat
 now, so the app never needs a calorie target:
 
