@@ -80,6 +80,15 @@ by collection name, such as `gym.sets` or `expense.expenses` (`SyncCollections` 
 The app pulls before it pushes, and keeps a local edit that hasn't reached the server yet unless
 the server's copy wins over it.
 
+**Live updates.** While the app is logged in and on screen, it keeps a WebSocket open to
+`GET /sync/live` (with the same bearer token). The server sends only its position, as
+`{"cursor":123}`: when the socket opens, after every push that saved something, and every 30
+seconds so the app can tell a silent socket from a dead one. It never sends record data. When the
+position differs from the app's cursor, the app runs a normal sync. The server also pings every 30
+seconds, and closes a socket whose token has been logged out. A dropped socket is opened again
+after 2 seconds, doubling up to a minute. Without the socket (an older server, a blocked network)
+the app syncs exactly as before.
+
 ### Adding a synced feature
 
 1. Name its collections in `SyncCollections` (`shared/.../api/Sync.kt`).

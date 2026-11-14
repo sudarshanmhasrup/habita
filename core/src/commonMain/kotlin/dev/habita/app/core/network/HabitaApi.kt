@@ -4,6 +4,8 @@ import dev.habita.app.core.data.Settings
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.websocket.WebSockets
+import io.ktor.client.plugins.websocket.webSocket
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.plugins.timeout
@@ -21,7 +23,10 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.websocket.Frame
+import io.ktor.websocket.readText
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -63,6 +68,7 @@ class HabitaApi(serverUrl: String, private val settings: Settings) {
             connectTimeoutMillis = 10_000
             requestTimeoutMillis = 30_000
         }
+        install(WebSockets)
     }
 
     suspend inline fun <reified T> get(path: String): T =
@@ -109,6 +115,23 @@ class HabitaApi(serverUrl: String, private val settings: Settings) {
             throw e
         } catch (e: Exception) {
             throw ApiException.Offline(e)
+        }
+    }
+
+    /**
+     * Opens a WebSocket at [path] with the saved token and calls [onText] with every text message.
+     * Returns when the server closes it or sends nothing for [silenceMillis]; throws when it can't
+     * be opened.
+     */
+    suspend fun listen(path: String, silenceMillis: Long, onText: suspend (String) -> Unit) {
+        if (!isConfigured) throw ApiException.NotConfigured()
+        val token = settings.token.value ?: throw ApiException.Unauthorized("Not logged in")
+        val url = baseUrl.replaceFirst("https://", "wss://").replaceFirst("http://", "ws://") + path.removePrefix("/")
+        client.webSocket(url, request = { bearerAuth(token) }) {
+            while (true) {
+                val frame = withTimeoutOrNull(silenceMillis) { incoming.receiveCatching().getOrNull() } ?: return@webSocket
+                if (frame is Frame.Text) onText(frame.readText())
+            }
         }
     }
 

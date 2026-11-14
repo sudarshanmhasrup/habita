@@ -5,7 +5,9 @@ import dev.habita.app.core.data.PreferenceSyncTable
 import dev.habita.app.core.data.Settings
 import dev.habita.app.core.db.CoreDatabase
 import dev.habita.app.core.network.HabitaApi
+import dev.habita.app.core.sync.ApiLiveTransport
 import dev.habita.app.core.sync.ApiSyncTransport
+import dev.habita.app.core.sync.LiveSync
 import dev.habita.app.core.sync.SyncEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -38,11 +40,22 @@ class Core(val config: AppConfig, val databases: DatabaseFactory) {
 
     val api: HabitaApi = HabitaApi(config.serverUrl, settings)
 
+    private val loggedIn = settings.token.map { it != null }.stateIn(scope, SharingStarted.Eagerly, settings.token.value != null)
+
     val sync: SyncEngine = SyncEngine(
         scope = scope,
         transport = ApiSyncTransport(api),
         checkpoint = settings,
-        loggedIn = settings.token.map { it != null }.stateIn(scope, SharingStarted.Eagerly, settings.token.value != null),
+        loggedIn = loggedIn,
+    )
+
+    /** Syncs as soon as another device changes something, while the app is in use. */
+    val live: LiveSync = LiveSync(
+        scope = scope,
+        transport = ApiLiveTransport(api),
+        checkpoint = settings,
+        loggedIn = loggedIn,
+        requestSync = sync::request,
     )
 
     init {

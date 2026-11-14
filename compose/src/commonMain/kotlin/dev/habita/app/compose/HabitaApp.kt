@@ -37,6 +37,7 @@ class HabitaApp(config: AppConfig, databases: DatabaseFactory, installer: AppIns
 
     init {
         core.sync.start()
+        core.live.start()
         updates?.start()
     }
 }
