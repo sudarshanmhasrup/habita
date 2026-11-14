@@ -2,10 +2,32 @@ package dev.habita.app.feature.gym.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.ImageBitmap
+import kotlinx.coroutines.flow.StateFlow
 
-/** Returns a function that buzzes the phone, used when a rest ends. */
+/**
+ * Rings when a rest runs out on screen: an alarm that loops, with a buzz, until it is dismissed or
+ * has rung for [RING_CAP_MILLIS]. The same alarm rings when a rest ends with the phone locked.
+ */
+internal interface RestRinger {
+    /** Whether it is ringing now, wherever it was started, so the screen can offer to dismiss it. */
+    val ringing: StateFlow<Boolean>
+
+    fun start()
+
+    /** Stops it ringing; nothing happens when it isn't. */
+    fun stop()
+}
+
+/** The rest ringer: an alarm on Android and desktop, a single buzz on iOS. */
 @Composable
-internal expect fun rememberRestAlert(): () -> Unit
+internal expect fun rememberRestRinger(): RestRinger
+
+/** The sound the rest alarm rings with, by [name], and a way to [choose] another. */
+internal class AlarmTone(val name: String, val choose: () -> Unit)
+
+/** The rest alarm's sound, kept on this device; `null` where it can't be chosen (iOS, desktop). */
+@Composable
+internal expect fun rememberAlarmTone(): AlarmTone?
 
 /**
  * The end of a rest while the app is away, such as with the phone locked: the system rings and
@@ -15,7 +37,7 @@ internal interface RestAlarm {
     /** Rings at [endsAt]; replaces any rest alarm set before. */
     fun set(endsAt: Long)
 
-    /** Takes back the alarm, and its notification if it already rang. */
+    /** Takes back the alarm if it hasn't rung yet; one already ringing goes on until dismissed. */
     fun cancel()
 }
 

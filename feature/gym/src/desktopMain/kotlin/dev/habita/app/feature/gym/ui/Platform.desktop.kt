@@ -9,13 +9,90 @@ import java.awt.FileDialog
 import java.awt.Frame
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
+import dev.habita.app.core.data.nowMillis
+import java.io.ByteArrayInputStream
 import java.io.File
+import java.util.Timer
+import javax.sound.sampled.AudioFormat
+import javax.sound.sampled.AudioInputStream
+import javax.sound.sampled.AudioSystem
+import javax.sound.sampled.Clip
+import kotlin.concurrent.timerTask
+import kotlin.math.PI
+import kotlin.math.sin
+import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
 
-/** Desktop has no vibration. */
+/** A beeping alarm through the speakers; desktop has no vibration. */
 @Composable
-internal actual fun rememberRestAlert(): () -> Unit = {}
+internal actual fun rememberRestRinger(): RestRinger = DesktopRinger
+
+/** Desktop rings with its own beep; there are no system alarm sounds to pick from. */
+@Composable
+internal actual fun rememberAlarmTone(): AlarmTone? = null
+
+/** One beeping alarm for the whole app, looping until stopped or the cap runs out. */
+private object DesktopRinger : RestRinger {
+    private val state = RingState()
+    private var clip: Clip? = null
+    private var timer: Timer? = null
+
+    override val ringing: StateFlow<Boolean> get() = state.ringing
+
+    @Synchronized
+    override fun start() {
+        if (!state.start(nowMillis())) return
+        // No sound device, such as on a headless machine: the screen still shows Dismiss.
+        clip = runCatching {
+            AudioSystem.getClip().apply {
+                val format = AudioFormat(SAMPLE_RATE, 16, 1, true, false)
+                val data = beeps()
+                open(AudioInputStream(ByteArrayInputStream(data), format, data.size / 2L))
+                loop(Clip.LOOP_CONTINUOUSLY)
+            }
+        }.getOrNull()
+        timer = Timer("rest-alarm", true).apply {
+            schedule(timerTask { expire() }, state.remainingMillis(nowMillis()))
+        }
+    }
+
+    @Synchronized
+    override fun stop() {
+        if (state.stop()) silence()
+    }
+
+    @Synchronized
+    private fun expire() {
+        if (state.expire(nowMillis())) silence()
+    }
+
+    private fun silence() {
+        timer?.cancel()
+        timer = null
+        clip?.run {
+            stop()
+            close()
+        }
+        clip = null
+    }
+
+    private const val SAMPLE_RATE = 44_100f
+
+    /** Two short high beeps, then a pause: one second, 16-bit mono, little-endian. */
+    private fun beeps(): ByteArray {
+        val samples = SAMPLE_RATE.toInt()
+        val bytes = ByteArray(samples * 2)
+        for (i in 0 until samples) {
+            val t = i / SAMPLE_RATE
+            val on = t < 0.15f || (t >= 0.25f && t < 0.4f)
+            val value = if (on) (sin(2 * PI * 880 * t) * Short.MAX_VALUE * 0.6).toInt() else 0
+            bytes[i * 2] = value.toByte()
+            bytes[i * 2 + 1] = (value shr 8).toByte()
+        }
+        return bytes
+    }
+}
 
 /** A desktop app keeps running in the background, so its own timer is enough. */
 @Composable

@@ -27,8 +27,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleStartEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -87,6 +90,20 @@ internal fun WorkoutScreen(
     KeepScreenOn()
     var confirmFinish by remember(active.sessionId) { mutableStateOf(false) }
     val undoable by viewModel.undoableSet.collectAsStateWithLifecycle()
+    val ringer = rememberRestRinger()
+    val ringing by ringer.ringing.collectAsState()
+    // The lifter getting back to it, such as logging the next set, stops the alarm; the rest
+    // running out, which moves the screen on by itself, doesn't.
+    var seen by remember { mutableStateOf(active) }
+    LaunchedEffect(active) {
+        if (movedOn(seen, active)) ringer.stop()
+        seen = active
+    }
+    // Leaving the workout stops it too, but not the screen going away with the phone locked.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(ringer, lifecycle) {
+        onDispose { if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) ringer.stop() }
+    }
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         TopBar(
@@ -102,6 +119,7 @@ internal fun WorkoutScreen(
             Modifier.padding(start = Space.screen, end = Space.screen, top = Space.inside, bottom = Space.tiny),
             height = 4.dp,
         )
+        if (ringing) RingingBar(ringer::stop)
         // Each step of the workout (a warm-up, a set, a rest) eases in as the last one leaves.
         ContentSwap(active, Modifier.weight(1f), key = { it.stepKey() }) { active ->
         val rest = active.rest
@@ -112,6 +130,7 @@ internal fun WorkoutScreen(
                 rest = rest,
                 onDone = viewModel::endBreak,
                 onExtend = { viewModel.extendRest(30) },
+                onRing = ringer::start,
             ) {
                 active.currentSlot?.let { NextUp(active, data, it, label = "Main workout starts with") }
             }
@@ -120,6 +139,7 @@ internal fun WorkoutScreen(
                 rest = rest,
                 onDone = viewModel::endRest,
                 onExtend = { viewModel.extendRest(30) },
+                onRing = ringer::start,
                 onUndo = viewModel::undoLastSet.takeIf {
                     active.loggedSets.lastOrNull()?.let { it.id == undoable && !it.warmUp } == true
                 },
@@ -157,6 +177,28 @@ internal fun WorkoutScreen(
             onKeepGoing = { confirmFinish = false },
         )
     }
+    }
+}
+
+/** The rest alarm is ringing: a bar under the progress bar with a big Dismiss button. */
+@Composable
+private fun RingingBar(onDismiss: () -> Unit) {
+    val colors = HabitaTheme.colors
+    HabitaCard(
+        Modifier.fillMaxWidth().padding(start = Space.screen, end = Space.screen, top = Space.item),
+        borderColor = colors.accent,
+        contentPadding = PaddingValues(start = Space.card, end = Space.item, top = Space.item, bottom = Space.item),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HIcon(HabitaIcons.Clock, contentDescription = null, modifier = Modifier.size(20.dp), tint = colors.accent)
+            Gap(Space.item)
+            Column(Modifier.weight(1f)) {
+                HText("Rest is over", HabitaTheme.typography.title)
+                HText("Time for the next set.", HabitaTheme.typography.caption, color = colors.muted)
+            }
+            Gap(Space.item)
+            PrimaryButton("Dismiss", onDismiss)
+        }
     }
 }
 
@@ -257,16 +299,16 @@ private fun RestContent(
     rest: Rest,
     onDone: () -> Unit,
     onExtend: () -> Unit,
+    onRing: () -> Unit,
     onUndo: (() -> Unit)? = null,
     next: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = HabitaTheme.colors
     val type = HabitaTheme.typography
-    val alert = rememberRestAlert()
     var now by remember { mutableLongStateOf(nowMillis()) }
     val alarm = rememberRestAlarm()
     // In the background the timer below stops, so the system rings instead. Back on screen, the
-    // timer takes over again and the alarm goes, along with its notification.
+    // timer takes over again; an alarm that already rang goes on until it is dismissed.
     LifecycleStartEffect(rest) {
         alarm.cancel()
         onStopOrDispose {
@@ -274,17 +316,16 @@ private fun RestContent(
             if (away && rest.remainingMillis(nowMillis()) > 0) alarm.set(rest.endsAt)
         }
     }
-    // Ticks until the rest is over, buzzes, then moves on. This screen leaves as soon as the rest
+    // Ticks until the rest is over, rings, then moves on. This screen leaves as soon as the rest
     // ends, so a repeat call only happens if the first one was ignored while another action ran.
     LaunchedEffect(rest) {
-        var buzzed = false
+        var rang = false
         while (true) {
             now = nowMillis()
             if (rest.remainingMillis(now) == 0L) {
-                if (!buzzed) {
-                    // Only for a rest that ran out here, not one that ended while the app was away.
-                    if (now - rest.endsAt < 5_000) alert()
-                    buzzed = true
+                if (!rang) {
+                    if (ringsOnScreen(rest.endsAt, now)) onRing()
+                    rang = true
                 }
                 onDone()
                 delay(1000)
@@ -338,10 +379,13 @@ private fun RestContent(
                 Gap(Space.item)
                 TextAction("Undo last set", onUndo, Modifier.heightIn(min = 48.dp), color = colors.muted)
             }
-            // Without notifications, a rest that ends with the phone locked only buzzes.
+            // The alarm still rings without notifications, but can then only be dismissed in the app.
             val notifications = rememberNotificationAccess()
             if (notifications?.enabled == false) {
-                TextAction("Turn on notifications to hear the timer when locked", notifications.request, Modifier.heightIn(min = 48.dp))
+                TextAction("Turn on notifications to dismiss the alarm when locked", notifications.request, Modifier.heightIn(min = 48.dp))
+            }
+            rememberAlarmTone()?.let { tone ->
+                TextAction("Alarm sound: ${tone.name}", tone.choose, Modifier.heightIn(min = 48.dp), color = colors.muted)
             }
         }
     }
