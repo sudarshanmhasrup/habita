@@ -35,6 +35,11 @@ class ShareCardTest {
         assertEquals("7,848", text.number)
         assertEquals("KG LIFTED", text.unit)
         assertEquals(listOf("58 min", "17 sets", "1 new best"), text.stats)
+        assertEquals("10 NOV", text.date)
+        assertEquals("LOWER BODY A", text.workout)
+        assertEquals("58 min", text.duration)
+        assertEquals(17, text.sets)
+        assertEquals(1, text.bests)
     }
 
     @Test
@@ -49,6 +54,12 @@ class ShareCardTest {
     fun popIsTheFirstFilter() {
         assertEquals(ShareFilter.POP, ShareFilter.entries.first())
         assertEquals(10, ShareFilter.entries.size)
+    }
+
+    @Test
+    fun classicIsTheFirstStyle() {
+        assertEquals(ShareStyle.CLASSIC, ShareStyle.entries.first())
+        assertEquals(11, ShareStyle.entries.size)
     }
 
     @Test

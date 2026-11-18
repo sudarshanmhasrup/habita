@@ -47,7 +47,7 @@ import dev.habita.app.core.ui.TopBar
 import dev.habita.app.feature.gym.data.SessionReport
 import kotlinx.coroutines.yield
 
-/** Small previews in the filter row: 9:16 at this width in pixels. */
+/** Small previews in the filter and style rows: 9:16 at this width in pixels. */
 private const val THUMB_WIDTH = 216
 
 private val CardShape = RoundedCornerShape(22.dp)
@@ -55,7 +55,7 @@ private val ThumbShape = RoundedCornerShape(12.dp)
 
 /**
  * A photo card for one finished workout: take or pick a photo, choose a filter (Pop to start
- * with), then share it. Opens from the summary or, any time later, from the gym screen.
+ * with) and a style (Classic to start with), then share it. Opens from the summary or, any time later, from the gym screen.
  */
 @Composable
 internal fun ShareScreen(report: SessionReport?, onBack: () -> Unit) {
@@ -64,6 +64,8 @@ internal fun ShareScreen(report: SessionReport?, onBack: () -> Unit) {
     var photo by remember { mutableStateOf<ImageBitmap?>(null) }
     var filterName by rememberSaveable { mutableStateOf(ShareFilter.POP.name) }
     val filter = ShareFilter.valueOf(filterName)
+    var styleName by rememberSaveable { mutableStateOf(ShareStyle.CLASSIC.name) }
+    val style = ShareStyle.valueOf(styleName)
     var message by remember { mutableStateOf<String?>(null) }
 
     val photos = rememberPhotoSource(
@@ -81,15 +83,24 @@ internal fun ShareScreen(report: SessionReport?, onBack: () -> Unit) {
     val fonts = CardFonts(type.display.fontFamily!!, type.body.fontFamily!!)
     val text = remember(report) { report?.let { ShareCardText.of(it, shortDate(it.startedAt)) } }
 
-    val card = remember(photo, filter, text, measurer) {
-        text?.let { renderShareCard(photo, filter, it, measurer, fonts) }
+    val card = remember(photo, filter, style, text, measurer) {
+        text?.let { renderShareCard(photo, filter, style, it, measurer, fonts) }
     }
-    val thumbs = remember(photo, text, measurer) { mutableStateMapOf<ShareFilter, ImageBitmap>() }
-    LaunchedEffect(thumbs) {
+    // Each row previews its options with the other row's current pick.
+    val filterThumbs = remember(photo, style, text, measurer) { mutableStateMapOf<ShareFilter, ImageBitmap>() }
+    val styleThumbs = remember(photo, filter, text, measurer) { mutableStateMapOf<ShareStyle, ImageBitmap>() }
+    LaunchedEffect(filterThumbs) {
         val words = text ?: return@LaunchedEffect
         // One at a time with a pause between, so the screen stays smooth while they fill in.
         ShareFilter.entries.forEach {
-            thumbs[it] = renderShareCard(photo, it, words, measurer, fonts, THUMB_WIDTH)
+            filterThumbs[it] = renderShareCard(photo, it, style, words, measurer, fonts, THUMB_WIDTH)
+            yield()
+        }
+    }
+    LaunchedEffect(styleThumbs) {
+        val words = text ?: return@LaunchedEffect
+        ShareStyle.entries.forEach {
+            styleThumbs[it] = renderShareCard(photo, filter, it, words, measurer, fonts, THUMB_WIDTH)
             yield()
         }
     }
@@ -102,7 +113,7 @@ internal fun ShareScreen(report: SessionReport?, onBack: () -> Unit) {
             } else {
                 Image(
                     card,
-                    contentDescription = "Photo card for ${report?.workoutName}, ${filter.label} filter",
+                    contentDescription = "Photo card for ${report?.workoutName}, ${style.label} style, ${filter.label} filter",
                     modifier = Modifier.fillMaxHeight().aspectRatio(9f / 16f, matchHeightConstraintsFirst = true).clip(CardShape),
                     contentScale = ContentScale.Fit,
                 )
@@ -121,8 +132,19 @@ internal fun ShareScreen(report: SessionReport?, onBack: () -> Unit) {
         Gap(Space.inside)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(Space.item), contentPadding = PaddingValues(end = Space.item)) {
             items(ShareFilter.entries, key = { it.name }) { option ->
-                FilterThumb(option, thumbs[option], selected = option == filter) {
+                OptionThumb(option.label, filterThumbs[option], selected = option == filter) {
                     filterName = option.name
+                }
+            }
+        }
+
+        Gap(Space.item)
+        Overline("Style")
+        Gap(Space.inside)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(Space.item), contentPadding = PaddingValues(end = Space.item)) {
+            items(ShareStyle.entries, key = { it.name }) { option ->
+                OptionThumb(option.label, styleThumbs[option], selected = option == style) {
+                    styleName = option.name
                 }
             }
         }
@@ -149,15 +171,15 @@ internal fun ShareScreen(report: SessionReport?, onBack: () -> Unit) {
     }
 }
 
-/** One filter in the row: its small preview, ringed when picked, and its name. */
+/** One filter or style in its row: its small preview, ringed when picked, and its name. */
 @Composable
-private fun FilterThumb(filter: ShareFilter, preview: ImageBitmap?, selected: Boolean, onClick: () -> Unit) {
+private fun OptionThumb(label: String, preview: ImageBitmap?, selected: Boolean, onClick: () -> Unit) {
     val colors = HabitaTheme.colors
     Column(
         Modifier
             .width(64.dp)
             .clip(ThumbShape)
-            .clickable(role = Role.RadioButton, onClickLabel = filter.label, onClick = onClick),
+            .clickable(role = Role.RadioButton, onClickLabel = label, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
@@ -173,7 +195,7 @@ private fun FilterThumb(filter: ShareFilter, preview: ImageBitmap?, selected: Bo
         }
         Gap(Space.tiny)
         HText(
-            filter.label,
+            label,
             HabitaTheme.typography.caption,
             color = if (selected) colors.accent else colors.muted,
             maxLines = 1,

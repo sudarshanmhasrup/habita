@@ -65,6 +65,9 @@ internal object CardInk {
 
     /** The card before a photo is picked. */
     val empty = Color(0xFF161C19)
+
+    /** The slip of the Receipt style. */
+    val paper = Color(0xFFF6F4EE)
 }
 
 /**
