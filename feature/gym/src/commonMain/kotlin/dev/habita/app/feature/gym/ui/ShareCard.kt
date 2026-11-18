@@ -3,29 +3,19 @@ package dev.habita.app.feature.gym.ui
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Canvas
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.PointMode
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextMeasurer
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.sp
 import dev.habita.app.feature.gym.data.SessionReport
 import kotlin.math.roundToInt
 import kotlin.random.Random
@@ -40,6 +30,14 @@ internal data class ShareCardText(
     val unit: String,
     /** "58 min", "17 sets", "1 new best", drawn with dots between: the digits are drawn in the filter's highlight. */
     val stats: List<String>,
+    /** "10 NOV", the first half of [overline]. */
+    val date: String,
+    /** "LOWER BODY A", the second half of [overline]. */
+    val workout: String,
+    /** "58 min". */
+    val duration: String,
+    val sets: Int,
+    val bests: Int,
 ) {
     companion object {
         fun of(report: SessionReport, date: String): ShareCardText {
@@ -47,12 +45,15 @@ internal data class ShareCardText(
             val lifted = summary.volumeKg >= 1
             val sets = summary.setsCompleted
             val bests = summary.personalBests.size
+            val day = date.uppercase()
+            val workout = report.workoutName.uppercase()
+            val duration = formatDuration(summary.totalMillis)
             return ShareCardText(
-                overline = "${date.uppercase()} · ${report.workoutName.uppercase()}",
+                overline = "$day · $workout",
                 number = if (lifted) formatVolume(summary.volumeKg) else "$sets",
                 unit = if (lifted) "KG LIFTED" else if (sets == 1) "SET DONE" else "SETS DONE",
                 stats = listOfNotNull(
-                    formatDuration(summary.totalMillis),
+                    duration,
                     if (sets == 1) "1 set" else "$sets sets",
                     when (bests) {
                         0 -> null
@@ -60,6 +61,11 @@ internal data class ShareCardText(
                         else -> "$bests new bests"
                     },
                 ),
+                date = day,
+                workout = workout,
+                duration = duration,
+                sets = sets,
+                bests = bests,
             )
         }
     }
@@ -72,13 +78,22 @@ internal class CardFonts(val heading: FontFamily, val body: FontFamily)
 internal const val CARD_WIDTH = 1080
 
 /**
+ * How much of the card's height Instagram covers on a story: the profile bar at the top
+ * (about 250 of 1920 pixels) and the reply bar at the bottom (about 340). The photo runs under
+ * them, but no words are drawn there.
+ */
+internal const val SAFE_TOP = 0.13f
+internal const val SAFE_BOTTOM = 0.18f
+
+/**
  * Draws the card [width] pixels wide and 16:9 tall: [photo] cropped to fill it, through [filter],
- * with the workout's numbers across the top and the wordmark bottom-left. [measurer] must use a
+ * with the workout's words laid out the [style] way inside the safe area. [measurer] must use a
  * density of 1, so text sizes here are pixels.
  */
 internal fun renderShareCard(
     photo: ImageBitmap?,
     filter: ShareFilter,
+    style: ShareStyle,
     text: ShareCardText,
     measurer: TextMeasurer,
     fonts: CardFonts,
@@ -89,7 +104,7 @@ internal fun renderShareCard(
     val size = Size(width.toFloat(), height.toFloat())
     CanvasDrawScope().draw(Density(1f), LayoutDirection.Ltr, Canvas(bitmap), size) {
         drawPhoto(photo, filter)
-        drawText(text, filter, measurer, fonts)
+        CardPen(this, measurer, fonts, filter.highlight).draw(style, text)
     }
     return bitmap
 }
@@ -140,71 +155,4 @@ private fun DrawScope.drawGrain() {
     fun specks() = List(count / 2) { Offset(random.nextFloat() * size.width, random.nextFloat() * size.height) }
     drawPoints(specks(), PointMode.Points, CardInk.text.copy(alpha = 0.10f), strokeWidth = speck)
     drawPoints(specks(), PointMode.Points, CardInk.scrim.copy(alpha = 0.14f), strokeWidth = speck)
-}
-
-private fun DrawScope.drawText(text: ShareCardText, filter: ShareFilter, measurer: TextMeasurer, fonts: CardFonts) {
-    // One hundredth of the card width, so the layout is the same at any size.
-    val u = size.width / 100f
-    val accent = filter.highlight
-
-    drawRect(
-        Brush.verticalGradient(
-            0f to CardInk.scrim.copy(alpha = 0.82f),
-            0.55f to CardInk.scrim.copy(alpha = 0.55f),
-            1f to CardInk.scrim.copy(alpha = 0f),
-            endY = size.height * 0.42f,
-        ),
-        size = Size(size.width, size.height * 0.42f),
-    )
-
-    fun style(family: FontFamily, sizeU: Float, weight: FontWeight, spacingU: Float = 0f) = TextStyle(
-        fontFamily = family,
-        fontWeight = weight,
-        fontSize = (sizeU * u).sp,
-        letterSpacing = (spacingU * u).sp,
-        color = CardInk.text,
-    )
-
-    val left = 6 * u
-    var y = 7 * u
-    fun line(value: AnnotatedString, style: TextStyle, gapAfterU: Float) {
-        val layout = measurer.measure(value, style, softWrap = false, maxLines = 1)
-        drawText(layout, topLeft = Offset(left, y))
-        y += layout.size.height + gapAfterU * u
-    }
-
-    line(AnnotatedString(text.overline), style(fonts.heading, 3.4f, FontWeight.SemiBold, 0.35f).copy(color = accent), 0.6f)
-    line(AnnotatedString(text.number), style(fonts.heading, 19f, FontWeight.SemiBold, -0.5f), -1.2f)
-    line(AnnotatedString(text.unit), style(fonts.heading, 4.6f, FontWeight.SemiBold, 0.45f), 2.6f)
-    val stats = buildAnnotatedString {
-        text.stats.forEachIndexed { index, stat ->
-            if (index > 0) append("  ·  ")
-            withDigits(stat, accent)
-        }
-    }
-    line(stats, style(fonts.body, 3.8f, FontWeight.Bold), 0f)
-
-    // The wordmark, bottom-left: "habita." with the dot in the highlight, and the maker under it.
-    val credit = measurer.measure("by Sudarshan", style(fonts.body, 3f, FontWeight.SemiBold, 0.1f).copy(color = CardInk.soft))
-    val creditTop = size.height - 5 * u - credit.size.height
-    val mark = measurer.measure(
-        buildAnnotatedString {
-            append("habita")
-            withStyle(SpanStyle(color = accent)) { append(".") }
-        },
-        style(fonts.heading, 4.6f, FontWeight.SemiBold, 0.08f),
-    )
-    drawText(mark, topLeft = Offset(5 * u, creditTop - mark.size.height + 0.4f * u))
-    drawText(credit, topLeft = Offset(5 * u, creditTop))
-}
-
-/** Appends [value] with every run of digits in [color]. */
-private fun AnnotatedString.Builder.withDigits(value: String, color: Color) {
-    var start = 0
-    Regex("""\d[\d,.]*""").findAll(value).forEach { match ->
-        append(value.substring(start, match.range.first))
-        withStyle(SpanStyle(color = color)) { append(match.value) }
-        start = match.range.last + 1
-    }
-    append(value.substring(start))
 }
