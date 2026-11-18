@@ -40,6 +40,15 @@ class PlanTextTest {
     }
 
     @Test
+    fun `the buy column reads app, market and daily`() {
+        val text = PlanText.EXAMPLE.replace("| banana | Banana | 1 | pc | market | | 5 |", "| banana | Banana | 1 | pc | Daily | | 5 |")
+        val plan = assertIs<PlanResult.Ok>(PlanText.parse(text)).plan
+
+        assertEquals(BuyAt.DAILY, plan.item("banana")?.buyAt)
+        assertEquals(BuyAt.APP, plan.item("oats")?.buyAt)
+    }
+
+    @Test
     fun `problems are listed instead of saving a broken plan`() {
         val text = """
             ## Items

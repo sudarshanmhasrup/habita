@@ -215,4 +215,16 @@ class PantryTest {
         assertEquals("14/11", shortDate(dayFrom(2026, 11, 14)))
         assertEquals("Sat 14 Nov", dateLabel(dayFrom(2026, 11, 14)))
     }
+
+    @Test
+    fun `daily buys are a list for today, never counted, ordered or on the market run`() {
+        val daily = banana.copy(buyAt = BuyAt.DAILY)
+        val dailyPlan = plan.copy(items = listOf(milk, oats, daily))
+        val pantry = Pantry.of(dailyPlan, listOf(buy("milk", 400.0, day)), day + 1)
+
+        assertEquals(listOf(daily to 2.0), Refill.dailyList(pantry))
+        assertTrue(Refill.marketList(pantry).isEmpty())
+        assertTrue(Refill.lines(pantry).none { it.stock.item.id == "banana" })
+        assertTrue(Refill.due(pantry).none { it.item.id == "banana" })
+    }
 }
