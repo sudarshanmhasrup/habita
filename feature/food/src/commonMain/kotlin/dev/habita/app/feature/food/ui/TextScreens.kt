@@ -94,7 +94,7 @@ internal fun PlanScreen(text: String?, problems: List<String>, onBack: () -> Uni
             HText("Food plan", type.headline)
             Gap(Space.tiny)
             HText(
-                "An Items table (Id, Item, Pack, Unit, Buy app or market, Shop, Price per pack), then a \"## \" section per meal with " +
+                "An Items table (Id, Item, Pack, Unit, Buy app, market or daily, Shop, Price per pack), then a \"## \" section per meal with " +
                     "Time, Protein, Calories, an Item and Amount table, and Steps. Amounts are in the item's unit.",
                 type.caption,
                 color = colors.muted,

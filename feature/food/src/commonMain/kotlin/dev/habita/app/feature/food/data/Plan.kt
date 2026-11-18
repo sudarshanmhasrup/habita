@@ -2,8 +2,11 @@ package dev.habita.app.feature.food.data
 
 import kotlin.math.roundToLong
 
-/** Where an item is bought: from a delivery app, which a refill can order, or at the market. */
-enum class BuyAt { APP, MARKET }
+/**
+ * Where an item is bought: from a delivery app, which a refill can order, at the market once a
+ * week, or [DAILY], a few at a time each day (such as bananas), so it isn't counted in the pantry.
+ */
+enum class BuyAt { APP, MARKET, DAILY }
 
 /**
  * Something kept in the pantry, such as milk. Amounts are in its [unit]: "g", "ml" or "pc"
@@ -80,7 +83,8 @@ sealed interface PlanResult {
  * An "Items" section has a table of pantry items; every other "## " section is a meal, with
  * optional "Time:", "Protein:" and "Calories:" lines, a table of ingredients and the steps after
  * "Steps:". An ingredient whose name is an item id is counted against the pantry. An optional
- * "Opened" column on items says how many days an opened pack keeps. See [EXAMPLE].
+ * "Opened" column on items says how many days an opened pack keeps. The "Buy" column is "app",
+ * "market" or "daily" (bought each day, not counted). See [EXAMPLE].
  */
 object PlanText {
     private val units = setOf("g", "ml", "pc")
@@ -168,7 +172,11 @@ object PlanText {
                     name = cell(name).ifEmpty { itemId },
                     packSize = number(cell(pack))!!,
                     unit = cell(unit).lowercase(),
-                    buyAt = if (cell(buy).equals("market", ignoreCase = true)) BuyAt.MARKET else BuyAt.APP,
+                    buyAt = when (cell(buy).lowercase()) {
+                        "market" -> BuyAt.MARKET
+                        "daily" -> BuyAt.DAILY
+                        else -> BuyAt.APP
+                    },
                     shop = cell(shop).ifEmpty { null },
                     pricePaise = number(cell(price))?.let { (it * 100).roundToLong() },
                     openDays = number(cell(opened))?.toInt()?.takeIf { it > 0 },

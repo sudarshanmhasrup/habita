@@ -14,7 +14,6 @@ import dev.habita.app.feature.food.data.Refill
 import dev.habita.app.feature.food.data.RefillLine
 import dev.habita.app.feature.food.data.dateLabel
 import dev.habita.app.feature.food.data.parseDate
-import dev.habita.app.feature.food.data.trim
 import dev.habita.app.feature.food.data.whenLabel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -144,27 +143,15 @@ internal class FoodViewModel(private val feature: FoodFeature) : ViewModel() {
         return true
     }
 
-    /** The pack in use is finished: its opened day and best-before date are cleared. */
-    fun finished(stock: ItemStock) {
-        viewModelScope.launch {
-            repository.finished(stock.item.id)
-            _message.value = "${stock.item.name}: pack finished."
-        }
-    }
-
-    /** [packs] of an item are left right now. */
+    /**
+     * [packs] of an item are left right now. None left means the pack in use is finished, so its
+     * opened day and best-before date are cleared too.
+     */
     fun count(stock: ItemStock, packs: Double) {
         viewModelScope.launch {
             repository.count(stock.item.id, packs * stock.item.packSize)
-            _message.value = "${stock.item.name}: you have ${trim(packs)} now."
-        }
-    }
-
-    /** Bought [packs] of an item outside an order, such as at the market. */
-    fun bought(stock: ItemStock, packs: Double) {
-        viewModelScope.launch {
-            repository.add(listOf(stock.item.id to packs * stock.item.packSize), note = "Bought")
-            _message.value = "Added ${trim(packs)} to ${stock.item.name}."
+            if (packs == 0.0) repository.finished(stock.item.id)
+            _message.value = if (packs == 0.0) "${Refill.shortName(stock.item)}: finished." else "${Refill.shortName(stock.item)}: saved."
         }
     }
 
