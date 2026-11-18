@@ -36,6 +36,11 @@ object Refill {
             RefillLine(stock, max(1, ceil(needed / stock.item.packSize).toInt()), due = stock.daysLeft!! <= ASK_DAYS)
         }
 
+    /** What to buy each day, such as 3 bananas: daily items, with how much the plan eats a day. */
+    fun dailyList(pantry: List<ItemStock>): List<Pair<FoodItem, Double>> = pantry
+        .filter { it.item.buyAt == BuyAt.DAILY && it.dailyUse > 0 }
+        .map { it.item to it.dailyUse }
+
     /** The market run for the next week: how much of each market item to buy, in its unit. */
     fun marketList(pantry: List<ItemStock>): List<Pair<FoodItem, Double>> = pantry
         .filter { it.item.buyAt == BuyAt.MARKET && it.dailyUse > 0 }
