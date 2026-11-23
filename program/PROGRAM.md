@@ -107,6 +107,7 @@ alternative is an exercise of its own, with its own history and weights.
 | machine-chest-press              | dumbbell-bench-press, dumbbell-fly                                    |
 | hack-squat                       | leg-press, goblet-squat                                               |
 | dumbbell-romanian-deadlift       | back-extension, lying-dumbbell-leg-curl                               |
+| back-extension                   | hamstring-curl, dumbbell-romanian-deadlift                            |
 
 ## Warm-ups
 
@@ -165,6 +166,7 @@ the big ones twice a week. The first two exercises of each day start with a ligh
 | seated-dumbbell-shoulder-press | 3    | 12     | 90   |
 | dumbbell-lateral-raise         | 3    | 12     | 60   |
 | cable-triceps-pushdown         | 3    | 12     | 60   |
+| pec-deck-fly                   | 3    | 12     | 60   |
 
 ### Day 2 · Pull
 
@@ -191,6 +193,7 @@ the big ones twice a week. The first two exercises of each day start with a ligh
 | hamstring-curl               | 3    | 12     | 90   |
 | leg-extension                | 3    | 12     | 60   |
 | dumbbell-standing-calf-raise | 3    | 12     | 60   |
+| cable-crunch                 | 3    | 12     | 60   |
 
 ### Day 4 · Upper
 
@@ -215,8 +218,8 @@ the big ones twice a week. The first two exercises of each day start with a ligh
 | Exercise                   | Sets | Target | Rest |
 |----------------------------|------|--------|------|
 | hack-squat                 | 3    | 12     | 90   |
-| hip-thrust                 | 3    | 12     | 90   |
-| dumbbell-romanian-deadlift | 3    | 12     | 90   |
+| back-extension             | 3    | 12     | 90   |
+| dumbbell-seated-calf-raise | 3    | 12     | 60   |
 | cable-crunch               | 3    | 12     | 60   |
 
 ### Full Body
